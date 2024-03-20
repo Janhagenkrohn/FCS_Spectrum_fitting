@@ -23,7 +23,7 @@ import multiprocessing
 import sys
 
 # Custom module
-# For localizing FCS_Fixer
+# For localizing module
 repo_dir = os.path.abspath('..')
 
 # For data processing
@@ -36,15 +36,24 @@ from functions import utils
 # Input directory and the labelled protein fraction in each of them
 in_dir_names= []
 alpha_label = []
-glob_dir = r'Y:\Data\D044_MT200\20240307_JHK_NK_ParM_oligomerization\Data.sptw'
+glob_dir = r'U:\Data\D044_MT200\20240307_JHK_NK_ParM_oligomerization\Data.sptw'
 
-''' Labelled protein fraction'''
 in_dir_names.extend([glob_dir + r'\Calibration_AF488_23C_1'])
-alpha_label.append(50 / 20000) # 50 nM in 20 µM
+
+alpha_label.append(1.) #
 
 # Naming pattern for detecting correct files within subdirs of dir
-# file_name_pattern = '*PCMH*.csv' # CCF
-file_name_pattern = '12_PCMH0.csv' # CCF
+file_name_pattern_PCH = '*PCMH1*' # CCF
+file_name_pattern_FCS = '*CCF_symm_ch0_ch*' # CCF
+
+
+#%% Metadata
+FCS_psf_width_nm = 210. # Roughly
+FCS_psf_aspect_ratio = 6. # Roughly
+
+acquisition_time_s = 90.
+
+PCH_Q = 6. # More calculation parameter than metadata, but whatever
 
 #%% Define output directories/files
 
@@ -57,34 +66,17 @@ results_table_path = os.path.join(save_path, f'_fit.csv')
 #%% Input interpretation
 
 # Automatic input file detection
-# in_dir_names, in_file_names, alpha_label = utils.detect_files(in_dir_names, file_name_pattern, alpha_label, save_path)
-# Containers for storing results
-_in_file_names=[]
-_in_dir_names = [] 
-_other_info = []
+_in_dir_names, in_file_names_PCH, _alpha_label = utils.detect_files(in_dir_names,
+                                                                  file_name_pattern_PCH, 
+                                                                  alpha_label, 
+                                                                  save_path)
 
-# Iteration over directories
-for i_dir, directory in enumerate(in_dir_names):
-    
-    # Iteration over files: Find all that match pattern, and list
-    search_pattern = os.path.join(directory, '**/*' + file_name_pattern)
-    print(search_pattern)
-    for name in glob.glob(search_pattern, recursive = True):
-        
-        head, tail = os.path.split(name)
-        tail = tail.strip('.csv')
-        
-        if head != save_path:
-            _in_file_names.extend([tail])
-            _in_dir_names.extend([head])
-            _other_info.append(alpha_label[i_dir])
+# Repeat for FCS
+_, in_file_names_FCS, _ = utils.detect_files(in_dir_names, 
+                                             file_name_pattern_FCS, 
+                                             alpha_label,
+                                             save_path)
 
-if len(_in_dir_names) == 0:
-    raise ValueError('Could not detect any files.')
-
-in_file_names = _in_file_names
-in_dir_names = _in_dir_names
-alpha_label = _other_info
 
 # Prepare output
 if not os.path.exists(save_path):
@@ -93,13 +85,43 @@ if not os.path.exists(save_path):
     
 
 #%% Start processing
-for i_file, file_name in enumerate(in_file_names):
+for i_file, file_name_FCS in enumerate(in_file_names_FCS):
     
-    # Build path to file, but leaving out .csv ending for handling reasons
-    in_path = os.path.join(in_dir_names[i_file], file_name)
+
 
     # Load and unpack Kristine format FCS data
-    data = pd.read_csv(in_path + '.csv', header = 0)
+    in_path_FCS = os.path.join(_in_dir_names[i_file], file_name_FCS)
+    data_FCS = pd.read_csv(in_path_FCS + '.csv', header = 0)
+        
+    lag_times = data_FCS.iloc[:,0].to_numpy()
+    G = data_FCS.iloc[:, 1].to_numpy()
+    sigma_G = data_FCS.iloc[:, 3].to_numpy()
+    avg_count_rate = data_FCS.iloc[0:2,2].mean() 
+        # In case of cross-correlation, we average count rates of both channels for simplicity - not entirely accurate, but good enough I guess
 
+    # Load and unpack PCH data
+    in_path_PCH = os.path.join(_in_dir_names[i_file], in_file_names_PCH[i_file])
+    data_PCH = pd.read_csv(in_path_PCH + '.csv', header = 0)
+    
+    bin_times = np.array([float(bin_time) for bin_time in data_PCH.keys()])
+    
+    fluctuation_analysis = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
+                                                FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
+                                                PCH_Q = PCH_Q,
+                                                acquisition_time_s = acquisition_time_s,
+                                                data_FCS_tau_s = lag_times,
+                                                data_FCS_G = G,
+                                                data_FCS_sigma = sigma_G,
+                                                data_PCH_bin_times = bin_times,
+                                                data_PCH_hist = data_PCH.to_numpy())
+    
+    fit_results = []
+    for i_bin_time in np.arange(bin_times):
+        fit_results.append(fluctuation_analysis.run_simple_PCH_fit(i_bin_time))
+    
+    
+    
+    
+    
     
     

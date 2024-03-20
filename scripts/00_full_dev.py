@@ -8,6 +8,7 @@ Created on Fri 15 March 2024
 import glob
 import os
 import pandas as pd
+import sys
 
 # Data processing modules
 import numpy as np
@@ -22,7 +23,12 @@ import traceback
 import multiprocessing
 
 # Custom module
-from ../functions import utils
+# For localizing module
+repo_dir = os.path.abspath('..')
+
+# For data processing
+sys.path.insert(0, repo_dir)
+from functions import utils
 
 
 #%% Define input files
