@@ -221,7 +221,7 @@ class FCS_spectrum():
     
     def pch_3dgauss_1part(self,
                           cpms_eff,
-                          precision = 1E-6):
+                          n_photons_max):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
         calculation of the "real" multi-particle PCH.
@@ -230,9 +230,8 @@ class FCS_spectrum():
         ----------
         cpms_eff : 
             Float. Molecular brightness in counts per molecule and bin.
-        float :
-            OPTIONAL Float with default 1E-6. Numeric precision parameter that
-            determines at what photon count the iteration will terminate.
+        n_photons_max :
+            Int that will determine the highest photon count to consider.
         Returns
         -------
         pch : 
@@ -240,47 +239,33 @@ class FCS_spectrum():
             Cave: This is a truncated PCH that starts at the bin for 1 photon!
 
         '''
-        # Array with all photon counts from 1 to 1000 * average
-        n_photons_max = np.floor(cpms_eff * 1E3)
+        # Array with all photon counts > 0 to sample
         photon_counts_array = np.arange(1, n_photons_max+1)
         
+        # Results container
+        pch = np.zeros_like(photon_counts_array, 
+                            dtype = np.float64)
         
-        # Iterate over photon counts until we have essentially all the probability mass covered
-        pch = []
-        pch_cumsum = 0.
-        k = 1
-        while True:
+        # Iterate over photon counts 
+        for k in photon_counts_array:
             # Numeric integration over incomplete gamma function
-            new_value = sintegrate.quad(lambda x: self.pch_3dgauss_1part_int(x,
-                                                                             k,
-                                                                             cpms_eff),
-                                        0, np.inf)
+            pch[k-1], _ = sintegrate.quad(lambda x: self.pch_3dgauss_1part_int(x,
+                                                                                k,
+                                                                                cpms_eff),
+                                          0, np.inf)
             
-            # Scipy.special actually implements regularized lower incompl. gamma func, so we need to scale it
-            new_value *= sspecial.gamma(photon_counts_array)
-            
-            # A simpler prefactor
-            new_value *=  1 / self.PCH_Q / np.sqrt(2.) / sspecial.factorial(photon_counts_array)
-            
-            # Write
-            pch.append(new_value)
-            
-            # Converged?
-            if k > 1:
-                # From k=2 on, check for convergence within numeric precision
-                if pch[-2] / pch_cumsum < precision:
-                    # Tiny increment in probability mass, so we consider this converged
-                    break
-            
-            # Iterate
-            pch_cumsum += new_value
-            k += 1
-            
-        return np.array(pch)
+        # Scipy.special actually implements regularized lower incompl. gamma func, so we need to scale it
+        pch *= sspecial.gamma(photon_counts_array)
+        
+        # A simpler prefactor
+        pch *=  1 / self.PCH_Q / np.sqrt(2.) / sspecial.factorial(photon_counts_array)
+        
+        return pch
     
     
     def pch_3dgauss_nonideal_1part(self,
                                    F,
+                                   n_photons_max,
                                    cpms_eff):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
@@ -292,6 +277,8 @@ class FCS_spectrum():
         F :
             Float. Weight for non-Gaussian "out-of-focus" light contribution 
             correction.
+        n_photons_max :
+            Int that will determine the highest photon count to consider.
         cpms_eff : 
             Float. Molecular brightness in counts per molecule and bin.
 
@@ -305,13 +292,15 @@ class FCS_spectrum():
         
         # Get ideal-Gauss PCH
         pch = self.pch_3dgauss_1part(cpms_eff,
-                                     precision = 1E-6)
-        
+                                     n_photons_max)
+
         # Apply correction
         pch /= (1 + F)
         pch[0] += 2**(-3/2) / self.PCH_Q * cpms_eff * F
         
+        return pch
         
+    
     def pch_get_N_spectrum(self,
                            N_avg,
                            precision = 1E-4):
@@ -358,7 +347,7 @@ class FCS_spectrum():
         pch_full = np.zeros((pch_single_particle.shape[0] + 1 ) * (p_of_N.shape[0] + 1))
         
         # Append the probability mass for 0 photons to pch_single_particle
-        pch_1 = np.concatenate((np.array([pch_single_particle.sum()]), pch_single_particle))
+        pch_1 = np.concatenate((np.array([1 - pch_single_particle.sum()]), pch_single_particle))
         
         # Write probability for 0 particles -> 0 photons into full PCH
         pch_full[0] += p_of_N[0]
@@ -381,6 +370,7 @@ class FCS_spectrum():
     def get_pch(self,
                 F,
                 t_bin,
+                n_photons_max,
                 cpms,
                 N_avg):
         '''
@@ -393,6 +383,8 @@ class FCS_spectrum():
             correction.
         t_bin : 
             Float. Bin time in seconds.
+        n_photons_max :
+            Int that will determine the highest photon count to consider.
         cpms : 
             Float. Molecular brightness in counts per molecule and second.
         N_avg : 
@@ -405,6 +397,7 @@ class FCS_spectrum():
 
         # "Fundamental" single-particle PCH
         pch_single_particle = self.pch_3dgauss_nonideal_1part(F, 
+                                                              n_photons_max,
                                                               t_bin * cpms)
         
         # Weights for observation of 1, 2, 3, 4, ... particles
@@ -415,20 +408,21 @@ class FCS_spectrum():
         pch = self.pch_N_part(pch_single_particle,
                               p_of_N)
 
-        return pch
+        
+        return pch[:n_photons_max + 1]
 
 
     def get_pch_lmfit(self,
                       params,
-                      t_bin
                       ):
         '''
-        Wrapper for get_pch using a syntax that works with lmfit.minimize()
+        Wrapper for get_pch using a syntax that works easily with lmfit.minimize()
 
         Parameters
         ----------
         params : 
-            lmfit.parameters object
+            lmfit.parameters object containing all arguments of self.get_pch()
+            as parameters
 
         Returns
         -------
@@ -439,6 +433,7 @@ class FCS_spectrum():
         
         return self.get_pch(params['F'].value,
                             params['t_bin'].value,
+                            params['n_photons_max'].value,
                             params['cpms'].value,
                             params['N_avg'].value)
         
@@ -461,11 +456,12 @@ class FCS_spectrum():
     
     def simple_pch_penalty(self,
                            params,
-                           pch_data,
+                           pch
                            ):
-        return self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
-                                              k_successes = pch_data,
-                                              probabilities = self.get_pch_lmfit(params))
+        pch_model = self.get_pch_lmfit(params)
+        return self.negloglik_binomial_simple(n_trials = np.sum(pch),
+                                              k_successes = pch,
+                                              probabilities = pch_model)
     
     
     def run_simple_PCH_fit(self,
@@ -485,6 +481,24 @@ class FCS_spectrum():
         else:
             raise Exception('Cannor run PCH fit. It seems you specified an invalid value for i_bin_time.')
         
+        # We set the range such that we calculate the PCH until the first EMPTY 
+        # bin in the actual data, as "zero photons in this bin" actually is 
+        # a little bit of information for PCH fitting
+        n_photons_max = np.nonzero(pch)[0][-1] + 1 
+        
+        if n_photons_max > pch.shape[0] - 1:
+            #The last PCH bin is nonzero: We actually need to zero-pad the PCH
+            pch_fit = np.append(pch, np.array([0]))
+            
+        elif n_photons_max == pch.shape[0] - 1:
+            # The PCH is just right
+            pch_fit = pch.copy()
+            
+        else:
+            # The PCH contains more zeros than we need
+            pch_fit = pch[:n_photons_max + 1]
+            
+
         init_params = lmfit.Parameters()
         init_params.add('F', 
                         value = 0.4, 
@@ -494,6 +508,10 @@ class FCS_spectrum():
         
         init_params.add('t_bin', 
                         value = bin_time, 
+                        vary = False)
+
+        init_params.add('n_photons_max', 
+                        value = n_photons_max, 
                         vary = False)
         
         init_params.add('cpms', 
@@ -505,26 +523,34 @@ class FCS_spectrum():
                         value = 1., 
                         min = 0, 
                         vary = True)
-
+        
         fit_result = lmfit.minimize(self.simple_pch_penalty, 
                                     init_params, 
-                                    args=(pch),
+                                    args = (pch_fit,), 
                                     method='nelder') 
         
         print(lmfit.fit_report(fit_result), "\n")
 
-        prediction = self.get_pch_lmfit(fit_result.params) * np.sum(pch)
+        prediction = self.get_pch_lmfit(fit_result.params) * np.sum(pch_fit)
         
-        x_for_plot = np.arange(0, np.max([pch.shape[0], prediction.shape[0]]))
-        plt.plot(x = x_for_plot,
-                 y = pch,
-                 marker = '.',
-                 linestyle = 'none')
-        plt.plot(x = x_for_plot,
-                 y = prediction,
-                 marker = '',
-                 linestyle = '-')
+        x_for_plot = np.arange(0, np.max([pch_fit.shape[0], prediction.shape[0]]))
+        
+        fig, ax = plt.subplots(1, 1)
+        ax.semilogy(x_for_plot,
+                     pch_fit,
+                     marker = '.',
+                     linestyle = 'none')
+        ax.semilogy(x_for_plot,
+                     prediction,
+                     marker = '',
+                     linestyle = '-')
+        ax.set_ylim(0.3, np.max(pch_fit) * 1.25)
+        ax.set_title(f'PCH fit bin time {bin_time} s')
+        fig.supxlabel('Photons in bin')
+        fig.supylabel('Counts')
 
+        plt.show()
+        
         return fit_result
         
         

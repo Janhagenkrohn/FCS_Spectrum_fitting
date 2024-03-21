@@ -53,11 +53,11 @@ FCS_psf_aspect_ratio = 6. # Roughly
 
 acquisition_time_s = 90.
 
-PCH_Q = 6. # More calculation parameter than metadata, but whatever
+PCH_Q = 8. # More calculation parameter than metadata, but whatever
 
 #%% Define output directories/files
 
-# Output dir for result file writing
+# Output dir for result file writing◘
 save_path = glob_dir + '/PCH_testfit'
 
 # .csv table for collecting fit results
@@ -113,10 +113,11 @@ for i_file, file_name_FCS in enumerate(in_file_names_FCS):
                                                 data_FCS_G = G,
                                                 data_FCS_sigma = sigma_G,
                                                 data_PCH_bin_times = bin_times,
-                                                data_PCH_hist = data_PCH.to_numpy())
+                                                data_PCH_hist = data_PCH.to_numpy()
+                                                )
     
     fit_results = []
-    for i_bin_time in np.arange(bin_times):
+    for i_bin_time in np.arange(0, bin_times.shape[0]):
         fit_results.append(fluctuation_analysis.run_simple_PCH_fit(i_bin_time))
     
     
