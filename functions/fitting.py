@@ -155,21 +155,58 @@ class FCS_spectrum():
             raise ValueError('data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
 
 
-    def g_3d_diff_single_species(self, 
-                                 tau_diff):
+    def fcs_3d_diff_single_species(self, 
+                                   tau_diff):
         '''
         Normalized 3D diffusion autocorrelation for a single species
         '''
-        return self.g_2d_diff_single_species(tau_diff) / np.sqrt(1 + self.tau / (np.square(self.FCS_psf_aspect_ratio) * self.data_tau_s))
+        return 1 / (1 + self.data_tau_s/tau_diff) / np.sqrt(1 + self.tau / (np.square(self.FCS_psf_aspect_ratio) * self.data_tau_s))
 
 
-    def g_2d_diff_single_species(self, 
-                                 tau_diff):
+    def fcs_2d_diff_single_species(self, 
+                                   tau_diff):
         '''
         Normalized 2D diffusion autocorrelation for a single species
         '''
         return 1 / (1 + self.data_tau_s/tau_diff)
     
+    def fcs_blink_stretched_exp(self,
+                                tau_blink,
+                                F_blink,
+                                beta_blink):
+        return np.exp(-(self.data_FCS_tau_s / tau_blink)**beta_blink)
+        
+        
+    def fcs_n_spec_model(self,
+                         params):
+                
+        model_num = np.zeros_like(self.data_FCS_G)
+        model_den = np.zeros_like(self.data_FCS_G)
+        
+        for i_spec_2d in range(1, params['n_spec_2d'].value + 1):
+            g_norm = self.fcs_2d_diff_single_species(params[f'tau_diff_2D_{i_spec_2d}'].value)
+            model_num += 2**(-3/2) * g_norm * params[f'N_2D_{i_spec_2d}'].value * params[f'cpms_2D_{i_spec_2d}']**2
+            model_den += params[f'N_2D_{i_spec_2d}'].value * params[f'cpms_2D_{i_spec_2d}']
+
+        for i_spec_3d in range(1, params['n_spec_3d'].value + 1):
+            g_norm = self.fcs_3d_diff_single_species(params[f'tau_diff_3D_{i_spec_3d}'].value)
+            model_num += 0.5 * g_norm * params[f'N_3D_{i_spec_3d}'].value * params[f'cpms_3D_{i_spec_3d}']**2
+            model_den += params[f'N_3D_{i_spec_3d}'].value * params[f'cpms_3D_{i_spec_3d}']
+        
+        model = model_num / model_den**2
+        
+        if params['F_blink'].value > 0:
+            model *= self.fcs_blink_stretched_exp(params['tau_blink'].value,
+                                                  params['F_blink'].value,
+                                                  params['beta_blink'].value)
+        
+        model += params['offset'].value
+            
+        return model
+        
+    def fcs_n_spec_simple_penalty(self,
+                                  params):
+        return np.sum(((self.fcs_n_spec_model(params) - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
     
     @staticmethod
     def negloglik_poisson_full(rates, 
@@ -212,15 +249,15 @@ class FCS_spectrum():
     @staticmethod
     def pch_3dgauss_1part_int(x,
                               k,
-                              cpms_eff):
+                              cpm_eff):
         '''
         Helper function for implementing the numeric integral in pch_3dgauss_1part
         '''
-        return sspecial.gammainc(k, cpms_eff * np.exp(-2*x**2))
+        return sspecial.gammainc(k, cpm_eff * np.exp(-2*x**2))
     
     
     def pch_3dgauss_1part(self,
-                          cpms_eff,
+                          cpm_eff,
                           n_photons_max):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
@@ -228,7 +265,7 @@ class FCS_spectrum():
 
         Parameters
         ----------
-        cpms_eff : 
+        cpm_eff : 
             Float. Molecular brightness in counts per molecule and bin.
         n_photons_max :
             Int that will determine the highest photon count to consider.
@@ -251,7 +288,7 @@ class FCS_spectrum():
             # Numeric integration over incomplete gamma function
             pch[k-1], _ = sintegrate.quad(lambda x: self.pch_3dgauss_1part_int(x,
                                                                                 k,
-                                                                                cpms_eff),
+                                                                                cpm_eff),
                                           0, np.inf)
             
         # Scipy.special actually implements regularized lower incompl. gamma func, so we need to scale it
@@ -266,7 +303,7 @@ class FCS_spectrum():
     def pch_3dgauss_nonideal_1part(self,
                                    F,
                                    n_photons_max,
-                                   cpms_eff):
+                                   cpm_eff):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
         calculation of the "real" multi-particle PCH. See:
@@ -279,7 +316,7 @@ class FCS_spectrum():
             correction.
         n_photons_max :
             Int that will determine the highest photon count to consider.
-        cpms_eff : 
+        cpm_eff : 
             Float. Molecular brightness in counts per molecule and bin.
 
         Returns
@@ -291,12 +328,12 @@ class FCS_spectrum():
         '''
         
         # Get ideal-Gauss PCH
-        pch = self.pch_3dgauss_1part(cpms_eff,
+        pch = self.pch_3dgauss_1part(cpm_eff,
                                      n_photons_max)
 
         # Apply correction
         pch /= (1 + F)
-        pch[0] += 2**(-3/2) / self.PCH_Q * cpms_eff * F
+        pch[0] += 2**(-3/2) / self.PCH_Q * cpm_eff * F
         
         return pch
         
@@ -499,6 +536,66 @@ class FCS_spectrum():
             pch_fit = pch[:n_photons_max + 1]
             
 
+        init_params = lmfit.Parameters()
+        init_params.add('F', 
+                        value = 0.4, 
+                        min = 0, 
+                        max = 1.,
+                        vary=True)
+        
+        init_params.add('t_bin', 
+                        value = bin_time, 
+                        vary = False)
+
+        init_params.add('n_photons_max', 
+                        value = n_photons_max, 
+                        vary = False)
+        
+        init_params.add('cpms', 
+                        value = 1E3, 
+                        min = 0, 
+                        vary = True)
+
+        init_params.add('N_avg', 
+                        value = 1., 
+                        min = 0, 
+                        vary = True)
+        
+        fit_result = lmfit.minimize(self.simple_pch_penalty, 
+                                    init_params, 
+                                    args = (pch_fit,), 
+                                    method='nelder') 
+        
+        print(lmfit.fit_report(fit_result), "\n")
+
+        prediction = self.get_pch_lmfit(fit_result.params) * np.sum(pch_fit)
+        
+        x_for_plot = np.arange(0, np.max([pch_fit.shape[0], prediction.shape[0]]))
+        
+        fig, ax = plt.subplots(1, 1)
+        ax.semilogy(x_for_plot,
+                     pch_fit,
+                     marker = '.',
+                     linestyle = 'none')
+        ax.semilogy(x_for_plot,
+                     prediction,
+                     marker = '',
+                     linestyle = '-')
+        ax.set_ylim(0.3, np.max(pch_fit) * 1.25)
+        ax.set_title(f'PCH fit bin time {bin_time} s')
+        fig.supxlabel('Photons in bin')
+        fig.supylabel('Counts')
+
+        plt.show()
+        
+        return fit_result
+        
+        
+    def run_simple_FCS_fit(self):
+        
+        if not self.FCS_possible:
+            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+        
         init_params = lmfit.Parameters()
         init_params.add('F', 
                         value = 0.4, 
