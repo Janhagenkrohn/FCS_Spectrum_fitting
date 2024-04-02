@@ -14,6 +14,7 @@ import numpy as np
 import scipy.special as sspecial
 import scipy.integrate as sintegrate
 import scipy.stats as sstats
+import scipy.optimize.minimize as sminimize
 import lmfit
 
 # Plotting
@@ -145,10 +146,12 @@ class FCS_spectrum():
         if utils.isempty(data_PCH_hist) or not self.PCH_possible:
             self.data_PCH_hist = None
             self.PCH_possible = False
+            self.PCH_n_photons_max = 0
         elif utils.isiterable(data_PCH_hist):
             data_PCH_hist = np.array(data_PCH_hist)
             if data_PCH_hist.shape[1] == data_PCH_bin_times.shape[0]:
                 self.data_PCH_hist = data_PCH_hist
+                self.PCH_n_photons_max = data_PCH_hist.shape[0] + 1
             else:
                 raise ValueError('data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
         else:
@@ -172,13 +175,12 @@ class FCS_spectrum():
     
     def fcs_blink_stretched_exp(self,
                                 tau_blink,
-                                F_blink,
                                 beta_blink):
         return np.exp(-(self.data_FCS_tau_s / tau_blink)**beta_blink)
         
         
-    def fcs_n_spec_model(self,
-                         params):
+    def fcs_discrete_model(self,
+                           params):
                 
         model_num = np.zeros_like(self.data_FCS_G)
         model_den = np.zeros_like(self.data_FCS_G)
@@ -196,17 +198,19 @@ class FCS_spectrum():
         model = model_num / model_den**2
         
         if params['F_blink'].value > 0:
-            model *= self.fcs_blink_stretched_exp(params['tau_blink'].value,
-                                                  params['F_blink'].value,
-                                                  params['beta_blink'].value)
+            model *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
+                                                                                                                params['beta_blink'].value)
         
         model += params['offset'].value
             
         return model
         
-    def fcs_n_spec_simple_penalty(self,
-                                  params):
-        return np.sum(((self.fcs_n_spec_model(params) - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
+    
+    def fcs_discrete_model_chisq(self,
+                                 params,
+                                 n_dof = 0):
+        return np.sum(((self.fcs_discrete_model(params) - self.data_FCS_G) / self.data_FCS_sigma) ** 2) / (self.data_FCS_G.shape[0] - n_dof)
+    
     
     @staticmethod
     def negloglik_poisson_full(rates, 
@@ -257,8 +261,7 @@ class FCS_spectrum():
     
     
     def pch_3dgauss_1part(self,
-                          cpm_eff,
-                          n_photons_max):
+                          cpm_eff):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
         calculation of the "real" multi-particle PCH.
@@ -277,7 +280,7 @@ class FCS_spectrum():
 
         '''
         # Array with all photon counts > 0 to sample
-        photon_counts_array = np.arange(1, n_photons_max+1)
+        photon_counts_array = np.arange(1, self.PCH_n_photons_max+1)
         
         # Results container
         pch = np.zeros_like(photon_counts_array, 
@@ -302,7 +305,6 @@ class FCS_spectrum():
     
     def pch_3dgauss_nonideal_1part(self,
                                    F,
-                                   n_photons_max,
                                    cpm_eff):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
@@ -314,8 +316,6 @@ class FCS_spectrum():
         F :
             Float. Weight for non-Gaussian "out-of-focus" light contribution 
             correction.
-        n_photons_max :
-            Int that will determine the highest photon count to consider.
         cpm_eff : 
             Float. Molecular brightness in counts per molecule and bin.
 
@@ -329,7 +329,7 @@ class FCS_spectrum():
         
         # Get ideal-Gauss PCH
         pch = self.pch_3dgauss_1part(cpm_eff,
-                                     n_photons_max)
+                                     self.PCH_n_photons_max)
 
         # Apply correction
         pch /= (1 + F)
@@ -407,7 +407,6 @@ class FCS_spectrum():
     def get_pch(self,
                 F,
                 t_bin,
-                n_photons_max,
                 cpms,
                 N_avg):
         '''
@@ -420,8 +419,6 @@ class FCS_spectrum():
             correction.
         t_bin : 
             Float. Bin time in seconds.
-        n_photons_max :
-            Int that will determine the highest photon count to consider.
         cpms : 
             Float. Molecular brightness in counts per molecule and second.
         N_avg : 
@@ -434,7 +431,6 @@ class FCS_spectrum():
 
         # "Fundamental" single-particle PCH
         pch_single_particle = self.pch_3dgauss_nonideal_1part(F, 
-                                                              n_photons_max,
                                                               t_bin * cpms)
         
         # Weights for observation of 1, 2, 3, 4, ... particles
@@ -446,7 +442,7 @@ class FCS_spectrum():
                               p_of_N)
 
         
-        return pch[:n_photons_max + 1]
+        return pch[:self.PCH_n_photons_max + 1]
 
 
     def get_pch_lmfit(self,
@@ -470,7 +466,6 @@ class FCS_spectrum():
         
         return self.get_pch(params['F'].value,
                             params['t_bin'].value,
-                            params['n_photons_max'].value,
                             params['cpms'].value,
                             params['N_avg'].value)
         
@@ -521,19 +516,18 @@ class FCS_spectrum():
         # We set the range such that we calculate the PCH until the first EMPTY 
         # bin in the actual data, as "zero photons in this bin" actually is 
         # a little bit of information for PCH fitting
-        n_photons_max = np.nonzero(pch)[0][-1] + 1 
         
-        if n_photons_max > pch.shape[0] - 1:
+        if self.PCH_n_photons_max > pch.shape[0] - 1:
             #The last PCH bin is nonzero: We actually need to zero-pad the PCH
             pch_fit = np.append(pch, np.array([0]))
             
-        elif n_photons_max == pch.shape[0] - 1:
+        elif self.PCH_n_photons_max == pch.shape[0] - 1:
             # The PCH is just right
             pch_fit = pch.copy()
             
         else:
             # The PCH contains more zeros than we need
-            pch_fit = pch[:n_photons_max + 1]
+            pch_fit = pch[:self.PCH_n_photons_max + 1]
             
 
         init_params = lmfit.Parameters()
@@ -546,10 +540,6 @@ class FCS_spectrum():
         init_params.add('t_bin', 
                         value = bin_time, 
                         vary = False)
-
-        init_params.add('n_photons_max', 
-                        value = n_photons_max, 
-                        vary = False)
         
         init_params.add('cpms', 
                         value = 1E3, 
@@ -591,64 +581,343 @@ class FCS_spectrum():
         return fit_result
         
         
-    def run_simple_FCS_fit(self):
+    def set_up_params_discrete(self,
+                               use_FCS,
+                               use_PCH,
+                               n_species,
+                               tau_diff_min,
+                               tau_diff_max,
+                               use_blinking
+                               ):
         
-        if not self.FCS_possible:
+        if use_FCS and not self.FCS_possible:
             raise Exception('Cannot run FCS fit - not all required attributes set in class')
         
-        init_params = lmfit.Parameters()
-        init_params.add('F', 
-                        value = 0.4, 
-                        min = 0, 
-                        max = 1.,
-                        vary=True)
-        
-        init_params.add('t_bin', 
-                        value = bin_time, 
-                        vary = False)
+        if use_PCH and not self.PCH_possible:
+            raise Exception('Cannot run PCH fit - not all required attributes set in class')
 
-        init_params.add('n_photons_max', 
-                        value = n_photons_max, 
-                        vary = False)
+        if not (utils.isint(n_species) and n_species > 0):
+            raise Exception("Invalid input for n_species - must be int > 0")
         
-        init_params.add('cpms', 
-                        value = 1E3, 
-                        min = 0, 
-                        vary = True)
+        if not (utils.isfloat(tau_diff_min) and tau_diff_min > 0):
+            raise Exception("Invalid input for tau_diff_min - must be float > 0")
 
-        init_params.add('N_avg', 
-                        value = 1., 
-                        min = 0, 
-                        vary = True)
-        
-        fit_result = lmfit.minimize(self.simple_pch_penalty, 
-                                    init_params, 
-                                    args = (pch_fit,), 
-                                    method='nelder') 
-        
-        print(lmfit.fit_report(fit_result), "\n")
+        if not (utils.isfloat(tau_diff_max) and tau_diff_max > 0):
+            raise Exception("Invalid input for tau_diff_max - must be float > 0")
 
-        prediction = self.get_pch_lmfit(fit_result.params) * np.sum(pch_fit)
-        
-        x_for_plot = np.arange(0, np.max([pch_fit.shape[0], prediction.shape[0]]))
-        
-        fig, ax = plt.subplots(1, 1)
-        ax.semilogy(x_for_plot,
-                     pch_fit,
-                     marker = '.',
-                     linestyle = 'none')
-        ax.semilogy(x_for_plot,
-                     prediction,
-                     marker = '',
-                     linestyle = '-')
-        ax.set_ylim(0.3, np.max(pch_fit) * 1.25)
-        ax.set_title(f'PCH fit bin time {bin_time} s')
-        fig.supxlabel('Photons in bin')
-        fig.supylabel('Counts')
+        if type(use_blinking) != bool:
+            raise Exception("Invalid input for use_blinking - must be bool")
 
-        plt.show()
+
+        initial_params = lmfit.Parameters()
         
-        return fit_result
+        # Technical parameters that still have to be adapted in fitting
+        if use_PCH:
+            initial_params.add('F', 
+                               value = 0.4, 
+                               min = 0, 
+                               max = 1.,
+                               vary=True)
+                                
+        
+        # Actual model parameters 
+        for i_spec in range(1, n_species+1):
+            initial_params.add(f'N_avg_{i_spec}', 
+                               value = 1., 
+                               min = 0, 
+                               vary = True)
+
+            initial_params.add(f'tau_diff_{i_spec}', 
+                               value = 1E-3, 
+                               min = tau_diff_min,
+                               max = tau_diff_max,
+                               vary = True)
+
+            
+            if use_PCH:
+                initial_params.add(f'cpms_{i_spec}', 
+                                   value = 1E3, 
+                                   min = 0, 
+                                   vary = True)
+            else:
+                # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
+                initial_params.add(f'cpms_{i_spec}', 
+                                   value = 1., 
+                                   min = 0, 
+                                   vary = False)
+                
+        # Add blinking parameters - real or dummy
+        initial_params = self.set_blinking_initial_params(initial_params,
+                                                          use_blinking,
+                                                          tau_diff_min)
+
+        return initial_params
+        
+    def get_tau_diff_array(self,
+                           tau_diff_min,
+                           tau_diff_max,
+                           n_species
+                           ):
+                
+        return np.logspace(start = np.log(tau_diff_min),
+                           stop = np.log(tau_diff_max),
+                           num = n_species,
+                           base = np.e)
+    
+    
+    def single_filament_tau_diff_fold_change(j):
+        return 2 * j / (2 * np.log(j) + 0.632 + 1.165 * j ** (-1) + 0.1 * j ** (-2))
+
+
+    def single_filament_tau_diff_fold_change_deviation(self,
+                                                       log_j,
+                                                       tau_diff_fold_change):
+        return (self.single_filament_tau_diff_fold_change(np.exp(log_j)) - tau_diff_fold_change) ** 2
+
+
+    def double_filament_tau_diff_fold_change(j):
+        axial_ratio = np.floor(j / 2)
+        return 2 * axial_ratio / (2 * np.log(axial_ratio) + 0.632 + 1.165 * axial_ratio ** (-1) + 0.1 * axial_ratio ** (-2))
+    
+    
+    def double_filament_tau_diff_fold_change_deviation(self,
+                                                       log_j,
+                                                       tau_diff_fold_change):
+        return (self.double_filament_tau_diff_fold_change(np.exp(log_j)) - tau_diff_fold_change) ** 2
+
+    
+    def stoichiometry_from_tau_diff_array(self,
+                                          tau_diff_array,
+                                          oligomer_type
+                                          ):
+        if not utils.isiterable(tau_diff_array):
+            raise Exception("Invalid input for tau_diff_array - must be np.array")
+            
+        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+
+        fold_changes = tau_diff_array / tau_diff_array[0]
+        
+        if oligomer_type in ['continuous_spherical', 'discrete_spherical']:
+            # tau_diff proportional hydrodyn. radius
+            # Stoichiometry proportional volume
+            stoichiometry = np.round(fold_changes ** 3)
+        
+        elif oligomer_type == 'continuous_shell':
+            # tau_diff proportional hydrodyn. radius
+            # Stoichiometry proportional surface area
+            stoichiometry = np.round(fold_changes ** 3)
+
+        elif oligomer_type == 'discrete_single_filament':
+            # For the filament models, we have more complicated expressions based
+            # on Seils & Pecora 1995. We numerically solve the expression,
+            # which cannot be decently inverted. This is a one-parameter 
+            # optimization and needs to be done only once per species, so it's not a big deal
+
+            stoichiometry = np.zeros_like(fold_changes)
+            
+            for i_species, tau_diff_fold_change in enumerate(fold_changes):
+                res = sminimize(fun = self.single_filament_tau_diff_fold_change_deviation, 
+                                x0 = np.array([1.]),
+                                args = (tau_diff_fold_change,))
+                stoichiometry[i_species] = np.exp(res.x)
+        
+        else: # oligomer_type == 'discrete_double_filament'
+        
+            stoichiometry = np.zeros_like(fold_changes)
+            
+            for i_species, tau_diff_fold_change in enumerate(fold_changes):
+
+                res = sminimize(fun = self.double_filament_tau_diff_fold_change_deviation, 
+                                x0 = np.array([1.]),
+                                args = (tau_diff_fold_change,))
+                stoichiometry[i_species] = np.round(np.exp(res.x))
+        
+        return stoichiometry
+    
+    
+    
+    
+    
+    def set_blinking_initial_params(self,
+                                    initial_params,
+                                    use_blinking,
+                                    tau_diff_min):
+        
+        # Blinking parameters 
+        if use_blinking:
+            initial_params.add('tau_blink', 
+                               value = tau_diff_min / 10., 
+                               min = 0., 
+                               max = tau_diff_min, 
+                               vary = True)
+
+            initial_params.add('F_blink', 
+                               value = 0.1, 
+                               min = 0., 
+                               max = 1., 
+                               vary = True)
+
+            initial_params.add('beta_blink', 
+                               value = 1., 
+                               min = 0., 
+                               max = 10., 
+                               vary = True)
+            
+        else: # not use_blinking -> Dummy values
+            initial_params.add('tau_blink', 
+                               value = tau_diff_min / 10., 
+                               vary = False)
+
+            initial_params.add('F_blink', 
+                               value = 0., 
+                               vary = False)
+
+            initial_params.add('beta_blink', 
+                               value = 1., 
+                               vary = False)
+
+        return initial_params
+    
+    
+    def set_up_params_reg(self,
+                          use_FCS,
+                          use_PCH,
+                          spectrum_type,
+                          oligomer_type,
+                          incomplete_sampling_correction,
+                          n_species,
+                          tau_diff_min,
+                          tau_diff_max,
+                          use_blinking
+                          ):
+    
+        if use_FCS and not self.FCS_possible:
+            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+        
+        if use_PCH and not self.PCH_possible:
+            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+
+        if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+            raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+
+        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament'] or spectrum_type == 'discrete'):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+
+        if not (utils.isint(n_species) and n_species >= 10):
+            raise Exception("Invalid input for n_species - must be int >= 10 for regularized fitting")
+            
+        tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
+                                                 tau_diff_max, 
+                                                 n_species)
+        
+        stoichiometry = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
+                                                               oligomer_type)
+            
+        initial_params = lmfit.Parameters()
+
+        # Technical parameters that still have to be adapted in fitting
+        if use_PCH:
+            initial_params.add('F', 
+                               value = 0.4, 
+                               min = 0, 
+                               max = 1.,
+                               vary=True)
+
+        for i_species, tau_diff_i in enumerate(tau_diff_array):
+            
+            pass
+            
+            
+            
+        # Add blinking parameters - real or dummy
+        initial_params = self.set_blinking_initial_params(initial_params,
+                                                          use_blinking,
+                                                          tau_diff_min)
+
+
+        return None
+
+
+
+
+    def run_fit(self,
+                use_FCS, # bool
+                use_PCH, # bool
+                spectrum_type, # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+                spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
+                oligomer_type, # 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament'
+                labelling_correction, # bool
+                incomplete_sampling_correction, # bool
+                n_species, # int
+                tau_diff_min, # float
+                tau_diff_max, # float
+                use_blinking # bool
+                ):
+        
+        # A bunch of input and compatibility checks
+        if use_FCS and not self.FCS_possible:
+            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+        
+        if use_PCH and not self.PCH_possible:
+            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+
+        if not spectrum_type in ['discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
+            raise Exception("Invalid input for spectrum_type - must be one out of 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'")
+
+        if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
+            raise Exception("Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+    
+        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament'] or spectrum_type == 'discrete'):
+            raise Exception("Invalid input for oligomer_type - unless spectrum_type is 'discrete', oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+        
+        if type(labelling_correction) != bool:
+            raise Exception("Invalid input for labelling_correction - must be bool")
+
+        if type(incomplete_sampling_correction) != bool:
+            raise Exception("Invalid input for incomplete_sampling_correction - must be bool")
+
+        if incomplete_sampling_correction and spectrum_type == 'discrete':
+            raise Exception("incomplete_sampling_correction does not work for spectrum_type 'discrete' and must be set to false")
+
+        if not (utils.isint(n_species) and n_species > 0):
+            raise Exception("Invalid input for n_species - must be int > 0")
+        
+        if n_species < 10 and spectrum_type != 'discrete':
+            raise Exception("For any spectrum_type other than 'discrete', use n_species >= 10")
+
+        if not (utils.isfloat(tau_diff_min) and tau_diff_min > 0):
+            raise Exception("Invalid input for tau_diff_min - must be float > 0")
+
+        if not (utils.isfloat(tau_diff_max) and tau_diff_max > 0):
+            raise Exception("Invalid input for tau_diff_max - must be float > 0")
+
+        if type(use_blinking) != bool:
+            raise Exception("Invalid input for use_blinking - must be bool")
+
+
+
+
+
+
+        if spectrum_type == 'discrete':
+            initial_params = self.set_up_params_discrete(use_FCS, 
+                                                         use_PCH, 
+                                                         n_species, 
+                                                         tau_diff_min, 
+                                                         tau_diff_max, 
+                                                         use_blinking
+                                                         )
+            
+        elif spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+            pass
+        else: # spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']
+            pass
+            
+        
+
+
+        return None
         
         
         
