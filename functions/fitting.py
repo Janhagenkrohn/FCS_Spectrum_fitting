@@ -409,7 +409,8 @@ class FCS_spectrum():
                 F,
                 t_bin,
                 cpms,
-                N_avg):
+                N_avg,
+                crop_output = True):
         '''
         Calculate a single-species PCH without diffusion or blinking information
 
@@ -424,6 +425,9 @@ class FCS_spectrum():
             Float. Molecular brightness in counts per molecule and second.
         N_avg : 
             Float. <N> as defined in FCS math.
+        crop_output :
+            OPTIONAL Bool with default True. Whether or not to cut the output 
+            of the PCH to the length defined by self.PCH_n_photons_max.
         Returns
         -------
         pch
@@ -442,8 +446,10 @@ class FCS_spectrum():
         pch = self.pch_N_part(pch_single_particle,
                               p_of_N)
 
-        
-        return pch[:self.PCH_n_photons_max + 1]
+        if crop_output:
+            pch = pch[:self.PCH_n_photons_max + 1]
+            
+        return pch
     
     
     def pch_bin_time_correction(self,
@@ -455,12 +461,40 @@ class FCS_spectrum():
                                 beta_blink,
                                 F_blink
                                 ):
+        '''
+        Key function for generalizing PCH to time-resolved PCMH. Essentially 
+        uses diffusion time and blinking parameters from FCS math to correct 
+        apparent brightness and particle number parameters for the "blurring"
+        induced by particle dynamics during integration time
+
+        Parameters
+        ----------
+        t_bin : 
+            Float. Bin time in seconds.
+        cpms : 
+            Float. Molecular brightness in counts per molecule and second.
+        N_avg : 
+            Float. <N> as defined in FCS math.
+        tau_diff : 
+            Float. Diffusion time in seconds as defined in FCS math.
+        tau_blink : 
+            Float. Blinking relaxation time in seconds as defined in FCS math.
+        beta_blink : 
+            Float. Stretched-exponential scale parameter for blinking.
+        F_blink : 
+            Float. Blinking off-state fraction as defined in FCS math.
+
+        Returns
+        -------
+        cpms_corr : 
+            Float. Integration-time corrected apparent cpms.
+        N_avg_corr : 
+            0Float. Integration-time corrected apparent N_avg.
+
+        '''
         
         if F_blink > 0.:
             # Blinking correction is to be done
-            # There is no closed-form solution for stretched-exponential 
-            # blinking for PCH, so (at least for now) we work with the average
-            # blink time as approximation
             tau_blink_avg = tau_blink / beta_blink * sspecial.gamma(1 / beta_blink)
             
             blink_corr = 1 + 2 * F_blink * tau_blink_avg / (t_bin * (1 - F_blink)) * \
@@ -482,6 +516,58 @@ class FCS_spectrum():
         return cpms_corr, N_avg_corr
 
 
+    def multi_species_pch(self,
+                          F,
+                          t_bin,
+                          cpms_array,
+                          N_avg_array,
+                          crop_output = True
+                          ):
+        
+        if not utils.isfloat(F) or F <= 0.:
+           raise Exception('Invalid input for F: Must be float > 0.') 
+
+        if not utils.isfloat(t_bin) or t_bin <= 0.:
+           raise Exception('Invalid input for t_bin: Must be float > 0.') 
+
+        if not utils.isiterable(cpms_array):
+           raise Exception('Invalid input for cpms_array: Must be array.') 
+            
+        if not utils.isiterable(N_avg_array):
+           raise Exception('Invalid input for N_avg_array: Must be array.')
+           
+        if not cpms_array.shape[0] == N_avg_array.shape[0]:
+           raise Exception('cpms_array and N_avg_array must have same length.')
+           
+        if not type(crop_output) == bool:
+           raise Exception('Invalid input for crop_output: Must be bool.')
+        
+
+        for i_spec, cpms_spec in enumerate(cpms_array):
+            N_avg_spec = N_avg_array[i_spec]
+            
+            if i_spec == 0:
+                # Get first species PCH
+                pch = self.get_pch(F,
+                                   t_bin,
+                                   cpms_spec,
+                                   N_avg_spec,
+                                   crop_output = False)        
+            
+            else:
+                # Colvolve with further species PCH
+                pch = np.convolve(pch, 
+                                  self.get_pch(F,
+                                               t_bin,
+                                               cpms_spec,
+                                               N_avg_spec,
+                                               crop_output = False),
+                                  mode = 'full')      
+        
+        if crop_output:
+            pch = pch[:self.PCH_n_photons_max + 1]
+            
+        return pch
 
     #%% More complete/complex FCS models
     def fcs_discrete_model(self,
@@ -518,9 +604,9 @@ class FCS_spectrum():
 
 
     #%% More complete/complex PCH models
-    def get_pch_lmfit(self,
-                      params,
-                      ):
+    def get_simple_pch_lmfit(self,
+                             params,
+                             ):
         '''
         Wrapper for get_pch using a syntax that works easily with lmfit.minimize()
 
@@ -547,12 +633,78 @@ class FCS_spectrum():
                            params,
                            pch
                            ):
-        pch_model = self.get_pch_lmfit(params)
+        pch_model = self.get_simple_pch_lmfit(params)
         return self.negloglik_binomial_simple(n_trials = np.sum(pch),
                                               k_successes = pch,
                                               probabilities = pch_model)
     
     
+    def get_pch_spectrum_models_full_labelling(self,
+                                               params,
+                                               n_species,
+                                               t_bin,
+                                               time_resolved = False):
+        
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+        
+        if time_resolved:
+            for i_spec in range(n_species):
+                cpms_corr, N_avg_corr = self.pch_bin_time_correction(t_bin = t_bin, 
+                                                                     cpms = cpms_array[i_spec], 
+                                                                     N_avg = N_avg_array[i_spec], 
+                                                                     tau_diff = params[f'tau_diff_{i_spec}'].value, 
+                                                                     tau_blink = params['tau_blink'].value, 
+                                                                     beta_blink = params['beta_blink'].value, 
+                                                                     F_blink = params['F_blink'].value)
+                cpms_array[i_spec] = cpms_corr
+                N_avg_array[i_spec] = N_avg_corr
+        
+        pch = self.multi_species_pch(F = params['F'].value,
+                                     t_bin = t_bin,
+                                     cpms_array = cpms_array,
+                                     N_avg_array = N_avg_array,
+                                     crop_output = True
+                                     )
+        
+        return pch
+
+
+    def get_pch_spectrum_models_partial_labelling(self,
+                                                  params,
+                                                  n_species,
+                                                  t_bin,
+                                                  time_resolved = False):
+        
+        #TODO: Add iteration over labelling stoichiometries deriving their respective N from probabilities and convolving all their PCHs
+        
+        
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+        
+        
+        
+        if time_resolved:
+            for i_spec in range(n_species):
+                cpms_corr, N_avg_corr = self.pch_bin_time_correction(t_bin = t_bin, 
+                                                                     cpms = cpms_array[i_spec], 
+                                                                     N_avg = N_avg_array[i_spec], 
+                                                                     tau_diff = params[f'tau_diff_{i_spec}'].value, 
+                                                                     tau_blink = params['tau_blink'].value, 
+                                                                     beta_blink = params['beta_blink'].value, 
+                                                                     F_blink = params['F_blink'].value)
+                cpms_array[i_spec] = cpms_corr
+                N_avg_array[i_spec] = N_avg_corr
+        
+        pch = self.multi_species_pch(F = params['F'].value,
+                                     t_bin = t_bin,
+                                     cpms_array = cpms_array,
+                                     N_avg_array = N_avg_array,
+                                     crop_output = True
+                                     )
+        
+        return pch
+
         
     #%% Stuff for fit parameter initialization
     def get_tau_diff_array(self,
@@ -931,12 +1083,16 @@ class FCS_spectrum():
                            vary = False)
         
         # N distribution parameters
-        # Gauss mean
+        initial_params.add('N_dist_amp', 
+                           value = 10., 
+                           min = 0., 
+                           vary=True)
+
         initial_params.add('N_dist_a', 
                            value = 10., 
                            min = 0., 
                            vary=True)
-        # Gauss sigma
+
         initial_params.add('N_dist_b', 
                            value = 1., 
                            min = 0.,
@@ -955,24 +1111,24 @@ class FCS_spectrum():
             # Define 
             if spectrum_type == 'par_Gauss':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'1 / sqrt(2 * pi) / N_dist_b * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
+                                   expr = f'N_dist_amp / sqrt(2 * pi) / N_dist_b * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
                                    vary = False)
                 
             if spectrum_type == 'par_LogNorm':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'1 / sqrt(2 * pi) / N_dist_b / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - N_dist_a) / N_dist_b) ** 2)',
+                                   expr = f'N_dist_amp / sqrt(2 * pi) / N_dist_b / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - N_dist_a) / N_dist_b) ** 2)',
                                    vary = False)
                 
             if spectrum_type == 'par_Gamma':
                 # We cannot use sspecial.gamma inside the "expr" attribute. We instead use the Lanczos approximation for the gamma function.
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_b ** N_dist_a / sqrt(2 * pi) * N_dist_a ** (0.5 - N_dist_a) * stoichiometry_{i_spec} ** (N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
+                                   expr = f'N_dist_amp * N_dist_b ** N_dist_a / sqrt(2 * pi) * N_dist_a ** (0.5 - N_dist_a) * stoichiometry_{i_spec} ** (N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
                                    vary = False)
                 
             if spectrum_type == 'par_StrExp':
                 # Again Lanczos approximation for gamma function.
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_a / sqrt(2 * pi) * (1 / N_dist_b) ** (0.5 - (1 / N_dist_b)) * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
+                                   expr = f'N_dist_amp * N_dist_a / sqrt(2 * pi) * (1 / N_dist_b) ** (0.5 - (1 / N_dist_b)) * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
                                    vary = False)
 
             if incomplete_sampling_correction:
