@@ -201,7 +201,7 @@ class FCS_spectrum():
     def negloglik_poisson_full(rates, 
                                observations):
         '''
-        Poisson penalty in fitting. Full model to allow "observations" 
+        Poisson neg log lik in fitting. Full model to allow "observations" 
         themselves to vary in a hierarchical model with a hidden Poisson process
         (if "observations" were fixed, the factorial term could be omitted)
         '''
@@ -212,7 +212,7 @@ class FCS_spectrum():
     def negloglik_poisson_simple(rates, 
                                  observations):
         '''
-        Poisson penalty in fitting. Simplified version for fixed observations.
+        Poisson neg log lik in fitting. Simplified version for fixed observations.
         '''
         return np.sum(np.log(rates ** observations) - rates)
 
@@ -222,7 +222,7 @@ class FCS_spectrum():
                                   k_successes, 
                                   probabilities):
         '''
-        Likelihood model for fitting a histogram described by k_successes from
+        Neg log likelihood function for fitting a histogram described by k_successes from
         n_trials observations (where for PCH sum(k_successes)==n_trials when summing 
         over all histogram bins = fit data points) with a probability model
         described by probabilities.
@@ -230,6 +230,44 @@ class FCS_spectrum():
         term1 = -k_successes * np.log(probabilities)
         term2 = -(n_trials - k_successes) * np.log(1 - probabilities)
         return np.sum(term1 + term2)
+
+
+    #%% Other small stuff
+    @staticmethod
+    def get_n_species(params):
+        '''
+        Brute-force method to figure out number of species in a multi-species 
+        lmfit.Parameters object as used in this class. Not an efficient way to
+        do it I guess, but used to avoid explicitly passing the number of 
+        species through the code stack, making things more robust in coding. 
+        Or that's the idea at least.
+        '''
+        n_species = 0
+        while True:
+            if f'cpms_{n_species}' in params.keys():
+                n_species += 1
+            else:
+                break
+        return n_species
+
+
+    def n_observed_from_N(self, 
+                          N, 
+                          tau_diff):
+        '''
+        For converting the particle number parameter in FCS
+        to the estiamted total number of observed particles during acquisition
+        '''
+        return N * self.acquisition_time_s / tau_diff
+        
+    
+    def N_from_n_observed(self, 
+                          n_observed, 
+                          tau_diff):
+        '''
+        Inverse of FCS_spectrum.n_observed_from_N
+        '''
+        return n_observed * tau_diff / self.acquisition_time_s 
 
 
     #%% PCH model code stack
@@ -350,16 +388,54 @@ class FCS_spectrum():
         # x axis array
         N_box_array = np.arange(0, np.round(N_avg_box * 1E3))
         
-        # Clip N_box to useful significant values within precision
+        # Clip N_box to useful significant values within precision (on righthand side)
         poisson_sf = poisson_dist.sf(N_box_array)
-        N_box_array_clip = N_box_array[poisson_sf > precision]
+        N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > precision)[0][-1] + 1]
         
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
         
         return p_of_N
+
+
+    def pch_get_stoichiometry_spectrum(self,
+                                       max_label,
+                                       precision = 1E-4):
+        '''
+        Get the weighting function p(n_labels) for different labelling 
+        stoichiometries of the oligomer based on binomial stats
+
+        Parameters
+        ----------
+        max_label : 
+            Scalar. The maximum number of labels possible on the particle.
+        precision : 
+            OPTIONAL float with default 1E-4. Precision parameter defining at 
+            which value for p(n_labels) to truncate the spectrum
+
+        Returns
+        -------
+        p_of_n_labels : 
+            np.array (1D). probabilities for n_labels = 0, 1, 2, ...
+
+        '''
+        
+        # Parameterize Binomial dist object
+        binomial_dist = sstats.binom(max_label, self.labelling_efficiency)
+
+        # x axis array
+        n_labels_array = np.arange(0, max_label + 1)
+        
+        # Clip n_labels_array to useful significant values within precision
+        binomial_sf = binomial_dist.sf(n_labels_array)
+        n_labels_array_clip = n_labels_array[binomial_sf > precision]
+        
+        # Get probability mass function
+        p_of_n_labels = binomial_dist.pmf(n_labels_array_clip)
+        
+        return n_labels_array_clip, p_of_n_labels
     
-    
+    @staticmethod
     def pch_N_part(pch_single_particle,
                    p_of_N):
         '''
@@ -472,24 +548,24 @@ class FCS_spectrum():
         t_bin : 
             Float. Bin time in seconds.
         cpms : 
-            Float. Molecular brightness in counts per molecule and second.
+            Float or array of float. Molecular brightness in counts per molecule and second.
         N_avg : 
-            Float. <N> as defined in FCS math.
+            Float or array of float. . <N> as defined in FCS math.
         tau_diff : 
-            Float. Diffusion time in seconds as defined in FCS math.
+            Float or array of float. . Diffusion time in seconds as defined in FCS math.
         tau_blink : 
-            Float. Blinking relaxation time in seconds as defined in FCS math.
+            Float or array of float. . Blinking relaxation time in seconds as defined in FCS math.
         beta_blink : 
-            Float. Stretched-exponential scale parameter for blinking.
+            Float or array of float. . Stretched-exponential scale parameter for blinking.
         F_blink : 
-            Float. Blinking off-state fraction as defined in FCS math.
+            Float or array of float. . Blinking off-state fraction as defined in FCS math.
 
         Returns
         -------
         cpms_corr : 
-            Float. Integration-time corrected apparent cpms.
+            Float or array of float. Integration-time corrected apparent cpms.
         N_avg_corr : 
-            0Float. Integration-time corrected apparent N_avg.
+            Float or array of float. Integration-time corrected apparent N_avg.
 
         '''
         
@@ -570,37 +646,52 @@ class FCS_spectrum():
         return pch
 
     #%% More complete/complex FCS models
-    def fcs_discrete_model(self,
-                           params):
                 
-        model_num = np.zeros_like(self.data_FCS_G)
-        model_den = np.zeros_like(self.data_FCS_G)
+    
+    def get_acf_full_labelling(self, 
+                               params):
+                
+        acf_num = np.zeros_like(self.data_FCS_G)
+        acf_den = np.zeros_like(self.data_FCS_G)
         
-        for i_spec_2d in range(1, params['n_spec_2d'].value + 1):
-            g_norm = self.fcs_2d_diff_single_species(params[f'tau_diff_2D_{i_spec_2d}'].value)
-            model_num += 2**(-3/2) * g_norm * params[f'N_2D_{i_spec_2d}'].value * params[f'cpms_2D_{i_spec_2d}']**2
-            model_den += params[f'N_2D_{i_spec_2d}'].value * params[f'cpms_2D_{i_spec_2d}']
+        n_species = self.get_n_species(params)
+            
+        # Extract parameters
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
 
-        for i_spec_3d in range(1, params['n_spec_3d'].value + 1):
-            g_norm = self.fcs_3d_diff_single_species(params[f'tau_diff_3D_{i_spec_3d}'].value)
-            model_num += 0.5 * g_norm * params[f'N_3D_{i_spec_3d}'].value * params[f'cpms_3D_{i_spec_3d}']**2
-            model_den += params[f'N_3D_{i_spec_3d}'].value * params[f'cpms_3D_{i_spec_3d}']
+        for i_spec in range(n_species):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
+            acf_num += g_norm * N_avg_array[i_spec] * cpms_array[i_spec]**2
+            acf_den += N_avg_array[i_spec] * cpms_array[i_spec]
         
-        model = model_num / model_den**2
-        
+        acf = acf_num / acf_den**2
+
         if params['F_blink'].value > 0:
-            model *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
+            acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                                 params['beta_blink'].value)
         
-        model += params['offset'].value
-            
-        return model
+        acf *= 2**(-2/3) # Amplitude correction
+        acf += params['acf_offset'].value # Offset
+
+        return acf
+
+
+    def fcs_chisq(self, 
+                  params):
         
-    
-    def fcs_discrete_model_chisq(self,
-                                 params,
-                                 n_dof = 0):
-        return np.sum(((self.fcs_discrete_model(params) - self.data_FCS_G) / self.data_FCS_sigma) ** 2) / (self.data_FCS_G.shape[0] - n_dof)
+        # Count variable parameters in fit
+        n_vary = np.sum([1. for key in params.keys() if params[key].vary])
+                
+        # Get model
+        acf_model = self.get_acf_full_labelling(params)
+        
+        # Calc weighted residual sum of squares
+        wrss = np.sum(((acf_model - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
+        
+        # Return reduced chi-square
+        return wrss / (self.data_FCS_G.shape[0] - n_vary)
 
 
     #%% More complete/complex PCH models
@@ -639,26 +730,32 @@ class FCS_spectrum():
                                               probabilities = pch_model)
     
     
-    def get_pch_spectrum_models_full_labelling(self,
-                                               params,
-                                               n_species,
-                                               t_bin,
-                                               time_resolved = False):
-        
+    def get_pch_full_labelling(self,
+                               params,
+                               n_species,
+                               t_bin,
+                               time_resolved = False,
+                               crop_output = False
+                               ):
+                
+        # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+
+        tau_blink = params['tau_blink'].value, 
+        beta_blink = params['beta_blink'].value, 
+        F_blink = params['F_blink'].value
+
         if time_resolved:
-            for i_spec in range(n_species):
-                cpms_corr, N_avg_corr = self.pch_bin_time_correction(t_bin = t_bin, 
-                                                                     cpms = cpms_array[i_spec], 
-                                                                     N_avg = N_avg_array[i_spec], 
-                                                                     tau_diff = params[f'tau_diff_{i_spec}'].value, 
-                                                                     tau_blink = params['tau_blink'].value, 
-                                                                     beta_blink = params['beta_blink'].value, 
-                                                                     F_blink = params['F_blink'].value)
-                cpms_array[i_spec] = cpms_corr
-                N_avg_array[i_spec] = N_avg_corr
+            # Bin time correction
+            cpms_array, N_avg_array = self.pch_bin_time_correction(t_bin = t_bin, 
+                                                                 cpms = cpms_array, 
+                                                                 N_avg = N_avg_array,
+                                                                 tau_diff = tau_diff_array, 
+                                                                 tau_blink = tau_blink, 
+                                                                 beta_blink = beta_blink, 
+                                                                 F_blink = F_blink)
         
         pch = self.multi_species_pch(F = params['F'].value,
                                      t_bin = t_bin,
@@ -666,43 +763,74 @@ class FCS_spectrum():
                                      N_avg_array = N_avg_array,
                                      crop_output = True
                                      )
-        
+        if crop_output:
+            pch = pch[:self.PCH_n_photons_max + 1]
+
         return pch
 
 
-    def get_pch_spectrum_models_partial_labelling(self,
-                                                  params,
-                                                  n_species,
-                                                  t_bin,
-                                                  time_resolved = False):
+    def get_pch_partial_labelling(self,
+                                  params,
+                                  t_bin,
+                                  time_resolved = False,
+                                  crop_output = False):
+                
+        cpms_0 = params['cpms_0'].value
         
-        #TODO: Add iteration over labelling stoichiometries deriving their respective N from probabilities and convolving all their PCHs
+        tau_blink = params['tau_blink'].value, 
+        beta_blink = params['beta_blink'].value, 
+        F_blink = params['F_blink'].value
         
-        
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        
-        
-        
-        if time_resolved:
-            for i_spec in range(n_species):
-                cpms_corr, N_avg_corr = self.pch_bin_time_correction(t_bin = t_bin, 
-                                                                     cpms = cpms_array[i_spec], 
-                                                                     N_avg = N_avg_array[i_spec], 
+        # Iterate over species in spectrum
+        n_species = self.get_n_species(params)
+        for i_spec in range(n_species):
+            
+            # Get parameters
+            max_labels = params[f'stoichiometry_{i_spec}'].value
+            N_avg = params[f'N_avg_obs_{i_spec}'].value
+            
+            # Get probabilities for different label stoichiometries, 
+            # clipping away extremely unlikely ones for computational feasibility
+            n_labels_array, p_of_n_labels = self.pch_get_stoichiometry_spectrum(max_labels, 
+                                                                                precision = 1E-4)
+            
+            # Use parameters to get full array of PCH parameters
+            cpms_array_spec = n_labels_array * cpms_0
+            N_array_spec = N_avg * p_of_n_labels
+            
+            if time_resolved:
+                # Bin time correction
+                cpms_array_spec, N_array_spec = self.pch_bin_time_correction(t_bin = t_bin, 
+                                                                     cpms = cpms_array_spec, 
+                                                                     N_avg = N_array_spec ,
                                                                      tau_diff = params[f'tau_diff_{i_spec}'].value, 
-                                                                     tau_blink = params['tau_blink'].value, 
-                                                                     beta_blink = params['beta_blink'].value, 
-                                                                     F_blink = params['F_blink'].value)
-                cpms_array[i_spec] = cpms_corr
-                N_avg_array[i_spec] = N_avg_corr
-        
-        pch = self.multi_species_pch(F = params['F'].value,
-                                     t_bin = t_bin,
-                                     cpms_array = cpms_array,
-                                     N_avg_array = N_avg_array,
-                                     crop_output = True
-                                     )
-        
+                                                                     tau_blink = tau_blink, 
+                                                                     beta_blink = beta_blink, 
+                                                                     F_blink = F_blink)
+                
+                
+            if i_spec == 0:
+                # Get first species PCH
+                pch = self.multi_species_pch(F = params['F'].value,
+                                             t_bin = t_bin,
+                                             cpms_array = cpms_array_spec,
+                                             N_avg_array = N_array_spec,
+                                             crop_output = True
+                                             )
+            else:
+                # Colvolve with further species PCH
+                pch = np.convolve(pch,
+                                 self.multi_species_pch(F = params['F'].value,
+                                                              t_bin = t_bin,
+                                                              cpms_array = cpms_array_spec,
+                                                              N_avg_array = N_array_spec,
+                                                              crop_output = True
+                                                              ),
+                                 mode = 'full')
+                
+            if crop_output:
+                pch = pch[:self.PCH_n_photons_max + 1]
+
         return pch
 
         
@@ -719,25 +847,6 @@ class FCS_spectrum():
                            base = np.e)
     
     
-    def n_observed_from_N(self, 
-                          N, 
-                          tau_diff):
-        '''
-        For converting the particle number parameter in FCS
-        to the estiamted total number of observed particles during acquisition
-        '''
-        return N * self.acquisition_time_s / tau_diff
-        
-    
-    def N_from_n_observed(self, 
-                          n_observed, 
-                          tau_diff):
-        '''
-        Inverse of FCS_spectrum.n_observed_from_N
-        '''
-        return n_observed * tau_diff / self.acquisition_time_s 
-
-
     def single_filament_tau_diff_fold_change_deviation(self,
                                                        log_j,
                                                        tau_diff_fold_change):
@@ -872,7 +981,11 @@ class FCS_spectrum():
 
         initial_params = lmfit.Parameters()
         
-        # Technical parameters that still have to be adapted in fitting
+        # More technical parameters
+        initial_params.add('acf_offset', 
+                           value = 0., 
+                           vary=True)
+
         if use_PCH:
             initial_params.add('F', 
                                value = 0.4, 
@@ -883,7 +996,7 @@ class FCS_spectrum():
         
         # Actual model parameters 
         for i_spec in range(1, n_species+1):
-            initial_params.add(f'N_avg_{i_spec}', 
+            initial_params.add(f'N_avg_obs_{i_spec}', 
                                value = 1., 
                                min = 0., 
                                vary = True)
@@ -953,6 +1066,10 @@ class FCS_spectrum():
         initial_params = lmfit.Parameters()
 
         # More technical parameters
+        initial_params.add('acf_offset', 
+                           value = 0., 
+                           vary=True)
+
         if use_PCH:
             initial_params.add('F', 
                                value = 0.4, 
