@@ -57,7 +57,7 @@ PCH_Q = 8. # More calculation parameter than metadata, but whatever
 
 #%% Define output directories/files
 
-# Output dir for result file writing◘
+# Output dir for result file writing
 save_path = glob_dir + '/PCH_testfit'
 
 # .csv table for collecting fit results

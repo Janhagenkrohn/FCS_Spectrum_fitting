@@ -14,7 +14,7 @@ import numpy as np
 import scipy.special as sspecial
 import scipy.integrate as sintegrate
 import scipy.stats as sstats
-import scipy.optimize.minimize as sminimize
+from scipy.optimize import minimize as sminimize
 import lmfit
 
 # Plotting
