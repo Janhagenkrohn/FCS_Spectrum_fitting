@@ -107,28 +107,46 @@ if not os.path.exists(save_path):
     
     
 
-# #%% Start processing
-# for i_file, dir_name in enumerate(in_dir_names):
+#%% Start processing
+for i_file, dir_name in enumerate(in_dir_names):
     
-#     data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
-#                                                                                                              in_file_names_FCS[i_file],
-#                                                                                                              FCS_min_lag_time,
-#                                                                                                              FCS_max_lag_time)
+    data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
+                                                                                                             in_file_names_FCS[i_file],
+                                                                                                             FCS_min_lag_time,
+                                                                                                             FCS_max_lag_time)
     
-#     data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
-#                                                         in_file_names_PCH[i_file])
+    data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
+                                                        in_file_names_PCH[i_file])
     
-#     fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
-#                                   FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
-#                                   PCH_Q = PCH_Q,
-#                                   acquisition_time_s = acquisition_time_s if acquisition_time_s > 0 else 90., # Dummy for debugging with old-format data
-#                                   data_FCS_tau_s = data_FCS_tau_s,
-#                                   data_FCS_G = data_FCS_G,
-#                                   data_FCS_sigma = data_FCS_sigma,
-#                                   data_PCH_bin_times = None,
-#                                   data_PCH_hist = None,
-#                                   labelling_efficiency = 1.,
-#                                   numeric_precision = 1E-4
-#                                   )
+    fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
+                                  FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
+                                  PCH_Q = PCH_Q,
+                                  acquisition_time_s = acquisition_time_s if acquisition_time_s > 0 else 90., # Dummy for debugging with old-format data
+                                  data_FCS_tau_s = data_FCS_tau_s,
+                                  data_FCS_G = data_FCS_G,
+                                  data_FCS_sigma = data_FCS_sigma,
+                                  data_PCH_bin_times = data_PCH_bin_times,
+                                  data_PCH_hist = data_PCH_hist,
+                                  labelling_efficiency = 1.,
+                                  numeric_precision = 1E-5
+                                  )
     
     
+    fit_result = fitter.run_fit(use_FCS = False, # bool
+                                use_PCH = True, # bool
+                                time_resolved_PCH = True, # bool
+                                spectrum_type = 'discrete', # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+                                spectrum_parameter = 'Amplitude', # 'Amplitude', 'N_monomers', 'N_oligomers',
+                                oligomer_type = 'sherical_dense', #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+                                labelling_correction = False, # bool
+                                incomplete_sampling_correction = False, # bool
+                                n_species = 1, # int
+                                tau_diff_min = 1E-6, # float
+                                tau_diff_max = 1E0, # float
+                                use_blinking = False # bool
+                                )
+    
+    fit_params = fit_result.params
+    
+    print('\n Fitted parameters:')
+    [print(f'{key}: {fit_params[key].value} (varied: {fit_params[key].vary})') for key in fit_params.keys()]

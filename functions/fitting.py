@@ -261,13 +261,13 @@ class FCS_spectrum():
 
 
 
-    #%% Collection of some miscallaneous expressions
+    #%% Collection of some miscellaneous expressions
     def fcs_3d_diff_single_species(self, 
                                    tau_diff):
         '''
         Normalized 3D diffusion autocorrelation for a single species
         '''
-        return 1 / (1 + self.data_tau_s/tau_diff) / np.sqrt(1 + self.tau / (np.square(self.FCS_psf_aspect_ratio) * self.data_tau_s))
+        return 1 / (1 + self.data_FCS_tau_s/tau_diff) / np.sqrt(1 + self.data_FCS_tau_s / (np.square(self.FCS_psf_aspect_ratio) * tau_diff))
 
 
     def fcs_2d_diff_single_species(self, 
@@ -275,7 +275,8 @@ class FCS_spectrum():
         '''
         Normalized 2D diffusion autocorrelation for a single species
         '''
-        return 1 / (1 + self.data_tau_s/tau_diff)
+        return 1 / (1 + self.data_FCS_tau_s/tau_diff)
+    
     
     def fcs_blink_stretched_exp(self,
                                 tau_blink,
@@ -515,6 +516,9 @@ class FCS_spectrum():
         described by probabilities. Simplified version for fitting models where
         only probabilities is varied.
         '''
+        # Renormalize for possible truncation artifacts
+        probabilities /= probabilities.sum()
+        
         successes_term = -k_successes * np.log(probabilities)
         failures_term = -(n_trials - k_successes) * np.log(1 - probabilities)
         
@@ -533,7 +537,9 @@ class FCS_spectrum():
         only all parameters can be varied, used here in incomplete labelling + 
         incomplete sampling treatment.
         '''
-        
+        # Renormalize for possible truncation artifacts
+        probabilities /= probabilities.sum()
+
         neglog_binom_coeff = - np.log(sspecial.binom(n_trials, 
                                                      k_successes))
         successes_term = -k_successes * np.log(probabilities)
@@ -545,14 +551,22 @@ class FCS_spectrum():
 
 
     def regularization_MEM(self,
-                           params):
+                           params,
+                           spectrum_parameter):
         
         # Unpack parameters
         n_species = self.get_n_species(params)
-        N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+        if spectrum_parameter == 'Amplitude':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
+        elif spectrum_parameter == 'N_monomers':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
+        elif spectrum_parameter == 'N_oligomers':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+        else:
+            raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
         
         # Normalize and remove zeros
-        frequency_array = N_avg_pop_array / N_avg_pop_array.sum()
+        frequency_array = reg_target / reg_target.sum()
         frequency_array_nonzero = frequency_array[frequency_array > 0.] 
         
         # neg entropy regularizer
@@ -561,14 +575,23 @@ class FCS_spectrum():
 
 
     def regularization_CONTIN(self,
-                              params):
-        
+                              params,
+                              spectrum_parameter):
+
         # Unpack parameters
         n_species = self.get_n_species(params)
-        N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
         
+        if spectrum_parameter == 'Amplitude':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
+        elif spectrum_parameter == 'N_monomers':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
+        elif spectrum_parameter == 'N_oligomers':
+            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+        else:
+            raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+            
         # Normalize
-        frequency_array = N_avg_pop_array / N_avg_pop_array.sum()
+        frequency_array = reg_target / reg_target.sum()
         
         # Numerically approximate second derivative of N distribution
         second_numerical_diff = np.diff(frequency_array, 2)
@@ -599,10 +622,16 @@ class FCS_spectrum():
                                                 time_resolved_PCH = False,
                                                 crop_output = True)
         
-        negloglik = self.negloglik_binomial_simple(n_trials = np.sum(self.data_PCH_hist[:,i_bin_time]),
-                                                   k_successes = self.data_PCH_hist[:,i_bin_time],
+        # Crop data/model where needed...Can happen for data handling reasons
+        pch_data = self.data_PCH_hist[:,i_bin_time]
+        if pch_model.shape[0] > pch_data.shape[0]:
+            pch_model = pch_model[:pch_data.shape[0]]
+        elif pch_model.shape[0] < pch_data.shape[0]:
+            pch_data = pch_data[:pch_model.shape[0]]
+
+        negloglik = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                   k_successes = pch_data,
                                                    probabilities = pch_model)
-        
             
         return negloglik
 
@@ -616,8 +645,15 @@ class FCS_spectrum():
                                                    time_resolved_PCH = False,
                                                    crop_output = True)
         
-        negloglik = self.negloglik_binomial_simple(n_trials = np.sum(self.data_PCH_hist[:,i_bin_time]),
-                                                   k_successes = self.data_PCH_hist[:,i_bin_time],
+        # Crop data/model where needed...Can happen for data handling reasons
+        pch_data = self.data_PCH_hist[:,i_bin_time]
+        if pch_model.shape[0] > pch_data.shape[0]:
+            pch_model = pch_model[:pch_data.shape[0]]
+        elif pch_model.shape[0] < pch_data.shape[0]:
+            pch_data = pch_data[:pch_model.shape[0]]
+
+        negloglik = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                   k_successes = pch_data,
                                                    probabilities = pch_model)
         
         return negloglik
@@ -635,8 +671,15 @@ class FCS_spectrum():
                                                     time_resolved_PCH = True,
                                                     crop_output = True)
             
-            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(self.data_PCH_hist[:,i_bin_time]),
-                                                        k_successes = self.data_PCH_hist[:,i_bin_time],
+            # Crop data/model where needed...Can happen for data handling reasons
+            pch_data = self.data_PCH_hist[:,i_bin_time]
+            if pch_model.shape[0] > pch_data.shape[0]:
+                pch_model = pch_model[:pch_data.shape[0]]
+            elif pch_model.shape[0] < pch_data.shape[0]:
+                pch_data = pch_data[:pch_model.shape[0]]
+
+            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                        k_successes = pch_data,
                                                         probabilities = pch_model)
             
         return negloglik
@@ -654,8 +697,15 @@ class FCS_spectrum():
                                                        time_resolved_PCH = True,
                                                        crop_output = True)
             
-            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(self.data_PCH_hist[:,i_bin_time]),
-                                                        k_successes = self.data_PCH_hist[:,i_bin_time],
+            # Crop data/model where needed...Can happen for data handling reasons
+            pch_data = self.data_PCH_hist[:,i_bin_time]
+            if pch_model.shape[0] > pch_data.shape[0]:
+                pch_model = pch_model[:pch_data.shape[0]]
+            elif pch_model.shape[0] < pch_data.shape[0]:
+                pch_data = pch_data[:pch_model.shape[0]]
+                
+            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                        k_successes = pch_data,
                                                         probabilities = pch_model)
             
         return negloglik
@@ -667,6 +717,7 @@ class FCS_spectrum():
                              use_PCH,
                              time_resolved_PCH,
                              spectrum_type,
+                             spectrum_parameter,
                              labelling_correction,
                              incomplete_sampling_correction):
         
@@ -697,10 +748,12 @@ class FCS_spectrum():
                 negloglik += self.negloglik_pcmh_full_labelling(params)
                 
         if spectrum_type == 'reg_CONTIN':
-            negloglik += self.regularization_CONTIN(params)
+            negloglik += self.regularization_CONTIN(params, 
+                                                    spectrum_parameter)
         
         elif spectrum_type == 'reg_MEM':
-            negloglik += self.regularization_MEM(params)
+            negloglik += self.regularization_MEM(params,
+                                                 spectrum_parameter)
             
         if incomplete_sampling_correction:
             # Incomplete sampling correction included in fit
@@ -793,8 +846,7 @@ class FCS_spectrum():
         '''
         
         # Get ideal-Gauss PCH
-        pch = self.pch_3dgauss_1part(cpm_eff,
-                                     self.PCH_n_photons_max)
+        pch = self.pch_3dgauss_1part(cpm_eff)
 
         # Apply correction
         pch /= (1 + F)
@@ -824,8 +876,7 @@ class FCS_spectrum():
         poisson_dist = sstats.poisson(N_avg_box)
         
         # x axis array
-        N_box_array = np.arange(0, np.round(N_avg_box * 1E3))
-        
+        N_box_array = np.arange(0, np.ceil(N_avg_box * 1E3))
         # Clip N_box to useful significant values within precision (on righthand side)
         poisson_sf = poisson_dist.sf(N_box_array)
         N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > self.numeric_precision)[0][-1] + 1]
@@ -1020,11 +1071,11 @@ class FCS_spectrum():
             blink_corr = 1.
 
         temp1 = np.sqrt(self.FCS_psf_aspect_ratio**2 - 1)
-        temp2 = np.sqrt(self.FCS_psf_aspect_ratio**2 - t_bin / tau_diff)
-        temp3 = np.arctanh(temp1 * (temp2 - self.FCS_psf_aspect_ratio) / 1 + self.FCS_psf_aspect_ratio * temp2 - self.FCS_psf_aspect_ratio)
+        temp2 = np.sqrt(self.FCS_psf_aspect_ratio**2 + t_bin / tau_diff)
+        temp3 = np.arctanh(temp1 * (temp2 - self.FCS_psf_aspect_ratio) / (1 + self.FCS_psf_aspect_ratio * temp2 - self.FCS_psf_aspect_ratio**2))
         
-        diff_corr = 4 * self.FCS_psf_aspect_ratio * tau_diff / t_bin**2 * temp1 * \
-            ((tau_diff + t_bin) * temp3 + tau_diff * temp1 * (self.FCS_psf_aspect_ratio * temp2)) 
+        diff_corr = 4 * self.FCS_psf_aspect_ratio * tau_diff / t_bin**2 / temp1 * \
+            ((tau_diff + t_bin) * temp3 + tau_diff * temp1 * (self.FCS_psf_aspect_ratio - temp2)) 
         
         cpms_corr = cpms * blink_corr * diff_corr
         N_avg_corr = N_avg / blink_corr / diff_corr
@@ -1112,7 +1163,6 @@ class FCS_spectrum():
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
         
-        acf *= 2**(-2/3) # Amplitude correction
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -1143,7 +1193,6 @@ class FCS_spectrum():
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
         
-        acf *= 2**(-2/3) # Amplitude correction
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -1316,24 +1365,24 @@ class FCS_spectrum():
         if not utils.isiterable(tau_diff_array):
             raise Exception("Invalid input for tau_diff_array - must be np.array")
             
-        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+        if not (oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         # The monomer by definition has stoichiometry 1, so we start with the second element
         fold_changes = tau_diff_array[1:] / tau_diff_array[0]
         stoichiometry = np.ones_like(tau_diff_array)
         
-        if oligomer_type in ['continuous_spherical', 'discrete_spherical']:
+        if oligomer_type in ['sherical_dense']:
             # tau_diff proportional hydrodyn. radius
             # Stoichiometry proportional volume
             stoichiometry[1:] = fold_changes ** 3
         
-        elif oligomer_type == 'continuous_shell':
+        elif oligomer_type == 'spherical_shell':
             # tau_diff proportional hydrodyn. radius
             # Stoichiometry proportional surface area
             stoichiometry[1:] = fold_changes ** 2
 
-        elif oligomer_type == 'discrete_single_filament':
+        elif oligomer_type == 'single_filament':
             # For the filament models, we have more complicated expressions based
             # on Seils & Pecora 1995. We numerically solve the expression,
             # which cannot be decently inverted. This is a one-parameter 
@@ -1345,7 +1394,7 @@ class FCS_spectrum():
                                 args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
         
-        else: # oligomer_type == 'discrete_double_filament'
+        else: # oligomer_type == 'double_filament'
         
             stoichiometry = np.zeros_like(fold_changes)
             
@@ -1436,24 +1485,25 @@ class FCS_spectrum():
         initial_params = lmfit.Parameters()
         
         # More technical parameters
-        initial_params.add('acf_offset', 
-                           value = 0., 
-                           vary=True)
-
         initial_params.add('Label_efficiency', 
                            value = self.labelling_efficiency if labelling_correction else 1.,
                            vary = False)
+        
+        if use_FCS:
+            initial_params.add('acf_offset', 
+                                value = 0., 
+                                vary=True)
 
         if use_PCH:
             initial_params.add('F', 
                                value = 0.4, 
-                               min = 0, 
+                               min = 0., 
                                max = 1.,
-                               vary=True)
+                               vary = True)
                                 
         
         # Actual model parameters 
-        for i_spec in range(1, n_species+1):
+        for i_spec in range(0, n_species):
             initial_params.add(f'N_avg_obs_{i_spec}', 
                                value = 1., 
                                min = 0., 
@@ -1525,8 +1575,8 @@ class FCS_spectrum():
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
-        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+        if not (oligomer_type in ['continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception("Invalid input for n_species - must be int >= 10 for regularized fitting")
@@ -1541,9 +1591,10 @@ class FCS_spectrum():
         initial_params = lmfit.Parameters()
 
         # More technical parameters
-        initial_params.add('acf_offset', 
-                           value = 0., 
-                           vary=True)
+        if use_FCS:
+            initial_params.add('acf_offset', 
+                                value = 0., 
+                                vary=True)
 
         if use_PCH:
             initial_params.add('F', 
@@ -1633,6 +1684,7 @@ class FCS_spectrum():
                           use_PCH,
                           time_resolved_PCH,
                           spectrum_type,
+                          spectrum_parameter,
                           oligomer_type,
                           incomplete_sampling_correction,
                           labelling_correction,
@@ -1654,8 +1706,8 @@ class FCS_spectrum():
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception("Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
 
-        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+        if not (oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception("Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
@@ -1670,6 +1722,11 @@ class FCS_spectrum():
         initial_params = lmfit.Parameters()
 
         # More technical parameters
+        if use_FCS:
+            initial_params.add('acf_offset', 
+                                value = 0., 
+                                vary=True)
+
         if use_PCH:
             initial_params.add('F', 
                                value = 0.4, 
@@ -1709,27 +1766,42 @@ class FCS_spectrum():
                                value = stoichiometry[i_spec], 
                                vary = False)
             
-            # Define 
+            # Weighting function that essentially decides which number the parameterization acts on
+            if spectrum_parameter == 'Amplitude':
+                initial_params.add(f'spectrum_weight_{i_spec}', 
+                                   value = stoichiometry[i_spec]**(-2), 
+                                   vary = False)
+            elif spectrum_parameter == 'N_monomers':
+                initial_params.add(f'spectrum_weight_{i_spec}', 
+                                   value = stoichiometry[i_spec]**(-1), 
+                                   vary = False)
+            elif spectrum_parameter == 'N_oligomers':
+                initial_params.add(f'spectrum_weight_{i_spec}', 
+                                   value = 1., 
+                                   vary = False)
+            else:
+                raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+            
+            
+            # Define particle numbers via parameterized distributions
             if spectrum_type == 'par_Gauss':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp / sqrt(2 * pi) / N_dist_b * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
+                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
                                    vary = False)
                 
             if spectrum_type == 'par_LogNorm':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp / sqrt(2 * pi) / N_dist_b / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - N_dist_a) / N_dist_b) ** 2)',
+                                   expr = f'N_dist_amp / spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - N_dist_a) / N_dist_b) ** 2)',
                                    vary = False)
                 
             if spectrum_type == 'par_Gamma':
-                # We cannot use sspecial.gamma inside the "expr" attribute. We instead use the Lanczos approximation for the gamma function.
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp * N_dist_b ** N_dist_a / sqrt(2 * pi) * N_dist_a ** (0.5 - N_dist_a) * stoichiometry_{i_spec} ** (N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
+                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
                                    vary = False)
                 
             if spectrum_type == 'par_StrExp':
-                # Again Lanczos approximation for gamma function.
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp * N_dist_a / sqrt(2 * pi) * (1 / N_dist_b) ** (0.5 - (1 / N_dist_b)) * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
+                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
                                    vary = False)
 
             if incomplete_sampling_correction:
@@ -1879,7 +1951,7 @@ class FCS_spectrum():
                 time_resolved_PCH, # bool
                 spectrum_type, # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
                 spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
-                oligomer_type, # 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament'
+                oligomer_type, # 'continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'
                 labelling_correction, # bool
                 incomplete_sampling_correction, # bool
                 n_species, # int
@@ -1904,8 +1976,8 @@ class FCS_spectrum():
         if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
             raise Exception("Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
     
-        if not (oligomer_type in ['continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', 'discrete_double_filament'] or spectrum_type == 'discrete'):
-            raise Exception("Invalid input for oligomer_type - unless spectrum_type is 'discrete', oligomer_type must be one out of 'continuous_spherical', 'continuous_shell', 'discrete_spherical', 'discrete_single_filament', or 'discrete_double_filament'")
+        if not (oligomer_type in ['continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] or spectrum_type == 'discrete'):
+            raise Exception("Invalid input for oligomer_type - unless spectrum_type is 'discrete', oligomer_type must be one out of 'continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
         
         if type(labelling_correction) != bool:
             raise Exception("Invalid input for labelling_correction - must be bool")
@@ -1966,7 +2038,8 @@ class FCS_spectrum():
             initial_params = self.set_up_params_par(use_FCS, 
                                                     use_PCH, 
                                                     time_resolved_PCH,
-                                                    spectrum_type, 
+                                                    spectrum_type,
+                                                    spectrum_parameter, 
                                                     oligomer_type, 
                                                     incomplete_sampling_correction, 
                                                     labelling_correction, 
@@ -1975,17 +2048,22 @@ class FCS_spectrum():
                                                     tau_diff_max, 
                                                     use_blinking
                                                     )
-
+            
+        print('\n Initial parameters:')
+        [print(f'{key}: {initial_params[key].value} (varied: {initial_params[key].vary})') for key in initial_params.keys()]
+        
         # Define minimization target
         fitter = lmfit.Minimizer(self.negloglik_global_fit, 
                                  params = initial_params, 
                                  fcn_args = (use_FCS, 
                                              use_PCH, 
+                                             time_resolved_PCH,
                                              spectrum_type, 
+                                             spectrum_parameter,
                                              labelling_correction, 
                                              incomplete_sampling_correction),
                                  calc_covar = True)
-        
+            
         fit_result = fitter.minimize(method = 'nelder')
 
         
