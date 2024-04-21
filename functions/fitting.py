@@ -20,6 +20,10 @@ import lmfit
 # Plotting
 from matplotlib import pyplot as plt
 
+# Parallel processing and related
+import multiprocessing
+import traceback
+
 # Custom module
 # For localizing module
 repo_dir = os.path.abspath('..')
@@ -40,7 +44,7 @@ class FCS_spectrum():
                  data_PCH_bin_times = None,
                  data_PCH_hist = None,
                  labelling_efficiency = 1.,
-                 numeric_precision = 1E-4
+                 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
                  ):
         '''
         Class for single or combined fitting of FCS and/or PCH.
@@ -57,12 +61,12 @@ class FCS_spectrum():
             - Treatment of blinking via a stretched-exponential approximation 
               in FCS and PCMH
             - #TODO: Explicit treatment of short-acquisition time bias in FCS
-            - #TODO: Fitting of spectra of particle numbers over diffusion coefficients
+            - Fitting of spectra of particle numbers over diffusion coefficients
               in FCS and PC(M)H using statistical regularization techniques 
               (Maximum Entropy Method, second-derivative minimization) or 
               parameterization of an underlying distribution (Gaussian, 
               Lognormal, Gamma, stretched exponential)
-            - #TODO: Explicit treatment of statistically insufficient sampling 
+            - Explicit treatment of statistically insufficient sampling 
               of rare species in particle number spectra, using correlations
               from regularization or parameterization to compensate missing 
               information and simple Poisson distribution approximations to 
@@ -120,15 +124,20 @@ class FCS_spectrum():
             labelling correction models in both FCS and PC(M)H, otherwise 
             irrelevant.
         numeric_precision : 
-            OPTIONAL float 0<numeric_precision<1, with default is 1E-4. In PCH, 
+            OPTIONAL float 0<numeric_precision<1, or array of such floats.
+            Default is [1E-3, 1E-4, 1E-5]. In PCH, and in the 
+            incomplete-sampling + incomplete labelling likelihood function,
             some steps in model calculation require truncation of the model at 
-            a certain numerical precision. Some other steps do not strictly 
-            require it, but profit greatly in terms of performance. This 
+            a certain numerical precision, or at least profit greatly in 
+            terms of performance. This 
             parameter tunes the precision at which these calculations are to be 
             truncated. The smaller the value of numeric_precision, the more 
             accurate, but also the more computationally expensive, the 
-            calculation gets.
-
+            calculation gets. Using an array instead of a single value is meant
+            as a means of saving time by first fitting a low-precision model, 
+            and incrementally fine-tune parameters at higher calcualtion 
+            precision, rather than solving the computationally expensive 
+            high-precision model at every step of the fit procedure.
 
         '''
         # Acquisition metadata and technical settings
@@ -178,17 +187,29 @@ class FCS_spectrum():
                 self.incomplete_sampling_possible = True
             else: 
                 raise ValueError('acquisition_time_s must be empty value or float > 0')
+                
         elif utils.isempty(acquisition_time_s):
             self.acquisition_time_s = None
             self.incomplete_sampling_possible = False
+            
         else:
             raise ValueError('acquisition_time_s must be empty value or float > 0')
     
     
         if utils.isfloat(numeric_precision) and numeric_precision > 0. and numeric_precision < 1.:
             self.numeric_precision = numeric_precision
+            self.precision_incremental = False
+            
+        elif utils.isiterable(numeric_precision):
+            # Convert to array and sort so that we start with coarsest precision and increment towards finer parameters
+            numeric_precision = np.sort(np.array(numeric_precision))[::-1]
+            if np.all(numeric_precision > 0.) and np.all(numeric_precision < 1.):
+                self.numeric_precision = numeric_precision
+                self.precision_incremental = True
+            else:
+                raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
         else:
-            raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1.')
+            raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
 
 
         # FCS input data to be fitted
@@ -243,11 +264,12 @@ class FCS_spectrum():
             self.data_PCH_hist = None
             self.PCH_possible = False
             self.PCH_n_photons_max = 0
+            
         elif utils.isiterable(data_PCH_hist):
             data_PCH_hist = np.array(data_PCH_hist)
             if data_PCH_hist.shape[1] == data_PCH_bin_times.shape[0]:
                 self.data_PCH_hist = data_PCH_hist
-                self.PCH_n_photons_max = data_PCH_hist.shape[0] + 1
+                self.PCH_n_photons_max = np.array([np.nonzero(data_PCH_hist[:, i_bin_time])[0][-1] + 1 for i_bin_time in range(data_PCH_bin_times.shape[0])])
             else:
                 raise ValueError('data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
         else:
@@ -343,12 +365,15 @@ class FCS_spectrum():
         Neg log likelihood function for deviation between population-level
         and observed N, but without treatment of labelling statistics
         '''
+        
+        # Unpack parameters
         n_species = self.get_n_species(params)
         
         tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
             
+        # Likelihood function for particle numbers
         n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
                                         tau_diff_array)
         
@@ -358,11 +383,14 @@ class FCS_spectrum():
         negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                 observations = n_obs)
         
+        # Normalize to avoid effects from species numbers
+        negloglik /= n_species
         return negloglik
     
     
     def negloglik_incomplete_sampling_partial_labelling(self,
-                                                        params):
+                                                        params,
+                                                        numeric_precision = 1e-4):
         '''
         Neg log likelihood function for deviation between population-level
         and observed N and labelling statistics
@@ -396,37 +424,33 @@ class FCS_spectrum():
             
             # "Histogram" of "observed" labelling with "observed" N spectrum
             labelling_efficiency_array_spec_obs = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
-                                                                                      labelling_efficiency_obs_array[i_spec])
+                                                                                      labelling_efficiency_obs_array[i_spec],
+                                                                                      numeric_precision = numeric_precision)
             labelling_efficiency_array_spec_obs *= n_obs[i_spec]
             
-            # Reference labelling statistics based on labelling efficiency metadata and "observed" N spectrum
+            # Reference labelling statistics based on labelling efficiency metadata and "population" N spectrum
             labelling_efficiency_array_spec_pop = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
-                                                                                      lebelling_efficiency_pop)
+                                                                                      lebelling_efficiency_pop,
+                                                                                      numeric_precision = numeric_precision)
             
-            negloglik_labelling += self.negloglik_binomial_full(n_trials = n_obs[i_spec],
-                                                                k_successes = labelling_efficiency_array_spec_obs, 
-                                                                probabilities = labelling_efficiency_array_spec_pop)
+            # Likelihood function for current estimate of "observed" labelling statistics given current estimate of "population" frequencies
+            negloglik_labelling_spec = self.negloglik_binomial_full(n_trials = n_obs[i_spec],
+                                                                    k_successes = labelling_efficiency_array_spec_obs, 
+                                                                    probabilities = labelling_efficiency_array_spec_pop)
             
-        negloglik = negloglik_N + negloglik_labelling
+            # Normalize by number of "meaningful" labelling data points to avoid effects from array length
+            negloglik_labelling_spec /= labelling_efficiency_array_spec_obs.shape[0]
+            
+            negloglik_labelling += negloglik_labelling
+            
+        # Combine neglogliks and normalize to avoid effects from species numbers
+        negloglik = (negloglik_N + negloglik_labelling) / n_species
         
         return negloglik
     
     
-    def negloglik_acf_full_labelling(self, 
+    def fcs_red_chisq_full_labelling(self, 
                                      params):
-        '''
-        Tiny wrapper for fcs_chisq_full_labelling() that corrects for the fact that reduced 
-        chi-square is actually 2*neg log likelihood, which is usually irrelevant,
-        but for global maximum-likelihood fitting worth correcting.
-        '''        
-        
-        negloglik = self.fcs_chisq_full_labelling(params) / 2.
-        
-        return negloglik
-    
-    
-    def fcs_chisq_full_labelling(self, 
-                                 params):
         '''
         Reduced chi-square for FCS fitting with full labelling.
         '''
@@ -446,21 +470,27 @@ class FCS_spectrum():
         return red_chi_sq
 
 
-    def negloglik_acf_partial_labelling(self, 
-                                        params):
-        '''
-        Tiny wrapper for fcs_chisq_partial_labelling() that corrects for the fact that reduced 
-        chi-square is actually 2*neg log likelihood, which is usually irrelevant,
-        but for global maximum-likelihood fitting worth correcting.
-        '''        
-        
-        negloglik = self.fcs_chisq_partial_labelling(params) / 2.
-        
-        return negloglik
-    
-    
-    def fcs_chisq_partial_labelling(self, 
+    def fcs_chisq_full_labelling(self, 
                                  params):
+        '''
+        Chi-square without normalization for parameter number for FCS fitting 
+        with full labelling.
+        '''
+                        
+        # Get model
+        acf_model = self.get_acf_full_labelling(params)
+        
+        # Calc weighted residual sum of squares
+        wrss = np.sum(((acf_model - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
+        
+        # Return reduced chi-square
+        red_chi_sq =  wrss / (self.data_FCS_G.shape[0])
+        
+        return red_chi_sq
+
+    
+    def fcs_red_chisq_partial_labelling(self, 
+                                        params):
         '''
         Reduced chi-square for FCS fitting with partial labelling.
         '''
@@ -478,6 +508,25 @@ class FCS_spectrum():
         red_chi_sq =  wrss / (self.data_FCS_G.shape[0] - n_vary)
         
         return red_chi_sq
+
+
+    def fcs_chisq_partial_labelling(self, 
+                                 params):
+        '''
+        Chi-square without normalization for parameter number for FCS fitting with partial labelling.
+        '''
+                        
+        # Get model
+        acf_model = self.get_acf_partial_labelling(params)
+        
+        # Calc weighted residual sum of squares
+        wrss = np.sum(((acf_model - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
+        
+        # Return reduced chi-square
+        red_chi_sq =  wrss / (self.data_FCS_G.shape[0])
+        
+        return red_chi_sq
+
 
 
     @staticmethod
@@ -570,7 +619,9 @@ class FCS_spectrum():
         frequency_array_nonzero = frequency_array[frequency_array > 0.] 
         
         # neg entropy regularizer
-        regularizer = np.sum(frequency_array_nonzero * np.log(frequency_array_nonzero))
+        # Mean rather than sum to avoid effects from length
+        regularizer = np.mean(frequency_array_nonzero * np.log(frequency_array_nonzero))
+        
         return regularizer
 
 
@@ -596,8 +647,9 @@ class FCS_spectrum():
         # Numerically approximate second derivative of N distribution
         second_numerical_diff = np.diff(frequency_array, 2)
         
-        # Get sum of squared second derivative as single number that reports on non-smoothness of distribution
-        regularizer = np.sum(second_numerical_diff**2)
+        # Get mean of squared second derivative as single number that reports on non-smoothness of distribution
+        # Mean rather than sum to avoid effects from length
+        regularizer = np.mean(second_numerical_diff**2)
         
         return regularizer
         
@@ -606,7 +658,7 @@ class FCS_spectrum():
                            params,
                            pch
                            ):
-        
+        # LEGACY
         pch_model = self.get_simple_pch_lmfit(params)
         return self.negloglik_binomial_simple(n_trials = np.sum(pch),
                                               k_successes = pch,
@@ -615,52 +667,76 @@ class FCS_spectrum():
 
     def negloglik_pch_single_full_labelling(self,
                                             params,
-                                            i_bin_time = 0):
+                                            i_bin_time = 0,
+                                            numeric_precision = 1e-4,
+                                            mp_pool = None):
         
         pch_model = self.get_pch_full_labelling(params,
                                                 self.data_PCH_bin_times[i_bin_time],
                                                 time_resolved_PCH = False,
-                                                crop_output = True)
+                                                crop_output = True,
+                                                numeric_precision = numeric_precision,
+                                                mp_pool = mp_pool)
         
         # Crop data/model where needed...Can happen for data handling reasons
         pch_data = self.data_PCH_hist[:,i_bin_time]
-        if pch_model.shape[0] > pch_data.shape[0]:
-            pch_model = pch_model[:pch_data.shape[0]]
-        elif pch_model.shape[0] < pch_data.shape[0]:
-            pch_data = pch_data[:pch_model.shape[0]]
+        n_data_points = pch_data.shape[0]
+        n_model_points = pch_model.shape[0]
+        
+        if n_model_points > n_data_points:
+            pch_model = pch_model[:n_data_points]
+        elif n_model_points < n_data_points:
+            pch_data = pch_data[:n_model_points]
 
         negloglik = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
                                                    k_successes = pch_data,
                                                    probabilities = pch_model)
-            
+        
+        # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
+        negloglik /= np.min([n_data_points, n_model_points])
+
         return negloglik
 
 
     def negloglik_pch_single_partial_labelling(self,
                                                params,
-                                               i_bin_time = 0):
+                                               i_bin_time = 0,
+                                               numeric_precision = 1e-4,
+                                               mp_pool = None):
         
         pch_model = self.get_pch_partial_labelling(params,
                                                    self.data_PCH_bin_times[i_bin_time],
                                                    time_resolved_PCH = False,
-                                                   crop_output = True)
+                                                   crop_output = True,
+                                                   numeric_precision = numeric_precision,
+                                                   mp_pool = mp_pool)
         
+
         # Crop data/model where needed...Can happen for data handling reasons
         pch_data = self.data_PCH_hist[:,i_bin_time]
-        if pch_model.shape[0] > pch_data.shape[0]:
-            pch_model = pch_model[:pch_data.shape[0]]
-        elif pch_model.shape[0] < pch_data.shape[0]:
-            pch_data = pch_data[:pch_model.shape[0]]
+        n_data_points = pch_data.shape[0]
+        n_model_points = pch_model.shape[0]
+        
+        if n_model_points > n_data_points:
+            pch_model = pch_model[:n_data_points]
+        elif n_model_points < n_data_points:
+            pch_data = pch_data[:n_model_points]
+
 
         negloglik = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
                                                    k_successes = pch_data,
                                                    probabilities = pch_model)
         
+        # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
+        negloglik /= np.min([n_data_points, n_model_points])
+
         return negloglik
         
     
     def negloglik_pcmh_full_labelling(self,
-                                      params):
+                                      params,
+                                      numeric_precision = 1e-4,
+                                      mp_pool = None):
         
         negloglik = 0
                 
@@ -669,24 +745,39 @@ class FCS_spectrum():
             pch_model = self.get_pch_full_labelling(params,
                                                     t_bin,
                                                     time_resolved_PCH = True,
-                                                    crop_output = True)
+                                                    crop_output = True,
+                                                    numeric_precision = numeric_precision,
+                                                    mp_pool = mp_pool)
             
             # Crop data/model where needed...Can happen for data handling reasons
             pch_data = self.data_PCH_hist[:,i_bin_time]
-            if pch_model.shape[0] > pch_data.shape[0]:
-                pch_model = pch_model[:pch_data.shape[0]]
-            elif pch_model.shape[0] < pch_data.shape[0]:
-                pch_data = pch_data[:pch_model.shape[0]]
-
-            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
-                                                        k_successes = pch_data,
-                                                        probabilities = pch_model)
+            n_data_points = pch_data.shape[0]
+            n_model_points = pch_model.shape[0]
             
+            if n_model_points > n_data_points:
+                pch_model = pch_model[:n_data_points]
+            elif n_model_points < n_data_points:
+                pch_data = pch_data[:n_model_points]
+
+            negloglik_iter = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                            k_successes = pch_data,
+                                                            probabilities = pch_model)
+            
+            # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
+            negloglik_iter /= np.min([n_data_points, n_model_points])
+
+            negloglik += negloglik_iter
+            
+        # Normalize for number of data points along second axis
+        negloglik /= self.data_PCH_bin_times.shape[0]
+        
         return negloglik
 
     
     def negloglik_pcmh_partial_labelling(self,
-                                         params):
+                                         params,
+                                         numeric_precision = 1e-4,
+                                         mp_pool = None):
         
         negloglik = 0
                 
@@ -695,18 +786,31 @@ class FCS_spectrum():
             pch_model = self.get_pch_partial_labelling(params,
                                                        t_bin,
                                                        time_resolved_PCH = True,
-                                                       crop_output = True)
+                                                       crop_output = True,
+                                                       numeric_precision = numeric_precision,
+                                                       mp_pool = mp_pool)
             
             # Crop data/model where needed...Can happen for data handling reasons
             pch_data = self.data_PCH_hist[:,i_bin_time]
-            if pch_model.shape[0] > pch_data.shape[0]:
-                pch_model = pch_model[:pch_data.shape[0]]
-            elif pch_model.shape[0] < pch_data.shape[0]:
-                pch_data = pch_data[:pch_model.shape[0]]
+            n_data_points = pch_data.shape[0]
+            n_model_points = pch_model.shape[0]
+            
+            if n_model_points > n_data_points:
+                pch_model = pch_model[:n_data_points]
+            elif n_model_points < n_data_points:
+                pch_data = pch_data[:n_model_points]
                 
-            negloglik += self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
-                                                        k_successes = pch_data,
-                                                        probabilities = pch_model)
+            negloglik_iter = self.negloglik_binomial_simple(n_trials = np.sum(pch_data),
+                                                            k_successes = pch_data,
+                                                            probabilities = pch_model)
+            
+            # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
+            negloglik_iter /= np.min([n_data_points, n_model_points])
+
+            negloglik += negloglik_iter
+            
+        # Normalize for number of data points along second axis
+        negloglik /= self.data_PCH_bin_times.shape[0]
             
         return negloglik
 
@@ -719,33 +823,46 @@ class FCS_spectrum():
                              spectrum_type,
                              spectrum_parameter,
                              labelling_correction,
-                             incomplete_sampling_correction):
+                             incomplete_sampling_correction,
+                             i_bin_time = 0,
+                             numeric_precision = 1e-4,
+                             mp_pool = None):
         
-        negloglik = 0
+        negloglik = 0.
         
         if use_FCS:
             # Correlation function is being fitted
             
             if labelling_correction:
-                negloglik += self.negloglik_acf_partial_labelling(params)
+                negloglik += self.fcs_chisq_partial_labelling(params) / 2.
             else: # not labelling_correction
-                negloglik += self.negloglik_acf_full_labelling(params)
+                negloglik += self.fcs_chisq_full_labelling(params) / 2.
                 
         if use_PCH and (not time_resolved_PCH):
             # Conventional single PCH is being fitted
             
             if labelling_correction:
-                negloglik += self.negloglik_pch_single_partial_labelling(params)
+                negloglik += self.negloglik_pch_single_partial_labelling(params,
+                                                                         i_bin_time = i_bin_time,
+                                                                         numeric_precision = numeric_precision,
+                                                                         mp_pool = mp_pool)
             else: # not labelling_correction
-                negloglik += self.negloglik_pch_single_full_labelling(params)
+                negloglik += self.negloglik_pch_single_full_labelling(params,
+                                                                      i_bin_time = i_bin_time,
+                                                                      numeric_precision = numeric_precision,
+                                                                      mp_pool = mp_pool)
                 
         elif use_PCH and time_resolved_PCH:
             # PCMH fit
             
             if labelling_correction:
-                negloglik += self.negloglik_pcmh_partial_labelling(params)
+                negloglik += self.negloglik_pcmh_partial_labelling(params,
+                                                                   numeric_precision = numeric_precision,
+                                                                   mp_pool = mp_pool)
             else: # not labelling_correction
-                negloglik += self.negloglik_pcmh_full_labelling(params)
+                negloglik += self.negloglik_pcmh_full_labelling(params,
+                                                                numeric_precision = numeric_precision,
+                                                                mp_pool = mp_pool)
                 
         if spectrum_type == 'reg_CONTIN':
             negloglik += self.regularization_CONTIN(params, 
@@ -759,11 +876,14 @@ class FCS_spectrum():
             # Incomplete sampling correction included in fit
             
             if labelling_correction:
-                negloglik += self.negloglik_incomplete_sampling_partial_labelling(params)
+                negloglik += self.negloglik_incomplete_sampling_partial_labelling(params,
+                                                                                  numeric_precision = numeric_precision)
             else: # not labelling_correction
                 negloglik += self.negloglik_incomplete_sampling_full_labelling(params)
         
         return negloglik
+
+
         
         
     #%% PCH model code stack
@@ -779,7 +899,8 @@ class FCS_spectrum():
     
     
     def pch_3dgauss_1part(self,
-                          cpm_eff):
+                          cpm_eff,
+                          PCH_n_photons_max):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
         calculation of the "real" multi-particle PCH.
@@ -798,7 +919,7 @@ class FCS_spectrum():
 
         '''
         # Array with all photon counts > 0 to sample
-        photon_counts_array = np.arange(1, self.PCH_n_photons_max+1)
+        photon_counts_array = np.arange(1, PCH_n_photons_max+1)
         
         # Results container
         pch = np.zeros_like(photon_counts_array, 
@@ -823,7 +944,8 @@ class FCS_spectrum():
     
     def pch_3dgauss_nonideal_1part(self,
                                    F,
-                                   cpm_eff):
+                                   cpm_eff,
+                                   PCH_n_photons_max):
         '''
         Calculates the single-particle compound PCH to be used in subsequent 
         calculation of the "real" multi-particle PCH. See:
@@ -846,7 +968,8 @@ class FCS_spectrum():
         '''
         
         # Get ideal-Gauss PCH
-        pch = self.pch_3dgauss_1part(cpm_eff)
+        pch = self.pch_3dgauss_1part(cpm_eff,
+                                     PCH_n_photons_max)
 
         # Apply correction
         pch /= (1 + F)
@@ -856,7 +979,8 @@ class FCS_spectrum():
         
     
     def pch_get_N_spectrum(self,
-                           N_avg):
+                           N_avg,
+                           numeric_precision = 1e-4):
         '''
         Get the weighting function p(N) for different N in the box defined by Q
         for PCH. 
@@ -879,7 +1003,7 @@ class FCS_spectrum():
         N_box_array = np.arange(0, np.ceil(N_avg_box * 1E3))
         # Clip N_box to useful significant values within precision (on righthand side)
         poisson_sf = poisson_dist.sf(N_box_array)
-        N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > self.numeric_precision)[0][-1] + 1]
+        N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > numeric_precision)[0][-1] + 1]
         
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
@@ -889,7 +1013,8 @@ class FCS_spectrum():
 
     def pch_get_stoichiometry_spectrum(self,
                                        max_label,
-                                       Label_efficiency):
+                                       Label_efficiency,
+                                       numeric_precision = 1e-4):
         '''
         Get the weighting function p(n_labels) for different labelling 
         stoichiometries of the oligomer based on binomial stats
@@ -919,7 +1044,7 @@ class FCS_spectrum():
         binomial_pmf = binomial_dist.pmf(n_labels_array)
         weights = binomial_pmf * (n_labels_array + 1) # +1 to avoid zeros, and we need not be super-accurate here
         weights /= weights.sum()
-        n_labels_array_clip = n_labels_array[weights > self.numeric_precision]
+        n_labels_array_clip = n_labels_array[weights > numeric_precision]
         
         # Get probability mass function
         p_of_n_labels = binomial_dist.pmf(n_labels_array_clip)
@@ -978,7 +1103,8 @@ class FCS_spectrum():
                 t_bin,
                 cpms,
                 N_avg,
-                crop_output = True):
+                crop_output = True,
+                numeric_precision = 1e-4):
         '''
         Calculate a single-species PCH without diffusion or blinking information
 
@@ -1001,20 +1127,24 @@ class FCS_spectrum():
         pch
             np.array (1D) with normalized pch model.
         '''
+        
+        PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
 
         # "Fundamental" single-particle PCH
         pch_single_particle = self.pch_3dgauss_nonideal_1part(F, 
-                                                              t_bin * cpms)
+                                                              t_bin * cpms,
+                                                              PCH_n_photons_max)
         
         # Weights for observation of 1, 2, 3, 4, ... particles
-        p_of_N = self.pch_get_N_spectrum(N_avg)
+        p_of_N = self.pch_get_N_spectrum(N_avg,
+                                         numeric_precision)
         
         # Put weights and fundamental PCH together for full PCH
         pch = self.pch_N_part(pch_single_particle,
                               p_of_N)
 
         if crop_output:
-            pch = pch[:self.PCH_n_photons_max + 1]
+            pch = pch[:PCH_n_photons_max + 1]
             
         return pch
     
@@ -1083,13 +1213,177 @@ class FCS_spectrum():
         return cpms_corr, N_avg_corr
 
 
-    def multi_species_pch(self,
-                          F,
-                          t_bin,
-                          cpms_array,
-                          N_avg_array,
-                          crop_output = True
-                          ):
+    def multi_species_pch_single(self,
+                                 F,
+                                 t_bin,
+                                 cpms_array,
+                                 N_avg_array,
+                                 crop_output = True,
+                                 numeric_precision = 1e-4
+                                 ):
+                
+
+        for i_spec, cpms_spec in enumerate(cpms_array):
+            N_avg_spec = N_avg_array[i_spec]
+                        
+            if i_spec == 0:
+                # Get first species PCH
+                pch = self.get_pch(F,
+                                   t_bin,
+                                   cpms_spec,
+                                   N_avg_spec,
+                                   crop_output = False,
+                                   numeric_precision = numeric_precision)        
+            
+            else:
+                # Colvolve with further species PCH
+                pch = np.convolve(pch, 
+                                  self.get_pch(F,
+                                               t_bin,
+                                               cpms_spec,
+                                               N_avg_spec,
+                                               crop_output = False,
+                                               numeric_precision = numeric_precision),
+                                  mode = 'full')      
+        
+        if crop_output:
+            PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
+            pch = pch[:PCH_n_photons_max + 1]
+            
+        return pch
+    
+    
+    @staticmethod
+    def multi_species_pch_parfunc(F,
+                                  t_bin,
+                                  cpms_spec,
+                                  N_avg_spec,
+                                  PCH_Q,
+                                  PCH_n_photons_max,
+                                  numeric_precision = 1e-4):
+        '''Static method copy of multi_species_pch and its child functions for parallel processing'''
+        
+        ### "Fundamental" single-particle PCH
+        
+        # Get ideal-Gauss PCH
+        # Array with all photon counts > 0 to sample
+        photon_counts_array = np.arange(1, PCH_n_photons_max+1)
+        
+        # Preliminary results container
+        pch_single_particle = np.zeros_like(photon_counts_array, 
+                                            dtype = np.float64)
+        
+        # Iterate over photon counts 
+        for k in photon_counts_array:
+            # Numeric integration over incomplete gamma function
+            pch_single_particle[k-1], _ = sintegrate.quad(lambda x: sspecial.gammainc(k, 
+                                                                                      t_bin * cpms_spec * np.exp(-2*x**2)),
+                                                          0, np.inf)
+            
+        # Scipy.special actually implements regularized lower incompl. gamma func, so we need to scale it
+        pch_single_particle *= sspecial.gamma(photon_counts_array)
+        
+        # Apply prefactors
+        pch_single_particle *=  1 / PCH_Q / np.sqrt(2.) / sspecial.factorial(photon_counts_array)
+        pch_single_particle /= (1 + F)
+        pch_single_particle[0] += 2**(-3/2) / PCH_Q * t_bin * cpms_spec * F
+
+        
+        ### Weights for observation of 1, 2, 3, 4, ... particles
+        # Get scaled <N> as mean for Poisson dist object
+        N_avg_box = PCH_Q * N_avg_spec
+        poisson_dist = sstats.poisson(N_avg_box)
+        
+        # x axis array
+        N_box_array = np.arange(0, np.ceil(N_avg_box * 1E3))
+        # Clip N_box to useful significant values within precision (on righthand side)
+        poisson_sf = poisson_dist.sf(N_box_array)
+        N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > numeric_precision)[0][-1] + 1]
+        
+        # Get probability mass function
+        p_of_N = poisson_dist.pmf(N_box_array_clip)
+
+        
+        ### Put weights and fundamental PCH together for full PCH
+        # Initialize a long array of zeros to contain the full PCH
+        pch_new_full = np.zeros((pch_single_particle.shape[0] + 1 ) * (p_of_N.shape[0] + 1))
+        
+        # Append the probability mass for 0 photons to pch_single_particle
+        pch_1 = np.concatenate((np.array([1 - pch_single_particle.sum()]), pch_single_particle))
+        
+        # Write probability for 0 particles -> 0 photons into full PCH
+        pch_new_full[0] += p_of_N[0]
+        
+        # Write single-particle weighted PCH into full PCH
+        pch_new_full[0:pch_1.shape[0]] += p_of_N[1] * pch_1
+        
+        # Get N-particle PCHs and write them into the full thing through 
+        # iterative convolutions
+        pch_N = pch_1.copy()
+        for pN in p_of_N[2:]:
+            pch_N = np.convolve(pch_N, 
+                                pch_1, 
+                                mode='full')
+            pch_new_full[0:pch_N.shape[0]] += pN * pch_N
+
+        pch = pch_new_full[:PCH_n_photons_max + 1]
+            
+        return pch
+
+    
+    def multi_species_pch_parwrap(self,
+                                  F,
+                                  t_bin,
+                                  cpms_array,
+                                  N_avg_array,
+                                  mp_pool,
+                                  crop_output = True,
+                                  numeric_precision = 1e-4
+                                  ):
+        
+        PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
+
+        # Define parameter list for parallel processes
+        list_of_param_tuples = []
+        for i_spec, cpms_spec in enumerate(cpms_array):
+            N_avg_spec = N_avg_array[i_spec]
+            
+            list_of_param_tuples.append((F,
+                                         t_bin,
+                                         cpms_spec,
+                                         N_avg_spec,
+                                         self.PCH_Q,
+                                         PCH_n_photons_max,
+                                         numeric_precision))
+
+        # Run parallel calculation
+        list_of_species_pch = [mp_pool.starmap(self.multi_species_pch_parfunc, list_of_param_tuples)]
+
+        # Put results together
+        # Get first species PCH
+        pch = list_of_species_pch[0]
+        
+        for i_spec in range(1, cpms_array.shape[0]):
+            # Colvolve with further species PCH
+            pch = np.convolve(pch,
+                              list_of_species_pch[i_spec], 
+                              mode = 'full')      
+            
+        if crop_output:
+            pch = pch[:PCH_n_photons_max + 1]
+            
+        return pch
+
+
+    def multi_species_pch_handler(self,
+                                  F,
+                                  t_bin,
+                                  cpms_array,
+                                  N_avg_array,
+                                  crop_output = True,
+                                  numeric_precision = 1e-4,
+                                  mp_pool = None
+                                  ):
         
         if not utils.isfloat(F) or F <= 0.:
            raise Exception('Invalid input for F: Must be float > 0.') 
@@ -1108,33 +1402,32 @@ class FCS_spectrum():
            
         if not type(crop_output) == bool:
            raise Exception('Invalid input for crop_output: Must be bool.')
-        
+            
+        if not utils.isfloat(numeric_precision) or numeric_precision <= 0. or numeric_precision >= 1.:
+           raise Exception('Invalid input for numeric_precision: Must be float, 0 < numeric_precision < 1.') 
 
-        for i_spec, cpms_spec in enumerate(cpms_array):
-            N_avg_spec = N_avg_array[i_spec]
-            
-            if i_spec == 0:
-                # Get first species PCH
-                pch = self.get_pch(F,
-                                   t_bin,
-                                   cpms_spec,
-                                   N_avg_spec,
-                                   crop_output = False)        
-            
-            else:
-                # Colvolve with further species PCH
-                pch = np.convolve(pch, 
-                                  self.get_pch(F,
-                                               t_bin,
-                                               cpms_spec,
-                                               N_avg_spec,
-                                               crop_output = False),
-                                  mode = 'full')      
-        
-        if crop_output:
-            pch = pch[:self.PCH_n_photons_max + 1]
-            
+        if type(mp_pool) == multiprocessing.Pool:
+            # Parallel execution
+            pch = self.multi_species_pch_parwrap(F,
+                                                 t_bin,
+                                                 cpms_array,
+                                                 N_avg_array,
+                                                 mp_pool,
+                                                 crop_output = crop_output,
+                                                 numeric_precision = numeric_precision
+                                                 )
+        else:
+            # "Normal" execution
+            pch = self.multi_species_pch_single(F,
+                                                t_bin,
+                                                cpms_array,
+                                                N_avg_array,
+                                                crop_output = crop_output,
+                                                numeric_precision = numeric_precision
+                                                )
         return pch
+
+
 
     #%% More complete/complex FCS models
                 
@@ -1232,11 +1525,14 @@ class FCS_spectrum():
                                params,
                                t_bin,
                                time_resolved_PCH = False,
-                               crop_output = False
+                               crop_output = False,
+                               numeric_precision = 1E-4,
+                               mp_pool = None
                                ):
         
         n_species = self.get_n_species(params)
-
+        
+            
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
@@ -1252,14 +1548,18 @@ class FCS_spectrum():
                                                                    beta_blink = params['beta_blink'].value, 
                                                                    F_blink = params['F_blink'].value)
         
-        pch = self.multi_species_pch(F = params['F'].value,
-                                     t_bin = t_bin,
-                                     cpms_array = cpms_array,
-                                     N_avg_array = N_avg_array,
-                                     crop_output = True
-                                     )
+        
+        pch = self.multi_species_pch_handler(F = params['F'].value,
+                                             t_bin = t_bin,
+                                             cpms_array = cpms_array,
+                                             N_avg_array = N_avg_array,
+                                             crop_output = True,
+                                             numeric_precision = numeric_precision,
+                                             mp_pool = mp_pool
+                                             )
         if crop_output:
-            pch = pch[:self.PCH_n_photons_max + 1]
+            PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
+            pch = pch[:PCH_n_photons_max + 1]
 
         return pch
 
@@ -1268,7 +1568,9 @@ class FCS_spectrum():
                                   params,
                                   t_bin,
                                   time_resolved_PCH = False,
-                                  crop_output = False):
+                                  crop_output = False,
+                                  numeric_precision = 1e-4,
+                                  mp_pool = None):
         
         # Unpack parameters
         cpms_0 = params['cpms_0'].value
@@ -1291,7 +1593,8 @@ class FCS_spectrum():
             # Get probabilities for different label stoichiometries, 
             # clipping away extremely unlikely ones for computational feasibility
             n_labels_array, p_of_n_labels = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec],
-                                                                                labelling_efficiency_array[i_spec])
+                                                                                labelling_efficiency_array[i_spec],
+                                                                                numeric_precision = numeric_precision)
             
             # Use parameters to get full array of PCH parameters
             cpms_array_spec = n_labels_array * cpms_0 #  frequency of 0,1,2,3,... labels
@@ -1309,25 +1612,29 @@ class FCS_spectrum():
             
             if i_spec == 0:
                 # Get first species PCH
-                pch = self.multi_species_pch(F = params['F'].value,
-                                             t_bin = t_bin,
-                                             cpms_array = cpms_array_spec,
-                                             N_avg_array = N_array_spec,
-                                             crop_output = True
-                                             )
+                pch = self.multi_species_pch_handler(F = params['F'].value,
+                                                     t_bin = t_bin,
+                                                     cpms_array = cpms_array_spec,
+                                                     N_avg_array = N_array_spec,
+                                                     crop_output = True,
+                                                     numeric_precision = numeric_precision,
+                                                     mp_pool = mp_pool
+                                                     )
             else:
                 # Colvolve with further species PCH
                 pch = np.convolve(pch,
-                                 self.multi_species_pch(F = params['F'].value,
-                                                        t_bin = t_bin,
-                                                        cpms_array = cpms_array_spec,
-                                                        N_avg_array = N_array_spec,
-                                                        crop_output = True
-                                                        ),
+                                 self.multi_species_pch_handler(F = params['F'].value,
+                                                                t_bin = t_bin,
+                                                                cpms_array = cpms_array_spec,
+                                                                N_avg_array = N_array_spec,
+                                                                crop_output = True,
+                                                                numeric_precision = numeric_precision,
+                                                                mp_pool = mp_pool
+                                                                ),
                                  mode = 'full')
-                
             if crop_output:
-                pch = pch[:self.PCH_n_photons_max + 1]
+                PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
+                pch = pch[:PCH_n_photons_max + 1]
 
         return pch
 
@@ -1862,6 +2169,7 @@ class FCS_spectrum():
     
     def run_simple_PCH_fit(self,
                            i_bin_time = None):
+        '''LEGACY, will likely not run any more'''
         
         if not self.PCH_possible:
             raise Exception('Cannot run PCH fit - not all required attributes set in class')
@@ -1957,7 +2265,9 @@ class FCS_spectrum():
                 n_species, # int
                 tau_diff_min, # float
                 tau_diff_max, # float
-                use_blinking # bool
+                use_blinking, # bool
+                i_bin_time = 0, # int
+                use_parallel = False # Bool
                 ):
         
         # A bunch of input and compatibility checks
@@ -2003,7 +2313,10 @@ class FCS_spectrum():
         if type(use_blinking) != bool:
             raise Exception("Invalid input for use_blinking - must be bool")
 
+        if not (utils.isint(i_bin_time) and i_bin_time >= 0):
+            raise Exception("Invalid input for i_bin_time - must be int >= 0")
 
+            
         if spectrum_type == 'discrete':
             # Parameter setup
             initial_params = self.set_up_params_discrete(use_FCS, 
@@ -2052,23 +2365,65 @@ class FCS_spectrum():
         print('\n Initial parameters:')
         [print(f'{key}: {initial_params[key].value} (varied: {initial_params[key].vary})') for key in initial_params.keys()]
         
-        # Define minimization target
-        fitter = lmfit.Minimizer(self.negloglik_global_fit, 
-                                 params = initial_params, 
-                                 fcn_args = (use_FCS, 
-                                             use_PCH, 
-                                             time_resolved_PCH,
-                                             spectrum_type, 
-                                             spectrum_parameter,
-                                             labelling_correction, 
-                                             incomplete_sampling_correction),
-                                 calc_covar = True)
-            
-        fit_result = fitter.minimize(method = 'nelder')
-
+        if use_parallel:
+            mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
+        else:
+            mp_pool = None
         
-
-
+        try:
+            if not self.precision_incremental or not (use_PCH or (labelling_correction and incomplete_sampling_correction)):
+                # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
+                # Define minimization target
+                fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+                                            params = initial_params, 
+                                            method = 'nelder',
+                                            args = (use_FCS, 
+                                                    use_PCH, 
+                                                    time_resolved_PCH,
+                                                    spectrum_type, 
+                                                    spectrum_parameter,
+                                                    labelling_correction, 
+                                                    incomplete_sampling_correction
+                                                    ),
+                                            kws = {'i_bin_time': i_bin_time,
+                                                   'numeric_precision': self.numeric_precision,
+                                                   'mp_pool': mp_pool},
+                                            calc_covar = True)
+                
+                
+            else:
+                # we use incremental precision fitting
+                # Define minimization target
+                for i_inc, inc_precision in enumerate(self.numeric_precision):
+                    
+                    fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+                                                params = initial_params, 
+                                                method = 'nelder',
+                                                args = (use_FCS, 
+                                                        use_PCH, 
+                                                        time_resolved_PCH,
+                                                        spectrum_type, 
+                                                        spectrum_parameter,
+                                                        labelling_correction, 
+                                                        incomplete_sampling_correction),
+                                                kws = {'i_bin_time': i_bin_time,
+                                                       'numeric_precision': inc_precision},
+                                                calc_covar = True)
+                    
+                    if i_inc < self.numeric_precision.shape[0] - 1:
+                        # At least one fit more to run, use output of previous fit as input for next round
+                        initial_params = fit_result.params
+        except:
+            # Something went wrong - whatever, not too much we can do
+            traceback.print_exc()
+            Warning('Cade ran into error. You will likely see a "variable referenced before assignment" error message below. That is an artifact from the error handling logic here, ignore that! The real error message is above this warning.')
+        finally:
+            # In any case, close parpool at the end if possible
+            try:                
+                mp_pool.close()
+            except:
+                pass
+        
         return fit_result
         
         

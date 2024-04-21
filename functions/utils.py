@@ -78,17 +78,23 @@ def read_Kristine_FCS(dir_name,
 
 
 def read_PCMH(dir_name,
-              file_name):
+              file_name,
+              PCH_min_bin_time,
+              PCH_max_bin_time):
 
     # Load PCH data
     in_path_PCH = os.path.join(dir_name, file_name)
     data_PCH = pd.read_csv(in_path_PCH + '.csv', header = 0)
     
     # Row 0 = Column names = bin times
-    data_PCH_bin_times = np.array([float(bin_time) for bin_time in data_PCH.keys()])
+    bin_times = np.array([float(bin_time) for bin_time in data_PCH.keys()])
+    bin_time_mask = np.logical_and(bin_times > PCH_min_bin_time,
+                                   bin_times < PCH_max_bin_time)
+    data_PCH_bin_times = bin_times[bin_time_mask]
     
     # Rows 1...end: PC(M)H data
-    data_PCH_hist = data_PCH.to_numpy()
+    PCH_hist = data_PCH.to_numpy()
+    data_PCH_hist = PCH_hist[:,bin_time_mask]
     
     return data_PCH_bin_times, data_PCH_hist
 
