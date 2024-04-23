@@ -18,10 +18,7 @@ import matplotlib.pyplot as plt
 
 
 # Custom module
-# For localizing module
 repo_dir = os.path.abspath('..')
-
-# For data processing
 sys.path.insert(0, repo_dir)
 from functions import utils
 from functions import fitting
@@ -56,12 +53,12 @@ spectrum_type = 'discrete' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', '
 spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'sherical_dense' #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
-use_blinking = False
+use_blinking = True
 
 
 
 ### FCS settings
-use_FCS = False
+use_FCS = True
 
 # Shortest and longest diffusion time to fit (parameter bounds)
 tau_diff_min = 1E-5
@@ -81,7 +78,7 @@ PCH_min_bin_time = 2E-6
 PCH_max_bin_time = 5E-4
 
 #ää Calculation settings
-use_parallel = True
+use_parallel = False
 
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 

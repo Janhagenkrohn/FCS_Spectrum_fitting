@@ -268,3 +268,182 @@ def isfloat(object_to_check):
 
     '''
     return type(object_to_check) in [float, np.float16, np.float32, np.float64]
+
+
+def dense_to_sparse(dense_trace, 
+                    dtype = None, 
+                    overflow_marker = None,
+                    overflow_policy = 'wrap'):
+    '''
+    Convert sparse representation of photon data to dense time binned trace 
+    representation (except without any binning applied yet).
+
+    Parameters
+    ----------
+    dense_trace : 
+        1D np.array with dense time trace of photons
+    dtype :
+        Data type for sparse_trace output. Must be a numpy unsigned integer type
+        or None. Optional with default None, in which case it will be heuristically 
+        chosen to minimize data size.
+    overflow_marker :
+        Marker for wrap-around of time tags in sparse_trace to allow effective 
+        time tags beyond the dynamic range of the sparse_trace data type. 
+        Optional with default None, which assumes that the overflow_marker is 
+        the highest number in the dynamic range dtype. MUST be None if dtype is None.
+    overflow_policy :
+        How to handle time tags of photons that end up beyond overflow_marker, 
+        i.e., too long for naive storage in the designated dynamic range:
+            'wrap' - values exceeding overflow_marker are wrapped around and a overflow_marker placed in the data
+            'ignore' (not recommended) - do nothing, accepting nonsense values from numeric overflow
+            'raise' - Break calculation and raise an exception when an overflow is encountered
+    Returns
+    -------
+    sparse_trace :
+        1D np.array with unsigned integers that denote photon time tags
+    '''
+    
+    # A bit of input check
+    if not (dense_trace.dtype in [np.uint8, np.uint16, np.uint32, np.uint64]):
+        raise ValueError("dense_trace must be of an unsigned integer numpy type!")
+        
+    if not (dtype in [np.uint8, np.uint16, np.uint32, np.uint64, None]):
+        raise ValueError("Invalid dtype: Can only output unsigned integer numpy types or None for auto-selection!")
+
+    if (dtype is None) and not (overflow_marker is None):
+        raise ValueError("If you specify overflow_marker, you also need to specify dtype!")
+        
+    if dtype is None:
+        # Roughly predict number of bits for uint8, uint16, uint32 and uint64, and pick most efficient one
+        # Calculation: minimize(bits_per_element * (number_of_photons + number_of_overflow_markers))
+        dtype_autopick = np.argmin(np.array([8, 16, 32, 64]) * (np.sum(dense_trace) + np.floor(dense_trace.shape[0] / (2.0**(np.array([8, 16, 32, 64], dtype=np.float64))-1))))
+        dtype = [np.uint8, np.uint16, np.uint32, np.uint64][dtype_autopick]
+        
+    if overflow_marker is None:
+        overflow_marker = dtype(np.iinfo(dtype).max)
+        
+    if not (overflow_policy in ['wrap', 'ignore', 'raise']):
+        raise ValueError("Invalid overflow_policy: Can only be 'wrap', 'ignore' (not recommended), or 'raise'!")
+       
+    if (overflow_policy == 'wrap') and (\
+                                        (overflow_marker > np.iinfo(dtype).max) or \
+                                        (overflow_marker < 0) or \
+                                        (not ((type(overflow_marker) in [np.uint8, np.uint16, np.uint32, np.uint64]) or (overflow_marker is None))) \
+                                        ):
+        raise ValueError("chosen overflow_marker does not work for chosen dtype!")
+    
+    encounters_overflow = dense_trace.shape[0] >= overflow_marker
+    if encounters_overflow and (overflow_policy == 'raise'):
+        raise ValueError("dense_trace is too long for the chosen output data type without overflow wrapping!")
+    
+    # Do conversion
+    max_count = np.max(dense_trace)
+    if (overflow_policy == 'ignore') or \
+        (overflow_policy in ['wrap', 'raise'] and not encounters_overflow): 
+        if max_count <= 1: # Only 0s and 1s
+            sparse_trace = np.nonzero(dense_trace)[0].astype(dtype)
+        else: # multiple photons
+            sparse_trace = np.nonzero(dense_trace)[0].astype(dtype)
+            for n_photons in range(1, max_count):
+                sparse_trace = np.append(sparse_trace, np.nonzero(dense_trace > n_photons)[0].astype(dtype))
+            sparse_trace = np.sort(sparse_trace)
+    elif overflow_policy == 'raise' and encounters_overflow:
+        raise ValueError("Encountered overflow in dense_trace relative to dynamic range allowed by the chosen dtype!")
+    else: # overflow_policy == 'wrap' and encounters_overflow
+        # Convert to sparse representation, for now as np.uint64 for practically unlimited dynamic range (>10^19)
+        sparse_trace = np.nonzero(dense_trace)[0].astype(np.uint64)
+        if max_count > 1: # multiple photons
+            for n_photons in range(1, max_count):
+                sparse_trace = np.append(sparse_trace, np.nonzero(dense_trace > n_photons)[0].astype(np.uint64))
+            sparse_trace = np.sort(sparse_trace)
+
+        # Find overflows and wrap
+        overflows = []
+        overflow = np.nonzero(sparse_trace >= overflow_marker)[0] # Look for overflows
+        while overflow.shape[0] > 0:
+            overflows.append(overflow[0]) 
+            sparse_trace[overflow[0]:] -= (overflow_marker -1)
+            overflow = np.nonzero(sparse_trace >= overflow_marker)[0] # Look for next remaining overflow
+
+        # Convert to target dtype and insert overflows
+        sparse_trace = sparse_trace.astype(dtype)
+        sparse_trace = np.insert(sparse_trace, overflows, overflow_marker) 
+            
+    return sparse_trace
+
+
+def sparse_to_dense(sparse_trace, 
+                    dtype = np.uint8, 
+                    overflow_marker = None, 
+                    clipping_policy = 'clip'):
+    '''
+    Convert sparse representation of photon data to dense time binned trace 
+    representation (except without any binning applied yet).
+
+    Parameters
+    ----------
+    sparse_trace : 
+        1D np.array with unsigned integers that denote photon time tags
+    dtype :
+        Data type for dense_trace output. Must be a numpy unsigned integer type. 
+        Optional with default np.uint8
+    overflow_marker :
+        Marker for wrap-around of time tags in sparse_trace to allow effective 
+        time tags beyond the dynamic range of the sparse_trace data type. 
+        Optional with default None, which assumes that the overflow_marker is 
+        the highest number in the dynamic range of sparse_trace data type.
+    clipping_policy :
+        How to handle cases in which photons came so bunched that the data 
+        type of dense_trace overflows. Optional with default 'clip'. Allowed:
+            'clip' - values exceeding allowed range are clipped to the maximum allowed value
+            'ignore' (not recommended) - do nothing, accepting nonsense values from numeric overflow
+            'raise' - Break calculation and raise an exception when a clipped value is found
+    Returns
+    -------
+    dense_trace :
+        1D np.array with dense time trace of photons
+    '''
+    
+    dtype_in = sparse_trace.dtype
+    
+    # A bit of input check
+    if not (dtype_in in [np.uint8, np.uint16, np.uint32, np.uint64]):
+        raise ValueError("sparse_trace must be of an unsigned integer numpy type!")
+        
+    if not (dtype in [np.uint8, np.uint16, np.uint32, np.uint64]):
+        raise ValueError("Invalid dtype: Can only output unsigned integer numpy types!")
+
+    if overflow_marker is None:
+        overflow_marker = np.iinfo(dtype_in).max
+    elif ((overflow_marker > np.iinfo(dtype_in).max) or (overflow_marker < 0)) or \
+        (type(overflow_marker) != dtype_in):
+        raise ValueError("overflow_marker must have the same datatype as sparse_trace!")
+    elif np.any(sparse_trace > overflow_marker):
+        raise ValueError("sparse_trace contains values not allowed by chosen overflow_marker!")
+        
+    if not clipping_policy in ['clip', 'ignore', 'raise']:
+        raise ValueError("Invalid overflow_policy: Can only be 'clip', 'ignore' (not recommended), or 'raise'!")
+
+    # Unwrap overflows, if needed
+    if np.any(sparse_trace == overflow_marker):
+        sparse_trace = sparse_trace.astype(np.uint64)
+        overflows = np.nonzero(sparse_trace == overflow_marker)[0]
+        for overflow in overflows:
+            sparse_trace[overflow+1:] += (overflow_marker -1) # Apply unwrap
+        sparse_trace = np.delete(sparse_trace, overflows) # Remove overflow_marker
+
+    # Reconstruct dense_trace
+    if np.all(np.diff(sparse_trace) > 0): # Only zeros and ones in dense_trace - easy
+        dense_trace = np.zeros(np.int64(sparse_trace[-1]+1), dtype = dtype)
+        dense_trace[sparse_trace[:]] = 1
+    else: # Multi-photon - more tricky...
+        dense_trace, _ = np.histogram(sparse_trace, bins = np.arange(sparse_trace[-1]+2))
+        if np.any(dense_trace > np.iinfo(dtype).max): # Clipping handling
+            if clipping_policy == 'clip':
+                dense_trace[dense_trace > np.iinfo(dtype).max] = np.iinfo(dtype).max
+            elif clipping_policy == 'raise':
+                raise ValueError("Cannot convert sparse_trace to chosen data type for dense_trace due to too-high photon count!")
+        dense_trace = dense_trace.astype(dtype)
+
+    return dense_trace
+
