@@ -14,7 +14,11 @@ import numpy as np
 import pandas as pd
 
 
-def detect_files(in_dir_names, file_name_pattern, other_info, exclude_path):
+def detect_files(in_dir_names, 
+                 file_name_pattern, 
+                 other_info, 
+                 exclude_path,
+                 file_type_suffix = '.csv'):
     # Automatic input file detection
     
     # Containers for storing results
@@ -35,7 +39,7 @@ def detect_files(in_dir_names, file_name_pattern, other_info, exclude_path):
             file_name, file_suffix = os.path.splitext(file_name_full)
             
             # Register if the found file is a .csv file and is not inside the exclude_path
-            if file_suffix == '.csv' and dir_name != exclude_path:
+            if file_suffix == file_type_suffix and dir_name != exclude_path:
                 _in_file_names.extend([file_name])
                 _in_dir_names.extend([dir_name])
                 _other_info.append(other_info[i_dir])
