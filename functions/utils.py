@@ -124,6 +124,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                 if in_dir_name_PCH == in_dir_name_FCS and not found:
                     # This looks like the right one - Store index for sorting PCH information
                     in_file_names_PCH_argsort.append(i_pch)
+                    found = True
                     
                 elif in_dir_name_PCH == in_dir_name_FCS and found:
                     # We already found the correct PCH, but now we find another? That does not work!
@@ -150,6 +151,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                 if in_dir_name_PCH == in_dir_name_FCS and not found:
                     # This looks like the right one - Store index for sorting PCH information
                     in_file_names_PCH_argsort.append(i_pch)
+                    found = True
                     
                 elif in_dir_name_PCH == in_dir_name_FCS and found:
                     # We already found the correct PCH, but now we find another? That does not work!
@@ -175,7 +177,8 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                 if in_dir_name_PCH == in_dir_name_FCS and not found:
                     # This looks like the right one - Store index for sorting PCH information
                     in_file_names_FCS_argsort.append(i_fcs)
-                    
+                    found = True
+
                 elif in_dir_name_PCH == in_dir_name_FCS and found:
                     # We already found the correct FCS dataset, but now we find another? That does not work!
                     raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined assignment code may be needed.')

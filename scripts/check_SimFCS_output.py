@@ -25,10 +25,24 @@ from functions import utils
 
 in_dir_names= []
 glob_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\simFCS2_simulations'
-
+sim_time_resolution = [] # Simulation time step in seconds - differs between sims sometimes, so we expand it
 
 ''' Which batch(es)'''
-in_dir_names.extend([os.path.join(glob_dir, r'3b')])
+# in_dir_names.extend([os.path.join(glob_dir, r'3a\raw_data')])
+# sim_time_resolution = 1E-6 # 1 us 
+
+# in_dir_names.extend([os.path.join(glob_dir, r'3b\slow')])
+# sim_time_resolution = 1E-5 # 10 us 
+
+in_dir_names.extend([os.path.join(glob_dir, r'3b\fast')])
+sim_time_resolution = 1E-6 # 1 us 
+
+# in_dir_names.extend([os.path.join(glob_dir, r'3c')])
+# sim_time_resolution = 1E-6 # 1 us 
+
+# in_dir_names.extend([os.path.join(glob_dir, r'3c')])
+# sim_time_resolution = 1E-6 # 1 us 
+
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 file_name_pattern = '*batch*'
@@ -37,7 +51,6 @@ file_name_pattern = '*batch*'
 
 sd_method = 'bootstrap'
 
-sim_time_resolution = 1E-5 # 10 us sampling in simulation settings
 
 FCS_tau_min = 1E-6
 FCS_tau_max = 1.
@@ -67,10 +80,10 @@ for i_file, in_dir_name in enumerate(in_dir_names):
     average_count_rate = n_photons / sim_duration
     
     # Prepare output dirs as needed
-    if not os.path.exists(os.path.join(in_dir_name, 'csv_exports')):
-        os.makedirs(os.path.join(in_dir_name, 'csv_exports'))
-    if not os.path.exists(os.path.join(in_dir_name, 'png_exports')):
-        os.makedirs(os.path.join(in_dir_name, 'png_exports'))
+    # Here, in_file_name without its file type extension becomes a subdir
+    save_path = os.path.join(in_dir_name, in_file_names[i_file])
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     
     #%% FCS Export
@@ -164,7 +177,7 @@ for i_file, in_dir_name in enumerate(in_dir_names):
                                      'Correlation': FCS_G,
                                      'ACR[Hz]': acr_col,
                                      'Uncertainty_SD': FCS_sigma})
-    out_table.to_csv(os.path.join(in_dir_name, 'csv_exports', os.path.splitext(in_file_name)[0] + '_ACF_ch0.csv'),
+    out_table.to_csv(os.path.join(save_path, in_file_name + '_ACF_ch0.csv'),
                      index = False, 
                      header = False)
     
@@ -178,7 +191,7 @@ for i_file, in_dir_name in enumerate(in_dir_names):
     plot_y_min_max = (np.percentile(FCS_G, 3), np.percentile(FCS_G, 97))
     ax.set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
                 plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
-    plt.savefig(os.path.join(in_dir_name, 'png_exports', os.path.splitext(in_file_name)[0] + '_ACF_ch0.png'), 
+    plt.savefig(os.path.join(save_path, in_file_name + '_ACF_ch0.png'), 
                 dpi=300)
     plt.close()
     
@@ -253,13 +266,13 @@ for i_file, in_dir_name in enumerate(in_dir_names):
     out_table = pd.DataFrame(data = {str(bin_time): pcmh[:,i_bin_time] for i_bin_time, bin_time in enumerate(bin_times)})
     
     
-    out_table.to_csv(os.path.join(in_dir_name, 'csv_exports', os.path.splitext(in_file_name)[0] + '_PCMH_ch0.csv'), 
+    out_table.to_csv(os.path.join(save_path, in_file_name + '_PCMH_ch0.csv'), 
                      index = False, 
                      header = True)
     
     out_table = pd.DataFrame(data = {'Bin Times [s]': bin_times,
                                      'Mandel Q': Mandel_Q_series})
-    out_table.to_csv(os.path.join(in_dir_name, 'csv_exports', os.path.splitext(in_file_name)[0] + '_Mandel_Q_ch0.csv'), 
+    out_table.to_csv(os.path.join(save_path, in_file_name + '_Mandel_Q_ch0.csv'), 
                      index = False, 
                      header = True)
     
@@ -294,6 +307,6 @@ for i_file, in_dir_name in enumerate(in_dir_names):
     ax[1].set_title("Mandel's Q")
     
     
-    plt.savefig(os.path.join(in_dir_name, 'png_exports', os.path.splitext(in_file_name)[0] + '_PCMH_ch0.png'), 
+    plt.savefig(os.path.join(save_path, in_file_name + '_PCMH_ch0.png'), 
                 dpi=300)
     plt.close()

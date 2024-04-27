@@ -29,16 +29,16 @@ from functions import fitting
 in_dir_names= []
 alpha_label = []
 # glob_dir = '/fs/pool/pool-schwille-spt/Experiment_analysis/20231117_JHK_NKaletta_ParM_oligomerization'
-glob_dir = r'D:\Testdata'
+glob_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\simFCS2_simulations\3a\csv_exports'
 
 
 ''' Labelled protein fraction'''
-in_dir_names.extend([os.path.join(glob_dir, 'Calibration_AF488_23C_1')])
+in_dir_names.extend([os.path.join(glob_dir)])
 alpha_label.append(1.) # 50 nM in 20 µM
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
-file_name_pattern_PCH = '*PCMH_ch0_ch1*' # Dual-channel PCH
-file_name_pattern_FCS = '*CCF_symm_ch0_ch1_bg*' # CCF
+file_name_pattern_PCH = '*batch3a_cond5*_PCMH_ch0*' # Dual-channel PCH
+file_name_pattern_FCS = '*batch3a_cond5*_ACF_ch0*' # CCF
 
 #%% Fit settings
 
