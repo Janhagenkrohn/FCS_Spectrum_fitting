@@ -34,11 +34,11 @@ sim_time_resolution = [] # Simulation time step in seconds - differs between sim
 # in_dir_names.extend([os.path.join(glob_dir, r'3b\slow')])
 # sim_time_resolution = 1E-5 # 10 us 
 
-in_dir_names.extend([os.path.join(glob_dir, r'3b\fast')])
-sim_time_resolution = 1E-6 # 1 us 
-
-# in_dir_names.extend([os.path.join(glob_dir, r'3c')])
+# in_dir_names.extend([os.path.join(glob_dir, r'3b\fast')])
 # sim_time_resolution = 1E-6 # 1 us 
+
+in_dir_names.extend([os.path.join(glob_dir, r'3c')])
+sim_time_resolution = 1E-6 # 1 us 
 
 # in_dir_names.extend([os.path.join(glob_dir, r'3c')])
 # sim_time_resolution = 1E-6 # 1 us 

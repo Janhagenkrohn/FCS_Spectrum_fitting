@@ -484,7 +484,7 @@ class FCS_spectrum():
         wrss = np.sum(((acf_model - self.data_FCS_G) / self.data_FCS_sigma) ** 2)
         
         # Return reduced chi-square
-        red_chi_sq =  wrss / (self.data_FCS_G.shape[0])
+        red_chi_sq =  wrss / self.data_FCS_G.shape[0]
         
         return red_chi_sq
 
@@ -1074,6 +1074,10 @@ class FCS_spectrum():
             Cave: This is a truncated PCH that starts at the bin for 1 photon!
 
         '''
+        # Exception workaround for weird parameter constellations
+        if p_of_N.shape[0] == 1:
+            p_of_N = np.append(p_of_N, [0.])
+        
         # Initialize a long array of zeros to contain the full PCH
         pch_full = np.zeros((pch_single_particle.shape[0] + 1 ) * (p_of_N.shape[0] + 1))
         
@@ -1385,26 +1389,26 @@ class FCS_spectrum():
                                   mp_pool = None
                                   ):
         
-        if not utils.isfloat(F) or F <= 0.:
-           raise Exception('Invalid input for F: Must be float > 0.') 
+        if not utils.isfloat(F) or F < 0.:
+            raise Exception('Invalid input for F: Must be float >= 0.') 
 
         if not utils.isfloat(t_bin) or t_bin <= 0.:
-           raise Exception('Invalid input for t_bin: Must be float > 0.') 
+            raise Exception('Invalid input for t_bin: Must be float > 0.') 
 
         if not utils.isiterable(cpms_array):
-           raise Exception('Invalid input for cpms_array: Must be array.') 
+            raise Exception('Invalid input for cpms_array: Must be array.') 
             
         if not utils.isiterable(N_avg_array):
-           raise Exception('Invalid input for N_avg_array: Must be array.')
+            raise Exception('Invalid input for N_avg_array: Must be array.')
            
         if not cpms_array.shape[0] == N_avg_array.shape[0]:
-           raise Exception('cpms_array and N_avg_array must have same length.')
+            raise Exception('cpms_array and N_avg_array must have same length.')
            
         if not type(crop_output) == bool:
-           raise Exception('Invalid input for crop_output: Must be bool.')
+            raise Exception('Invalid input for crop_output: Must be bool.')
             
         if not utils.isfloat(numeric_precision) or numeric_precision <= 0. or numeric_precision >= 1.:
-           raise Exception('Invalid input for numeric_precision: Must be float, 0 < numeric_precision < 1.') 
+            raise Exception('Invalid input for numeric_precision: Must be float, 0 < numeric_precision < 1.') 
 
         if type(mp_pool) == multiprocessing.Pool:
             # Parallel execution
@@ -1819,7 +1823,7 @@ class FCS_spectrum():
             if use_FCS or (use_PCH and time_resolved_PCH):
                 # Diffusion time only for FCS and PCMH
                 initial_params.add(f'tau_diff_{i_spec}', 
-                                   value = 1E-3, 
+                                   value = np.sqrt(tau_diff_min * tau_diff_max), # Initialize at geo mean of bounds
                                    min = tau_diff_min,
                                    max = tau_diff_max,
                                    vary = True)
@@ -2362,16 +2366,18 @@ class FCS_spectrum():
                                                     use_blinking
                                                     )
             
-        print('\n Initial parameters:')
-        [print(f'{key}: {initial_params[key].value} (varied: {initial_params[key].vary})') for key in initial_params.keys()]
-        
+        print('\n   Initial parameters:')
+        [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
+        print('\n   Constants & dep. variables:')
+        [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
+
         if use_parallel:
             mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
         else:
             mp_pool = None
         
         try:
-            if not self.precision_incremental or not (use_PCH or (labelling_correction and incomplete_sampling_correction)):
+            if (not self.precision_incremental) or (not (use_PCH or (labelling_correction and incomplete_sampling_correction))):
                 # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
                 # Define minimization target
                 fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
@@ -2408,7 +2414,7 @@ class FCS_spectrum():
                                                         incomplete_sampling_correction),
                                                 kws = {'i_bin_time': i_bin_time,
                                                        'numeric_precision': inc_precision},
-                                                calc_covar = True)
+                                                calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
                     
                     if i_inc < self.numeric_precision.shape[0] - 1:
                         # At least one fit more to run, use output of previous fit as input for next round
@@ -2421,10 +2427,10 @@ class FCS_spectrum():
             # In any case, close parpool at the end if possible
             try:                
                 mp_pool.close()
+                return fit_result
             except:
-                pass
+                return None
         
-        return fit_result
         
         
         

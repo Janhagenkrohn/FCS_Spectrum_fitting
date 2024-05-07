@@ -39,7 +39,7 @@ def detect_files(in_dir_names,
             file_name, file_suffix = os.path.splitext(file_name_full)
             
             # Register if the found file is a .csv file and is not inside the exclude_path
-            if file_suffix == file_type_suffix and dir_name != exclude_path:
+            if file_suffix == file_type_suffix and dir_name != exclude_path and not (path_is_parent(exclude_path, dir_name)):
                 _in_file_names.extend([file_name])
                 _in_dir_names.extend([dir_name])
                 _other_info.append(other_info[i_dir])
@@ -48,6 +48,16 @@ def detect_files(in_dir_names,
         raise Exception(f'Searched {i_dir+1} directories, but could not detect any files.')
         
     return _in_dir_names, _in_file_names, _other_info
+
+
+def path_is_parent(parent_path, child_path):
+    # Copy-paste from https://stackoverflow.com/questions/3812849/how-to-check-whether-a-directory-is-a-sub-directory-of-another-directory
+    # Smooth out relative path names, note: if you are concerned about symbolic links, you should use os.path.realpath too
+    parent_path = os.path.abspath(parent_path)
+    child_path = os.path.abspath(child_path)
+
+    # Compare the common path of the parent and child path with the common path of just the parent path. Using the commonpath method on just the parent path will regularise the path name in the same way as the comparison that deals with both paths, removing any trailing path separator
+    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
 
 
 def read_Kristine_FCS(dir_name,
@@ -142,7 +152,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
         # We use FCS as reference to sort PCH
         in_file_names_PCH_argsort = []
         
-        for in_dir_name in in_dir_names_FCS:
+        for in_dir_name_FCS in in_dir_names_FCS:
         # Find the index of the corresponding PCH file
             
             found = False
@@ -168,7 +178,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
         
         in_file_names_FCS_argsort = []
         
-        for in_dir_name in in_dir_names_PCH:
+        for in_dir_name_PCH in in_dir_names_PCH:
         # Find the index of the corresponding PCH file
             
             found = False
