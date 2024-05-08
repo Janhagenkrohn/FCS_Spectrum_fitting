@@ -49,7 +49,7 @@ file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, 'Testfit/FCS_Only')
+save_path = os.path.join(glob_dir, 'Testfit/PCH_signle_discrete')
 
 
 
@@ -90,8 +90,8 @@ time_resolved_PCH = True
 PCH_min_bin_time = 0. # Use 0. to use full range of data in .csv file
 PCH_max_bin_time = 5E-4 # Use np.inf to use full range of data in .csv file
 
-#ää Calculation settings
-use_parallel = True
+# Calculation settings
+use_parallel = False
 
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 
@@ -112,24 +112,30 @@ PCH_Q = 8. # More calculation parameter than metadata, but whatever
 
 # Automatic input file detection
 
-# Detect PCH files
-in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(in_dir_names,
-                                                                      file_name_pattern_PCH, 
-                                                                      alpha_label, 
-                                                                      save_path)
+if use_PCH:
+    # Detect PCH files
+    in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(in_dir_names,
+                                                                          file_name_pattern_PCH, 
+                                                                          alpha_label, 
+                                                                          save_path)
 
-# Repeat for FCS
-in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(in_dir_names, 
-                                                            file_name_pattern_FCS, 
-                                                            alpha_label,
-                                                            save_path)
-
-in_dir_names, in_file_names_FCS, in_file_names_PCH, alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-                                                                                               in_file_names_FCS,
-                                                                                               alpha_label_FCS,
-                                                                                               in_dir_names_PCH,
-                                                                                               in_file_names_PCH,
-                                                                                               alpha_label_PCH)
+if use_FCS:
+    # Repeat for FCS
+    in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(in_dir_names, 
+                                                                file_name_pattern_FCS, 
+                                                                alpha_label,
+                                                                save_path)
+if use_PCH and use_FCS:
+    in_dir_names, in_file_names_FCS, in_file_names_PCH, alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
+                                                                                                   in_file_names_FCS,
+                                                                                                   alpha_label_FCS,
+                                                                                                   in_dir_names_PCH,
+                                                                                                   in_file_names_PCH,
+                                                                                                   alpha_label_PCH)
+elif use_PCH and not use_FCS:
+    in_dir_names = in_dir_names_PCH
+else: # use_FCS and not use_PCH:
+    in_dir_names = in_dir_names_FCS
     
 # Prepare output
 if not os.path.exists(save_path):
@@ -150,34 +156,35 @@ fit_res_path += '.csv'
 for i_file, dir_name in enumerate(in_dir_names):
     
     # Command line message
-    time_tag = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    time_tag = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     message = 'Fitting '
     message += in_file_names_FCS[i_file] if use_FCS else ''
     message += ' and ' if (use_FCS and use_PCH) else ''
     message += in_file_names_PCH[i_file] if use_PCH else ''
-    message += ' globally:' if (use_FCS and use_PCH) else ':'
+    message += ' globally:' if (use_FCS and use_PCH) else ''
     print('\n' + time_tag + '\n' + message)
     
     try:
-        data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
-                                                                                                                 in_file_names_FCS[i_file],
-                                                                                                                 FCS_min_lag_time,
-                                                                                                                 FCS_max_lag_time)
-        
-        data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
-                                                            in_file_names_PCH[i_file],
-                                                            PCH_min_bin_time,
-                                                            PCH_max_bin_time)
+        if use_FCS:
+            data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
+                                                                                                                     in_file_names_FCS[i_file],
+                                                                                                                     FCS_min_lag_time,
+                                                                                                                     FCS_max_lag_time)
+        if use_PCH:
+            data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
+                                                                in_file_names_PCH[i_file],
+                                                                PCH_min_bin_time,
+                                                                PCH_max_bin_time)
         
         fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
                                       FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
                                       PCH_Q = PCH_Q,
                                       acquisition_time_s = acquisition_time_s if acquisition_time_s > 0 else 90., # Dummy for debugging with old-format data
-                                      data_FCS_tau_s = data_FCS_tau_s,
-                                      data_FCS_G = data_FCS_G,
-                                      data_FCS_sigma = data_FCS_sigma,
-                                      data_PCH_bin_times = data_PCH_bin_times,
-                                      data_PCH_hist = data_PCH_hist,
+                                      data_FCS_tau_s = data_FCS_tau_s if use_FCS else None,
+                                      data_FCS_G = data_FCS_G if use_FCS else None,
+                                      data_FCS_sigma = data_FCS_sigma if use_FCS else None,
+                                      data_PCH_bin_times = data_PCH_bin_times if use_PCH else None,
+                                      data_PCH_hist = data_PCH_hist if use_PCH else None,
                                       labelling_efficiency = labelling_efficiency,
                                       numeric_precision = numeric_precision
                                       )
@@ -200,7 +207,7 @@ for i_file, dir_name in enumerate(in_dir_names):
         
         fit_params = fit_result.params
         out_name = os.path.join(save_path,
-                                time_tag + f'{in_file_names_FCS[i_file]}_fit_{spectrum_type}_{n_species}spec')
+                                time_tag + f'{in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] }_fit_{spectrum_type}_{n_species}spec')
         
         # Command line preview of fit results
         print('\n   Fitted parameters:')
@@ -209,7 +216,7 @@ for i_file, dir_name in enumerate(in_dir_names):
         # Write fit results
         fit_result_dict = {}
         
-        fit_result_dict['file'] = in_file_names_FCS[i_file]
+        fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
         for key in fit_params.keys():
             fit_result_dict[key + '_val'] = fit_params[key].value
             fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'

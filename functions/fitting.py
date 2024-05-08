@@ -142,6 +142,7 @@ class FCS_spectrum():
         '''
         # Acquisition metadata and technical settings
         
+        # This parameter is actually currently unused...Whatever.
         if utils.isfloat(FCS_psf_width_nm):
             if FCS_psf_width_nm > 0:
                 self.FCS_psf_width_nm = FCS_psf_width_nm
@@ -239,7 +240,7 @@ class FCS_spectrum():
         if utils.isempty(data_FCS_sigma) or not self.FCS_possible:
             self.data_FCS_sigma = None
             self.FCS_possible = False
-        if utils.isiterable(data_FCS_sigma):
+        elif utils.isiterable(data_FCS_sigma):
             data_FCS_sigma = np.array(data_FCS_sigma)
             if data_FCS_sigma.shape[0] == data_FCS_tau_s.shape[0]:
                 self.data_FCS_sigma = data_FCS_sigma
@@ -1777,8 +1778,8 @@ class FCS_spectrum():
         if use_PCH and not self.PCH_possible:
             raise Exception('Cannot run PCH fit - not all required attributes set in class')
             
-        if (use_PCH and time_resolved_PCH) and not self.FCS_possible:
-            raise Exception('Cannot run PCMH fit - not all required attributes set in class')
+        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not (utils.isint(n_species) and n_species > 0):
             raise Exception("Invalid input for n_species - must be int > 0")
@@ -1880,8 +1881,8 @@ class FCS_spectrum():
         if use_PCH and not self.PCH_possible:
             raise Exception('Cannot run PCH fit - not all required attributes set in class')
                     
-        if (use_PCH and time_resolved_PCH) and not self.FCS_possible:
-            raise Exception('Cannot run PCMH fit - not all required attributes set in class')
+        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
             
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
@@ -2011,8 +2012,8 @@ class FCS_spectrum():
         if use_PCH and not self.PCH_possible:
             raise Exception('Cannot run PCH fit - not all required attributes set in class')
 
-        if (use_PCH and time_resolved_PCH) and not self.FCS_possible:
-            raise Exception('Cannot run PCMH fit - not all required attributes set in class')
+        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception("Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
@@ -2281,8 +2282,8 @@ class FCS_spectrum():
         if use_PCH and not self.PCH_possible:
             raise Exception('Cannot run PCH fit - not all required attributes set in class')
 
-        if time_resolved_PCH and not self.FCS_possible:
-            raise Exception('Cannot run PCMH fit - not all required attributes set in class')
+        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not spectrum_type in ['discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception("Invalid input for spectrum_type - must be one out of 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'")
@@ -2425,8 +2426,9 @@ class FCS_spectrum():
             Warning('Cade ran into error. You will likely see a "variable referenced before assignment" error message below. That is an artifact from the error handling logic here, ignore that! The real error message is above this warning.')
         finally:
             # In any case, close parpool at the end if possible
-            try:                
-                mp_pool.close()
+            try:       
+                if not mp_pool == None:
+                    mp_pool.close()
                 return fit_result
             except:
                 return None
