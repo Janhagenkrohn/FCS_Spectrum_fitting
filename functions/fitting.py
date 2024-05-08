@@ -44,7 +44,8 @@ class FCS_spectrum():
                  data_PCH_bin_times = None,
                  data_PCH_hist = None,
                  labelling_efficiency = 1.,
-                 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
+                 numeric_precision = np.array([1E-3, 1E-4, 1E-5]),
+                 verbosity = 1
                  ):
         '''
         Class for single or combined fitting of FCS and/or PCH.
@@ -138,7 +139,10 @@ class FCS_spectrum():
             and incrementally fine-tune parameters at higher calcualtion 
             precision, rather than solving the computationally expensive 
             high-precision model at every step of the fit procedure.
-
+        verbosity :
+            OPTIONAL int with default 1. Tunes the amount of command line 
+            feedback, with more feedback at higher number. Currently meaningful 
+            levels are 0, 1, 2.
         '''
         # Acquisition metadata and technical settings
         
@@ -213,6 +217,13 @@ class FCS_spectrum():
             raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
 
 
+        if utils.isint(verbosity):
+            self.verbosity = verbosity
+            
+        else:
+            raise ValueError('verbosity must be int')
+            
+            
         # FCS input data to be fitted
         if utils.isempty(data_FCS_tau_s) or not self.FCS_possible:
             self.data_FCS_tau_s = None  
@@ -1677,8 +1688,8 @@ class FCS_spectrum():
         if not utils.isiterable(tau_diff_array):
             raise Exception("Invalid input for tau_diff_array - must be np.array")
             
-        if not (oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         # The monomer by definition has stoichiometry 1, so we start with the second element
         fold_changes = tau_diff_array[1:] / tau_diff_array[0]
@@ -1706,7 +1717,7 @@ class FCS_spectrum():
                                 args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
         
-        else: # oligomer_type == 'double_filament'
+        elif oligomer_type == 'double_filament':
         
             stoichiometry = np.zeros_like(fold_changes)
             
@@ -1716,8 +1727,11 @@ class FCS_spectrum():
                                 x0 = np.array([1.]),
                                 args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
-        
-        return np.round(stoichiometry)
+        else: # oligomer_type == naive
+            # Simple enumeration where we actually ignore the fold changes
+            stoichiometry = np.arange(1, tau_diff_array.shape[0] + 1)
+            
+        return np.round(stoichiometry).astype(np.float64)
     
        
     def set_blinking_initial_params(self,
@@ -1887,8 +1901,8 @@ class FCS_spectrum():
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
-        if not (oligomer_type in ['continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception("Invalid input for n_species - must be int >= 10 for regularized fitting")
@@ -2018,8 +2032,8 @@ class FCS_spectrum():
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception("Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
 
-        if not (oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception("Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
@@ -2291,8 +2305,8 @@ class FCS_spectrum():
         if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
             raise Exception("Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
     
-        if not (oligomer_type in ['continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] or spectrum_type == 'discrete'):
-            raise Exception("Invalid input for oligomer_type - unless spectrum_type is 'discrete', oligomer_type must be one out of 'continuous_spherical', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] or spectrum_type == 'discrete'):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
         
         if type(labelling_correction) != bool:
             raise Exception("Invalid input for labelling_correction - must be bool")
@@ -2366,11 +2380,13 @@ class FCS_spectrum():
                                                     tau_diff_max, 
                                                     use_blinking
                                                     )
+        if self.verbosity > 0:
+            print('\n   Initial parameters:')
+            [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
             
-        print('\n   Initial parameters:')
-        [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
-        print('\n   Constants & dep. variables:')
-        [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
+        if self.verbosity > 1:
+            print('\n   Constants & dep. variables:')
+            [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
 
         if use_parallel:
             mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)

@@ -36,9 +36,9 @@ glob_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_H
 
 
 ''' Labelled protein fraction'''
-in_dir_names.extend([os.path.join(glob_dir, '3a\Exports')])
-in_dir_names.extend([os.path.join(glob_dir, '3b\Exports')])
-in_dir_names.extend([os.path.join(glob_dir, '3c\Exports')])
+in_dir_names.extend([os.path.join(glob_dir, r'3a\Exports')])
+in_dir_names.extend([os.path.join(glob_dir, r'3b\Exports')])
+in_dir_names.extend([os.path.join(glob_dir, r'3c\Exports')])
 
 alpha_label.append(1.) # 50 nM in 20 µM
 alpha_label.append(1.) # 50 nM in 20 µM
@@ -49,7 +49,7 @@ file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, 'Testfit/PCH_signle_discrete')
+save_path = os.path.join(glob_dir, r'Testfit\FCS_Gauss_amp_naive')
 
 
 
@@ -61,17 +61,17 @@ labelling_correction = False
 labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
-n_species = 1
-spectrum_type = 'discrete' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+n_species = 50
+spectrum_type = 'par_Gauss' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type = 'sherical_dense' #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking = False
 
 
 
 ### FCS settings
-use_FCS = False
+use_FCS = True
 
 # Shortest and longest diffusion time to fit (parameter bounds)
 tau_diff_min = 1E-5
@@ -83,7 +83,7 @@ FCS_max_lag_time = np.inf  # Use np.inf to use full range of data in .csv file
 
 
 ### PCH settings
-use_PCH = True
+use_PCH = False
 time_resolved_PCH = True
 
 # Shortest and longest bin times to consider
@@ -91,7 +91,7 @@ PCH_min_bin_time = 0. # Use 0. to use full range of data in .csv file
 PCH_max_bin_time = 5E-4 # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
-use_parallel = False
+use_parallel = True
 
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 
@@ -156,14 +156,15 @@ fit_res_path += '.csv'
 for i_file, dir_name in enumerate(in_dir_names):
     
     # Command line message
-    time_tag = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_tag = datetime.datetime.now()
     message = 'Fitting '
     message += in_file_names_FCS[i_file] if use_FCS else ''
     message += ' and ' if (use_FCS and use_PCH) else ''
     message += in_file_names_PCH[i_file] if use_PCH else ''
     message += ' globally:' if (use_FCS and use_PCH) else ''
-    print('\n' + time_tag + '\n' + message)
+    print('\n' + time_tag.strftime("%Y-%m-%d %H:%M:%S") + '\n' + message)
     
+
     try:
         if use_FCS:
             data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
@@ -186,7 +187,8 @@ for i_file, dir_name in enumerate(in_dir_names):
                                       data_PCH_bin_times = data_PCH_bin_times if use_PCH else None,
                                       data_PCH_hist = data_PCH_hist if use_PCH else None,
                                       labelling_efficiency = labelling_efficiency,
-                                      numeric_precision = numeric_precision
+                                      numeric_precision = numeric_precision,
+                                      verbosity = 1
                                       )
         
         
@@ -205,189 +207,197 @@ for i_file, dir_name in enumerate(in_dir_names):
                                     use_parallel = use_parallel # Bool
                                     )
         
-        fit_params = fit_result.params
-        out_name = os.path.join(save_path,
-                                time_tag + f'{in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] }_fit_{spectrum_type}_{n_species}spec')
-        
-        # Command line preview of fit results
-        print('\n   Fitted parameters:')
-        [print(f'{key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
-        
-        # Write fit results
-        fit_result_dict = {}
-        
-        fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
-        for key in fit_params.keys():
-            fit_result_dict[key + '_val'] = fit_params[key].value
-            fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
-            if not fit_params[key].stderr == None:
-                fit_result_dict[key + '_err'] = fit_params[key].stderr
-        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-        
-        if not os.path.isfile(fit_res_path):
-            # Does not yet exist - create with header
-            fit_result_df.to_csv(fit_res_path, 
-                                 header = True, 
-                                 index = False)
-        else:
-            # Exists - append
-            fit_result_df.to_csv(fit_res_path, 
-                                 mode = 'a', 
-                                 header = False, 
-                                 index = False)
-    
-        
-        # Show and write fits themselves
-        if use_FCS:
-            if not labelling_correction:
-                model_FCS = fitter.get_acf_full_labelling(fit_params)
+        if not fit_result == None:
+            fit_params = fit_result.params
+            out_name = os.path.join(save_path,
+                                    time_tag.strftime("%Y%m%d-%H%M%S") + f'{in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] }_fit_{spectrum_type}_{n_species}spec')
+            
+            # Command line preview of fit results
+            print('\n   Fitted parameters:')
+            [print(f'{key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
+            
+            # Write fit results
+            fit_result_dict = {}
+            
+            fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
+            for key in fit_params.keys():
+                fit_result_dict[key + '_val'] = fit_params[key].value
+                fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
+                if not fit_params[key].stderr == None:
+                    fit_result_dict[key + '_err'] = fit_params[key].stderr
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            
+            if not os.path.isfile(fit_res_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_path, 
+                                     header = True, 
+                                     index = False)
             else:
-                model_FCS = fitter.get_acf_partial_labelling(fit_params)
+                # Exists - append
+                fit_result_df.to_csv(fit_res_path, 
+                                     mode = 'a', 
+                                     header = False, 
+                                     index = False)
+        
             
-            # Plot FCS fit
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.semilogx(data_FCS_tau_s,
-                        data_FCS_G, 
-                        'dk')
-            ax.semilogx(data_FCS_tau_s, 
-                        data_FCS_G + data_FCS_sigma,
-                        '-k', 
-                        alpha = 0.7)
-            ax.semilogx(data_FCS_tau_s, 
-                        data_FCS_G - data_FCS_sigma,
-                        '-k', 
-                        alpha = 0.7)
-            ax.semilogx(data_FCS_tau_s,
-                        model_FCS, 
-                        marker = '',
-                        linestyle = '-', 
-                        color = 'tab:gray')  
-    
-            fig.supxlabel('Correlation time [s]')
-            fig.supylabel('G(\u03C4)')
-            ax.set_xlim(data_FCS_tau_s[0], data_FCS_tau_s[-1])
-            plot_y_min_max = (np.percentile(data_FCS_G, 3), np.percentile(data_FCS_G, 97))
-            ax.set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
-                        plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
-    
-            # Save and show figure
-            plt.savefig(os.path.join(save_path, 
-                                     out_name + '_FCS.png'), 
-                        dpi=300)
-            plt.show()
-            
-            
-            # Write spreadsheet
-            out_table = pd.DataFrame(data = {'Lagtime[s]':data_FCS_tau_s, 
-                                             'Correlation': data_FCS_G,
-                                             'Uncertainty_SD': data_FCS_sigma,
-                                             'Fit': model_FCS})
-            out_table.to_csv(os.path.join(save_path, 
-                                          out_name + '_FCS.csv'),
-                             index = False, 
-                             header = True)
-    
-    
-        if use_PCH:
-    
-            if not labelling_correction:
-                model_PCH = fitter.get_pch_full_labelling(fit_params,
-                                                          t_bin = data_PCH_bin_times[0],
-                                                          time_resolved_PCH = time_resolved_PCH,
-                                                          crop_output = True,
-                                                          numeric_precision = np.min(numeric_precision),
-                                                          mp_pool = None
-                                                          )
-            else: 
-                model_PCH = fitter.get_pch_partial_labelling(fit_params,
-                                                             t_bin = data_PCH_bin_times[0],
-                                                             time_resolved_PCH = time_resolved_PCH,
-                                                             crop_output = True,
-                                                             numeric_precision = np.min(numeric_precision),
-                                                             mp_pool = None)
-            
-            # Plot PCH fit
-            # Cycle through colors
-            prop_cycle = plt.rcParams['axes.prop_cycle']
-            colors = cycle(prop_cycle.by_key()['color'])
-            iter_color = next(colors)
-    
-            
-            fig2, ax2 = plt.subplots(1, 1)
-            ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
-                         data_PCH_hist[:,0],
-                         marker = '.',
-                         linestyle = 'none',
-                         color = iter_color)
-            
-            ax2.semilogy(np.arange(0, model_PCH.shape[0]),
-                         model_PCH * data_PCH_hist[:,0].sum(),
-                         marker = '',
-                         linestyle = '-',
-                         color = iter_color)
-            
-            max_x = np.nonzero(data_PCH_hist[:,0])[0][-1]
-            max_y = np.max(data_PCH_hist[:,0])
-            
-            if time_resolved_PCH:
-                # PCMH
-                for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
-                    iter_color = next(colors)
-                    if not labelling_correction:
-                        model_PCH = fitter.get_pch_full_labelling(fit_params,
-                                                                  t_bin = data_PCH_bin_times[i_bin_time],
-                                                                  time_resolved_PCH = time_resolved_PCH,
-                                                                  crop_output = True,
-                                                                  numeric_precision = np.min(numeric_precision),
-                                                                  mp_pool = None
-                                                                  )
-                    else: 
-                        model_PCH = fitter.get_pch_partial_labelling(fit_params,
-                                                                     t_bin = data_PCH_bin_times[i_bin_time],
-                                                                     time_resolved_PCH = time_resolved_PCH,
-                                                                     crop_output = True,
-                                                                     numeric_precision = np.min(numeric_precision),
-                                                                     mp_pool = None)
-                    
-                    
-                    ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
-                                 data_PCH_hist[:,i_bin_time],
-                                 marker = '.',
-                                 linestyle = 'none',
-                                 color = iter_color)
-                    
-                    ax2.semilogy(np.arange(0, model_PCH.shape[0]),
-                                 model_PCH * data_PCH_hist[:,i_bin_time].sum(),
-                                 marker = '',
-                                 linestyle = '-',
-                                 color = iter_color)
-            
-                    max_x = np.max([max_x, np.nonzero(data_PCH_hist[:,i_bin_time])[0][-1]])
-                    max_y = np.max([max_y, np.max(data_PCH_hist[:,i_bin_time])])
-                    
-                    
-            ax2.set_xlim(-0.49, max_x + 1.49)
-            ax2.set_ylim(0.3, max_y * 1.7)
-            ax2.set_title('PCH fit')
-            fig2.supxlabel('Photons in bin')
-            fig2.supylabel('Counts')
-    
-            # Save and show figure
-            plt.savefig(os.path.join(save_path, 
-                                     out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.png'), 
-                        dpi=300)
-            plt.show()
-            
-            # Write spreadsheet
-            out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 
-                        str(data_PCH_bin_times[0]): data_PCH_hist[:,0]}
-            if time_resolved_PCH:
-                for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
-                    out_dict[str(data_PCH_bin_times[i_bin_time])] = data_PCH_hist[:,i_bin_time]
-            out_table = pd.DataFrame(data = out_dict)
-            out_table.to_csv(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'),
-                             index = False, 
-                             header = True)
+            # Show and write fits themselves
+            if use_FCS:
+                if not labelling_correction:
+                    model_FCS = fitter.get_acf_full_labelling(fit_params)
+                else:
+                    model_FCS = fitter.get_acf_partial_labelling(fit_params)
+                
+                # Plot FCS fit
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                ax.semilogx(data_FCS_tau_s,
+                            data_FCS_G, 
+                            'dk')
+                ax.semilogx(data_FCS_tau_s, 
+                            data_FCS_G + data_FCS_sigma,
+                            '-k', 
+                            alpha = 0.7)
+                ax.semilogx(data_FCS_tau_s, 
+                            data_FCS_G - data_FCS_sigma,
+                            '-k', 
+                            alpha = 0.7)
+                ax.semilogx(data_FCS_tau_s,
+                            model_FCS, 
+                            marker = '',
+                            linestyle = '-', 
+                            color = 'tab:gray')  
+        
+                fig.supxlabel('Correlation time [s]')
+                fig.supylabel('G(\u03C4)')
+                ax.set_xlim(data_FCS_tau_s[0], data_FCS_tau_s[-1])
+                plot_y_min_max = (np.percentile(data_FCS_G, 3), np.percentile(data_FCS_G, 97))
+                ax.set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
+                            plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
+        
+                # Save and show figure
+                plt.savefig(os.path.join(save_path, 
+                                         out_name + '_FCS.png'), 
+                            dpi=300)
+                plt.show()
+                
+                
+                # Write spreadsheet
+                out_table = pd.DataFrame(data = {'Lagtime[s]':data_FCS_tau_s, 
+                                                 'Correlation': data_FCS_G,
+                                                 'Uncertainty_SD': data_FCS_sigma,
+                                                 'Fit': model_FCS})
+                out_table.to_csv(os.path.join(save_path, 
+                                              out_name + '_FCS.csv'),
+                                 index = False, 
+                                 header = True)
+        
+        
+            if use_PCH:
+        
+                if not labelling_correction:
+                    model_PCH = fitter.get_pch_full_labelling(fit_params,
+                                                              t_bin = data_PCH_bin_times[0],
+                                                              time_resolved_PCH = time_resolved_PCH,
+                                                              crop_output = True,
+                                                              numeric_precision = np.min(numeric_precision),
+                                                              mp_pool = None
+                                                              )
+                else: 
+                    model_PCH = fitter.get_pch_partial_labelling(fit_params,
+                                                                 t_bin = data_PCH_bin_times[0],
+                                                                 time_resolved_PCH = time_resolved_PCH,
+                                                                 crop_output = True,
+                                                                 numeric_precision = np.min(numeric_precision),
+                                                                 mp_pool = None)
+                
+                # Plot PCH fit
+                # Cycle through colors
+                prop_cycle = plt.rcParams['axes.prop_cycle']
+                colors = cycle(prop_cycle.by_key()['color'])
+                iter_color = next(colors)
+        
+                
+                fig2, ax2 = plt.subplots(1, 1)
+                ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
+                             data_PCH_hist[:,0],
+                             marker = '.',
+                             linestyle = 'none',
+                             color = iter_color)
+                
+                ax2.semilogy(np.arange(0, model_PCH.shape[0]),
+                             model_PCH * data_PCH_hist[:,0].sum(),
+                             marker = '',
+                             linestyle = '-',
+                             color = iter_color)
+                
+                max_x = np.nonzero(data_PCH_hist[:,0])[0][-1]
+                max_y = np.max(data_PCH_hist[:,0])
+                
+                if time_resolved_PCH:
+                    # PCMH
+                    for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
+                        iter_color = next(colors)
+                        if not labelling_correction:
+                            model_PCH = fitter.get_pch_full_labelling(fit_params,
+                                                                      t_bin = data_PCH_bin_times[i_bin_time],
+                                                                      time_resolved_PCH = time_resolved_PCH,
+                                                                      crop_output = True,
+                                                                      numeric_precision = np.min(numeric_precision),
+                                                                      mp_pool = None
+                                                                      )
+                        else: 
+                            model_PCH = fitter.get_pch_partial_labelling(fit_params,
+                                                                         t_bin = data_PCH_bin_times[i_bin_time],
+                                                                         time_resolved_PCH = time_resolved_PCH,
+                                                                         crop_output = True,
+                                                                         numeric_precision = np.min(numeric_precision),
+                                                                         mp_pool = None)
+                        
+                        
+                        ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
+                                     data_PCH_hist[:,i_bin_time],
+                                     marker = '.',
+                                     linestyle = 'none',
+                                     color = iter_color)
+                        
+                        ax2.semilogy(np.arange(0, model_PCH.shape[0]),
+                                     model_PCH * data_PCH_hist[:,i_bin_time].sum(),
+                                     marker = '',
+                                     linestyle = '-',
+                                     color = iter_color)
+                
+                        max_x = np.max([max_x, np.nonzero(data_PCH_hist[:,i_bin_time])[0][-1]])
+                        max_y = np.max([max_y, np.max(data_PCH_hist[:,i_bin_time])])
+                        
+                        
+                ax2.set_xlim(-0.49, max_x + 1.49)
+                ax2.set_ylim(0.3, max_y * 1.7)
+                ax2.set_title('PCH fit')
+                fig2.supxlabel('Photons in bin')
+                fig2.supylabel('Counts')
+        
+                # Save and show figure
+                plt.savefig(os.path.join(save_path, 
+                                         out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.png'), 
+                            dpi=300)
+                plt.show()
+                
+                # Write spreadsheet
+                out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 
+                            str(data_PCH_bin_times[0]): data_PCH_hist[:,0]}
+                if time_resolved_PCH:
+                    for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
+                        out_dict[str(data_PCH_bin_times[i_bin_time])] = data_PCH_hist[:,i_bin_time]
+                out_table = pd.DataFrame(data = out_dict)
+                out_table.to_csv(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'),
+                                 index = False, 
+                                 header = True)
+        else:
+            # Command line message
+            message = 'Failed to fit '
+            message += in_file_names_FCS[i_file] if use_FCS else ''
+            message += ' and ' if (use_FCS and use_PCH) else ''
+            message += in_file_names_PCH[i_file] if use_PCH else ''
+            print(message)
     except:
         traceback.print_exc()
         
