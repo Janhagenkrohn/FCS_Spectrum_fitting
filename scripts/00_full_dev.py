@@ -37,19 +37,19 @@ glob_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_H
 
 ''' Labelled protein fraction'''
 in_dir_names.extend([os.path.join(glob_dir, r'3a\Exports')])
-in_dir_names.extend([os.path.join(glob_dir, r'3b\Exports')])
-in_dir_names.extend([os.path.join(glob_dir, r'3c\Exports')])
+# in_dir_names.extend([os.path.join(glob_dir, r'3b\Exports')])
+# in_dir_names.extend([os.path.join(glob_dir, r'3c\Exports')])
 
 alpha_label.append(1.) # 50 nM in 20 µM
-alpha_label.append(1.) # 50 nM in 20 µM
-alpha_label.append(1.) # 50 nM in 20 µM
+# alpha_label.append(1.) # 50 nM in 20 µM
+# alpha_label.append(1.) # 50 nM in 20 µM
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, r'Testfit\FCS_Gauss_amp_naive')
+save_path = os.path.join(glob_dir, r'Testfit\FCS_LogNorm_amp_naive_newinit')
 
 
 
@@ -62,7 +62,7 @@ labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
 n_species = 50
-spectrum_type = 'par_Gauss' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_type = 'par_LogNorm' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
@@ -141,7 +141,7 @@ else: # use_FCS and not use_PCH:
 if not os.path.exists(save_path):
     os.makedirs(save_path)
     
-# Build name fore results spreadsheet
+# Build names for results spreadsheets
 fit_res_path = os.path.join(save_path, 
                             datetime.datetime.now().strftime("%Y%m%d"))
 fit_res_path += f'_Fit_params_{spectrum_type}' 
@@ -149,8 +149,11 @@ fit_res_path += f'_{spectrum_parameter}_{oligomer_type}' if (not spectrum_type =
 fit_res_path += f'_{n_species}spec'
 fit_res_path += '_FCS' if use_FCS else '' 
 fit_res_path += '_PCHM' if (use_PCH and time_resolved_PCH) else ('_PCH' if use_PCH else '')
-fit_res_path += '.csv'
-    
+fit_res_full_path = fit_res_path + '.csv' # General spreadsheet with all of them
+if n_species > 1:
+    fit_res_N_path = fit_res_path + '_N.csv' # N-only spreadsheet for convenience
+    fit_res_tau_diff_path = fit_res_path + '_tau_diff.csv' # tau_diff-only spreadsheet for convenience
+        
 
 #%% Start processing
 for i_file, dir_name in enumerate(in_dir_names):
@@ -213,12 +216,11 @@ for i_file, dir_name in enumerate(in_dir_names):
                                     time_tag.strftime("%Y%m%d-%H%M%S") + f'{in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] }_fit_{spectrum_type}_{n_species}spec')
             
             # Command line preview of fit results
-            print('\n   Fitted parameters:')
+            print('   Fitted parameters:')
             [print(f'{key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
             
             # Write fit results
-            fit_result_dict = {}
-            
+            fit_result_dict = {}            
             fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
             for key in fit_params.keys():
                 fit_result_dict[key + '_val'] = fit_params[key].value
@@ -227,19 +229,61 @@ for i_file, dir_name in enumerate(in_dir_names):
                     fit_result_dict[key + '_err'] = fit_params[key].stderr
             fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
             
-            if not os.path.isfile(fit_res_path):
+            if not os.path.isfile(fit_res_full_path):
                 # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_path, 
+                fit_result_df.to_csv(fit_res_full_path, 
                                      header = True, 
                                      index = False)
             else:
                 # Exists - append
-                fit_result_df.to_csv(fit_res_path, 
+                fit_result_df.to_csv(fit_res_full_path, 
                                      mode = 'a', 
                                      header = False, 
                                      index = False)
-        
-            
+                
+            # Additional spreadsheets for N and diffusion time spectra
+            if n_species > 1:
+                N_result_dict = {}
+                N_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
+                tau_diff_max_result_dict = {}
+                tau_diff_max_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
+                for i_spec in range(n_species):
+                    N_result_dict[f'N_avg_pop_{i_spec}'] = fit_params[f'N_avg_pop_{i_spec}'].value
+                    tau_diff_max_result_dict[f'tau_diff_{i_spec}'] = fit_params[f'tau_diff_{i_spec}'].value
+                    
+                if incomplete_sampling_correction and not spectrum_type == 'discrete':
+                    # Additional difference between sample-level and observation-level N
+                    for i_spec in range(n_species):
+                        N_result_dict[f'N_avg_obs_{i_spec}'] = fit_params[f'N_avg_obs_{i_spec}'].value
+                        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                
+                fit_result_N_df = pd.DataFrame(N_result_dict, index = [1]) 
+                fit_result_tau_diff_df = pd.DataFrame(tau_diff_max_result_dict, index = [1]) 
+
+                if not os.path.isfile(fit_res_N_path):
+                    # Does not yet exist - create with header
+                    fit_result_N_df.to_csv(fit_res_N_path, 
+                                           header = True, 
+                                           index = False)
+                else:
+                    # Exists - append
+                    fit_result_N_df.to_csv(fit_res_N_path, 
+                                           mode = 'a', 
+                                           header = False, 
+                                           index = False)
+    
+                if not os.path.isfile(fit_res_tau_diff_path):
+                    # Does not yet exist - create with header
+                    fit_result_tau_diff_df.to_csv(fit_res_tau_diff_path, 
+                                                  header = True, 
+                                                  index = False)
+                else:
+                    # Exists - append
+                    fit_result_tau_diff_df.to_csv(fit_res_tau_diff_path, 
+                                                  mode = 'a', 
+                                                  header = False, 
+                                                  index = False)
+
             # Show and write fits themselves
             if use_FCS:
                 if not labelling_correction:

@@ -2044,6 +2044,7 @@ class FCS_spectrum():
         
         stoichiometry = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
                                                                oligomer_type)
+        median_stoichiometry = stoichiometry[int(n_species // 2) + 1]
             
         initial_params = lmfit.Parameters()
 
@@ -2065,18 +2066,22 @@ class FCS_spectrum():
                            vary = False)
         
         # N distribution parameters
+        # We initialize all at median_stoichiometry, as depending on 
+        # parameters, stoichiometry can cover many orders of magnitude, and
+        # the median of the value range is likely to bring us sort of into the 
+        # right order of magnitude to start
         initial_params.add('N_dist_amp', 
-                           value = 10., 
+                           value = median_stoichiometry, 
                            min = 0., 
                            vary=True)
 
         initial_params.add('N_dist_a', 
-                           value = 10., 
+                           value = median_stoichiometry, 
                            min = 0., 
                            vary=True)
 
         initial_params.add('N_dist_b', 
-                           value = 1., 
+                           value = median_stoichiometry, 
                            min = 0.,
                            vary=True)
             
@@ -2117,7 +2122,7 @@ class FCS_spectrum():
                 
             if spectrum_type == 'par_LogNorm':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp / spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - N_dist_a) / N_dist_b) ** 2)',
+                                   expr = f'log(N_dist_amp) / spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
                                    vary = False)
                 
             if spectrum_type == 'par_Gamma':
@@ -2381,11 +2386,11 @@ class FCS_spectrum():
                                                     use_blinking
                                                     )
         if self.verbosity > 0:
-            print('\n   Initial parameters:')
+            print('   Initial parameters:')
             [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
             
         if self.verbosity > 1:
-            print('\n   Constants & dep. variables:')
+            print('   Constants & dep. variables:')
             [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
 
         if use_parallel:
