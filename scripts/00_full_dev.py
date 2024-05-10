@@ -49,7 +49,7 @@ file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, r'Testfit\FCS_LogNorm_amp_naive_newinit')
+save_path = os.path.join(glob_dir, r'Testfit\FCS_regMEM_naive_nMono_newInit')
 
 
 
@@ -62,8 +62,8 @@ labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
 n_species = 50
-spectrum_type = 'par_LogNorm' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
+spectrum_type = 'reg_MEM' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter = 'N_monomers' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking = False

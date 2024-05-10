@@ -2004,6 +2004,135 @@ class FCS_spectrum():
         return initial_params
 
 
+    def set_up_params_reg_from_parfit(self,
+                                      gauss_fit_params,
+                                      use_FCS,
+                                      use_PCH,
+                                      time_resolved_PCH,
+                                      spectrum_type,
+                                      oligomer_type,
+                                      incomplete_sampling_correction,
+                                      labelling_correction,
+                                      n_species,
+                                      tau_diff_min,
+                                      tau_diff_max,
+                                      use_blinking
+                                      ):
+    
+        if use_FCS and not self.FCS_possible:
+            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+        
+        if use_PCH and not self.PCH_possible:
+            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+                    
+        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            
+        if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+            raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
+            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+
+        if not (utils.isint(n_species) and n_species >= 10):
+            raise Exception("Invalid input for n_species - must be int >= 10 for regularized fitting")
+            
+        tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
+                                                 tau_diff_max, 
+                                                 n_species)
+        
+        stoichiometry = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
+                                                               oligomer_type)
+            
+        initial_params = lmfit.Parameters()
+
+        # More technical parameters
+        if use_FCS:
+            initial_params.add('acf_offset', 
+                                value = gauss_fit_params['acf_offset'].value, 
+                                vary=True)
+
+        if use_PCH:
+            initial_params.add('F', 
+                               value = gauss_fit_params['F'].value, 
+                               min = 0, 
+                               max = 1.,
+                               vary=True)
+
+        initial_params.add('Label_efficiency', 
+                           value = self.labelling_efficiency if labelling_correction else 1.,
+                           vary = False)
+
+        # Species-wise parameters
+        for i_spec, tau_diff_i in enumerate(tau_diff_array):
+            
+            initial_params.add(f'N_avg_pop_{i_spec}', 
+                               value = gauss_fit_params[f'N_avg_pop_{i_spec}'].value, 
+                               min = 0., 
+                               vary = True)
+
+            if incomplete_sampling_correction:
+                # Allow fluctuations of observed apparent particle count
+                initial_params.add(f'N_avg_obs_{i_spec}', 
+                                   value = gauss_fit_params[f'N_avg_obs_{i_spec}'].value, 
+                                   min = 0., 
+                                   vary = True)
+            else:
+                # Dummy
+                initial_params.add(f'N_avg_obs_{i_spec}', 
+                                   expr = f'N_avg_pop_{i_spec}', 
+                                   vary = False)
+
+            if use_FCS or (use_PCH and time_resolved_PCH):
+                # Diffusion time only for FCS and PCMH
+                initial_params.add(f'tau_diff_{i_spec}', 
+                                   value = tau_diff_array[i_spec], 
+                                   vary = False)
+            
+            initial_params.add(f'stoichiometry_{i_spec}', 
+                               value = stoichiometry[i_spec], 
+                               vary = False)
+
+            # An additional factor for translating between "sample-level" and
+            # "population-level" observed label efficiency if and only if we 
+            # use both incomplete_sampling_correction and labelling_correction
+            initial_params.add(f'Label_obs_factor_{i_spec}', 
+                               value = gauss_fit_params[f'Label_obs_factor_{i_spec}'].value,
+                               vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+
+            initial_params.add(f'Label_efficiency_obs_{i_spec}', 
+                               expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
+                               vary = False)
+
+            if i_spec == 0:
+                
+                # Monomer brightness
+                if use_PCH:
+                    initial_params.add('cpms_0', 
+                                       value = gauss_fit_params['cpms_0'].value, 
+                                       min = 0, 
+                                       vary = True)
+                else:
+                    # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
+                    initial_params.add('cpms_0', 
+                                       value = 1., 
+                                       min = 0, 
+                                       vary = False)
+            else: # i_spec >= 1
+            
+                # Oligomer cpms is defined by monomer and stoichiometry factor
+                initial_params.add(f'cpms_{i_spec}', 
+                                   expr = f'cpms_0 * stoichiometry_{i_spec}', 
+                                   vary = False)
+            
+        # Add blinking parameters for FCS and PCMH - real or dummy
+        if use_FCS or (use_PCH and time_resolved_PCH):
+            initial_params = self.set_blinking_initial_params(initial_params,
+                                                              use_blinking,
+                                                              tau_diff_min)
+
+        return initial_params
+
 
     def set_up_params_par(self,
                           use_FCS,
@@ -2355,11 +2484,14 @@ class FCS_spectrum():
             
             
         elif spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            # Parameter setup
-            initial_params = self.set_up_params_reg(use_FCS,
+            # Regularized fit: We actually start with a Gaussian-parameterized 
+            # fit as a first round to initialize the numerically less stable 
+            # parameter array of the regularized fit
+            initial_params = self.set_up_params_par(use_FCS,
                                                     use_PCH,    
                                                     time_resolved_PCH,
-                                                    spectrum_type,
+                                                    'par_Gauss',
+                                                    spectrum_parameter, 
                                                     oligomer_type,
                                                     incomplete_sampling_correction,
                                                     labelling_correction,
@@ -2441,6 +2573,67 @@ class FCS_spectrum():
                     if i_inc < self.numeric_precision.shape[0] - 1:
                         # At least one fit more to run, use output of previous fit as input for next round
                         initial_params = fit_result.params
+                        
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                # Regularized fit
+                if self.verbosity > 0:
+                    print('Now re-fitting with regularized spectrum')
+                initial_params = self.set_up_params_reg_from_parfit(fit_result.params,
+                                                                    use_FCS,
+                                                                    use_PCH,
+                                                                    time_resolved_PCH,
+                                                                    spectrum_type,
+                                                                    oligomer_type,
+                                                                    incomplete_sampling_correction,
+                                                                    labelling_correction,
+                                                                    n_species,
+                                                                    tau_diff_min,
+                                                                    tau_diff_max,
+                                                                    use_blinking
+                                                                    )
+                
+                if (not self.precision_incremental) or (not (use_PCH or (labelling_correction and incomplete_sampling_correction))):
+                    # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
+                    # Define minimization target
+                    fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+                                                params = initial_params, 
+                                                method = 'nelder',
+                                                args = (use_FCS, 
+                                                        use_PCH, 
+                                                        time_resolved_PCH,
+                                                        spectrum_type, 
+                                                        spectrum_parameter,
+                                                        labelling_correction, 
+                                                        incomplete_sampling_correction
+                                                        ),
+                                                kws = {'i_bin_time': i_bin_time,
+                                                       'numeric_precision': self.numeric_precision,
+                                                       'mp_pool': mp_pool},
+                                                calc_covar = True)
+                    
+                else:
+                    # we use incremental precision fitting
+                    # Define minimization target
+                    for i_inc, inc_precision in enumerate(self.numeric_precision):
+                        
+                        fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+                                                    params = initial_params, 
+                                                    method = 'nelder',
+                                                    args = (use_FCS, 
+                                                            use_PCH, 
+                                                            time_resolved_PCH,
+                                                            spectrum_type, 
+                                                            spectrum_parameter,
+                                                            labelling_correction, 
+                                                            incomplete_sampling_correction),
+                                                    kws = {'i_bin_time': i_bin_time,
+                                                           'numeric_precision': inc_precision},
+                                                    calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
+                        
+                        if i_inc < self.numeric_precision.shape[0] - 1:
+                            # At least one fit more to run, use output of previous fit as input for next round
+                            initial_params = fit_result.params
+
         except:
             # Something went wrong - whatever, not too much we can do
             traceback.print_exc()
