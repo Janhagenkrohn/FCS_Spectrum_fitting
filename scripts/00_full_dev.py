@@ -68,7 +68,7 @@ oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_
 
 use_blinking = False
 
-
+reg_weight = 1.
 
 ### FCS settings
 use_FCS = True
@@ -92,7 +92,6 @@ PCH_max_bin_time = 5E-4 # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
 use_parallel = True
-
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 
 
@@ -150,6 +149,7 @@ fit_res_path += f'_{n_species}spec'
 fit_res_path += '_FCS' if use_FCS else '' 
 fit_res_path += '_PCHM' if (use_PCH and time_resolved_PCH) else ('_PCH' if use_PCH else '')
 fit_res_full_path = fit_res_path + '.csv' # General spreadsheet with all of them
+
 if n_species > 1:
     fit_res_N_path = fit_res_path + '_N.csv' # N-only spreadsheet for convenience
     fit_res_tau_diff_path = fit_res_path + '_tau_diff.csv' # tau_diff-only spreadsheet for convenience
@@ -207,7 +207,8 @@ for i_file, dir_name in enumerate(in_dir_names):
                                     tau_diff_min = tau_diff_min, # float
                                     tau_diff_max = tau_diff_max, # float
                                     use_blinking = use_blinking, # bool
-                                    use_parallel = use_parallel # Bool
+                                    use_parallel = use_parallel, # Bool
+                                    reg_weight = reg_weight # Float
                                     )
         
         if not fit_result == None:
@@ -222,6 +223,8 @@ for i_file, dir_name in enumerate(in_dir_names):
             # Write fit results
             fit_result_dict = {}            
             fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['reg_weight'] = reg_weight
             for key in fit_params.keys():
                 fit_result_dict[key + '_val'] = fit_params[key].value
                 fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
@@ -244,9 +247,12 @@ for i_file, dir_name in enumerate(in_dir_names):
             # Additional spreadsheets for N and diffusion time spectra
             if n_species > 1:
                 N_result_dict = {}
-                N_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
                 tau_diff_max_result_dict = {}
+                N_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
                 tau_diff_max_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    N_result_dict['reg_weight'] = reg_weight
+                    tau_diff_max_result_dict['reg_weight'] = reg_weight
                 for i_spec in range(n_species):
                     N_result_dict[f'N_avg_pop_{i_spec}'] = fit_params[f'N_avg_pop_{i_spec}'].value
                     tau_diff_max_result_dict[f'tau_diff_{i_spec}'] = fit_params[f'tau_diff_{i_spec}'].value

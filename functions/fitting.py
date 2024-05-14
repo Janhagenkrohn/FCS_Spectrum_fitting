@@ -626,14 +626,18 @@ class FCS_spectrum():
         else:
             raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
         
-        # Normalize and remove zeros
+        # Normalize
         frequency_array = reg_target / reg_target.sum()
-        frequency_array_nonzero = frequency_array[frequency_array > 0.] 
+        
+        # Element-wise "entropy" terms circumventing log(0) errors
+        entropy_array = frequency_array[frequency_array > 0.] * np.log(frequency_array[frequency_array > 0.])
         
         # neg entropy regularizer
-        # Mean rather than sum to avoid effects from length
-        regularizer = np.mean(frequency_array_nonzero * np.log(frequency_array_nonzero))
+        regularizer = np.sum(entropy_array)
         
+        # Normalize by n_species to avoid effects from length
+        regularizer /= n_species
+                
         return regularizer
 
 
@@ -838,7 +842,8 @@ class FCS_spectrum():
                              incomplete_sampling_correction,
                              i_bin_time = 0,
                              numeric_precision = 1e-4,
-                             mp_pool = None):
+                             mp_pool = None,
+                             reg_weight = 1.):
         
         negloglik = 0.
         
@@ -877,12 +882,12 @@ class FCS_spectrum():
                                                                 mp_pool = mp_pool)
                 
         if spectrum_type == 'reg_CONTIN':
-            negloglik += self.regularization_CONTIN(params, 
-                                                    spectrum_parameter)
+            negloglik += reg_weight * self.regularization_CONTIN(params, 
+                                                                 spectrum_parameter)
         
         elif spectrum_type == 'reg_MEM':
-            negloglik += self.regularization_MEM(params,
-                                                 spectrum_parameter)
+            negloglik += reg_weight * self.regularization_MEM(params,
+                                                              spectrum_parameter)
             
         if incomplete_sampling_correction:
             # Incomplete sampling correction included in fit
@@ -2420,7 +2425,8 @@ class FCS_spectrum():
                 tau_diff_max, # float
                 use_blinking, # bool
                 i_bin_time = 0, # int
-                use_parallel = False # Bool
+                use_parallel = False, # Bool
+                reg_weight = 1. # Float
                 ):
         
         # A bunch of input and compatibility checks
@@ -2469,7 +2475,11 @@ class FCS_spectrum():
         if not (utils.isint(i_bin_time) and i_bin_time >= 0):
             raise Exception("Invalid input for i_bin_time - must be int >= 0")
 
-            
+        if not (utils.isfloat(reg_weight) and reg_weight >= 0):
+            raise Exception("Invalid input for reg_weight - must be float >= 0")
+
+
+
         if spectrum_type == 'discrete':
             # Parameter setup
             initial_params = self.set_up_params_discrete(use_FCS, 
@@ -2567,7 +2577,8 @@ class FCS_spectrum():
                                                         labelling_correction, 
                                                         incomplete_sampling_correction),
                                                 kws = {'i_bin_time': i_bin_time,
-                                                       'numeric_precision': inc_precision},
+                                                       'numeric_precision': inc_precision,
+                                                       'mp_pool': mp_pool},
                                                 calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
                     
                     if i_inc < self.numeric_precision.shape[0] - 1:
@@ -2608,7 +2619,8 @@ class FCS_spectrum():
                                                         ),
                                                 kws = {'i_bin_time': i_bin_time,
                                                        'numeric_precision': self.numeric_precision,
-                                                       'mp_pool': mp_pool},
+                                                       'mp_pool': mp_pool,
+                                                       'reg_weight': reg_weight},
                                                 calc_covar = True)
                     
                 else:
@@ -2627,7 +2639,9 @@ class FCS_spectrum():
                                                             labelling_correction, 
                                                             incomplete_sampling_correction),
                                                     kws = {'i_bin_time': i_bin_time,
-                                                           'numeric_precision': inc_precision},
+                                                           'numeric_precision': inc_precision,
+                                                           'mp_pool': mp_pool,
+                                                           'reg_weight': reg_weight},
                                                     calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
                         
                         if i_inc < self.numeric_precision.shape[0] - 1:

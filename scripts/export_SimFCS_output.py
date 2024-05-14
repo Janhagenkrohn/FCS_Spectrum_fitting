@@ -37,11 +37,11 @@ sim_time_resolution = [] # Simulation time step in seconds - differs between sim
 # in_dir_names.extend([os.path.join(glob_dir, r'3b\fast')])
 # sim_time_resolution = 1E-6 # 1 us 
 
-in_dir_names.extend([os.path.join(glob_dir, r'3c')])
-sim_time_resolution = 1E-6 # 1 us 
-
 # in_dir_names.extend([os.path.join(glob_dir, r'3c')])
 # sim_time_resolution = 1E-6 # 1 us 
+
+in_dir_names.extend([os.path.join(glob_dir, '3d')])
+sim_time_resolution = 1E-6 # 1 us 
 
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
@@ -68,7 +68,10 @@ in_dir_names, in_file_names, _ = utils.detect_files(in_dir_names,
 
 for i_file, in_dir_name in enumerate(in_dir_names):
     
-#%% Load data
+    # Unique for today: Skip some files to continue where the code broke
+    if i_file < 103: continue
+    
+    #%% Load data
     in_file_name = in_file_names[i_file] + '.bin'
     path = os.path.join(in_dir_name, in_file_name)
     
@@ -259,7 +262,15 @@ for i_file, in_dir_name in enumerate(in_dir_names):
         photon_count_mean = np.mean(time_trace)
         Mandel_Q = photon_count_variance / photon_count_mean - 1
     
+        if pch.shape[0] > pcmh.shape[0]:
+            # The super-rare exception where a smaller bin width reaches the 
+            # highest number of photons in a bin due to frame shifts in
+            # binning. It can happen, did crash my code once...
+            pcmh = np.append(pcmh, 
+                             np.zeros((pch.shape[0]-pcmh.shape[0], len(bin_times))),
+                             axis = 0)
         pcmh[0:pch.shape[0], i_bin_time] = pch
+
         Mandel_Q_series[i_bin_time] = Mandel_Q
     
     # Create and write spreadsheets

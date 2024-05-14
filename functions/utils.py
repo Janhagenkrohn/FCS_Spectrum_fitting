@@ -51,14 +51,23 @@ def detect_files(in_dir_names,
 
 
 def path_is_parent(parent_path, child_path):
-    # Copy-paste from https://stackoverflow.com/questions/3812849/how-to-check-whether-a-directory-is-a-sub-directory-of-another-directory
+    # Copy-paste with addition of drive check from 
+    # https://stackoverflow.com/questions/3812849/how-to-check-whether-a-directory-is-a-sub-directory-of-another-directory
     # Smooth out relative path names, note: if you are concerned about symbolic links, you should use os.path.realpath too
     parent_path = os.path.abspath(parent_path)
     child_path = os.path.abspath(child_path)
-
-    # Compare the common path of the parent and child path with the common path of just the parent path. Using the commonpath method on just the parent path will regularise the path name in the same way as the comparison that deals with both paths, removing any trailing path separator
-    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
-
+        
+    if os.stat(parent_path).st_dev == os.stat(child_path).st_dev:
+        # Files are on same drive, check further
+        
+        # Compare the common path of the parent and child path with the common path of just the parent path. 
+        # Using the commonpath method on just the parent path will regularise the path name in the same way 
+        # as the comparison that deals with both paths, removing any trailing path separator
+        return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
+    else:
+        # Different drives anyway, nevermind
+        return False
+    
 
 def read_Kristine_FCS(dir_name,
                       file_name,
