@@ -68,8 +68,6 @@ in_dir_names, in_file_names, _ = utils.detect_files(in_dir_names,
 
 for i_file, in_dir_name in enumerate(in_dir_names):
     
-    # Unique for today: Skip some files to continue where the code broke
-    if i_file < 103: continue
     
     #%% Load data
     in_file_name = in_file_names[i_file] + '.bin'

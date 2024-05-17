@@ -18,7 +18,7 @@ simulation of a distribution of particle sizes
 
 
 oligomer_type = 'spherical_shell' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
-label_efficiency = 0.5
+label_efficiency = 8e-4
 n_species = 10
 
 # Total number of particles to consider
@@ -37,8 +37,8 @@ FCS_psf_width_um = 0.350 # To match SimFCS settings
 # e.g. for stoichiometry_scaling_base = 2, species with stoichiometries 1, 2, 4, 8, ... will be simulated
 stoichiometry_scaling_base = 2.
 
-save_folder = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\simFCS2_simulations\3e'
-save_name = 'simulation_parameter_set_1'
+save_folder = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3e'
+save_name = 'batch3e_1_label8e-4_simParams'
 
 
 
@@ -78,19 +78,19 @@ effective_species_weights /= effective_species_weights.sum()
 effective_species_D = FCS_psf_width_um**2 / 4 / effective_species_tau_diff
 
 # Write stuff sorted from species with largest weight to species with smallest weight:
-# In SimFCS we can only simulate 50 effective species, so we stick to the most important ones
-sort_order = np.argsort(effective_species_weights)[::-1]
-out_table = pd.DataFrame(data = {'stoichiometry':effective_species_stoichiometry[sort_order],
-                                 'N': effective_species_N[sort_order],
-                                 'cpms':effective_species_cpms[sort_order],
-                                 'D': effective_species_D[sort_order],
-                                 'tau_diff':effective_species_tau_diff[sort_order], 
-                                 'rel_weights': effective_species_weights[sort_order]})
+# In an older version intended for use with SimFCS, there was an additional 
+# sorting step here as SimFCS can only simulate 50 effective species, so we 
+# stick to the most significant amplitude terms - or that was the idea, turns
+#  out SimFCS did not handle that either.
+out_table = pd.DataFrame(data = {'stoichiometry':effective_species_stoichiometry,
+                                 'N': effective_species_N,
+                                 'cpms':effective_species_cpms,
+                                 'D': effective_species_D,
+                                 'tau_diff':effective_species_tau_diff, 
+                                 'rel_weights': effective_species_weights})
 
 out_table.to_csv(os.path.join(save_folder, 
                               save_name + '.csv'),
                  index = False, 
                  header = True)
 
-weight_in_first_50 = effective_species_weights[sort_order][:50].sum() / effective_species_weights.sum()
-print(f'At these settings, the 50 most significant species make up {weight_in_first_50*100} % of the total correlation function amplitude')
