@@ -49,7 +49,7 @@ file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, r'Testfit\FCS_regMEM_naive_nMono_newInit')
+save_path = os.path.join(glob_dir, r'Testfit\Gausstest-new')
 
 
 
@@ -61,8 +61,8 @@ labelling_correction = False
 labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
-n_species = 50
-spectrum_type = 'reg_MEM' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+n_species = 100
+spectrum_type = 'par_Gauss' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter = 'N_monomers' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
@@ -109,6 +109,12 @@ PCH_Q = 8. # More calculation parameter than metadata, but whatever
 
 #%% Input interpretation
 
+# Prepare output
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+
+
+
 # Automatic input file detection
 
 if use_PCH:
@@ -136,9 +142,6 @@ elif use_PCH and not use_FCS:
 else: # use_FCS and not use_PCH:
     in_dir_names = in_dir_names_FCS
     
-# Prepare output
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
     
 # Build names for results spreadsheets
 fit_res_path = os.path.join(save_path, 

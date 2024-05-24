@@ -77,11 +77,7 @@ effective_species_weights = effective_species_cpms**2 * effective_species_N
 effective_species_weights /= effective_species_weights.sum()
 effective_species_D = FCS_psf_width_um**2 / 4 / effective_species_tau_diff
 
-# Write stuff sorted from species with largest weight to species with smallest weight:
-# In an older version intended for use with SimFCS, there was an additional 
-# sorting step here as SimFCS can only simulate 50 effective species, so we 
-# stick to the most significant amplitude terms - or that was the idea, turns
-#  out SimFCS did not handle that either.
+# Write stuff
 out_table = pd.DataFrame(data = {'stoichiometry':effective_species_stoichiometry,
                                  'N': effective_species_N,
                                  'cpms':effective_species_cpms,
