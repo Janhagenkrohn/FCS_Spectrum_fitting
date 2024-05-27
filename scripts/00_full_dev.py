@@ -62,20 +62,19 @@ labelling_correction = False
 labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
-n_species = 100
+n_species = 70
 spectrum_type = 'reg_MEM' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
+spectrum_parameter = 'N_oligomers' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking = False
 
-reg_weight = 1.
 
 ### FCS settings
 use_FCS = True
 
 # Shortest and longest diffusion time to fit (parameter bounds)
-tau_diff_min = 1E-5
+tau_diff_min = 1E-4
 tau_diff_max = 1E-0
 
 # Shortest and longest lag time to consider in fit (time axis clipping)
@@ -92,7 +91,7 @@ PCH_min_bin_time = 0. # Use 0. to use full range of data in .csv file
 PCH_max_bin_time = 5E-4 # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
-use_parallel = True
+use_parallel = False
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 
 
@@ -160,7 +159,7 @@ if n_species > 1:
         
 
 #%% Start processing
-for i_file, dir_name in enumerate(in_dir_names):
+for i_file, dir_name in enumerate(in_dir_names[0:1]):
     
     # Command line message
     time_tag = datetime.datetime.now()

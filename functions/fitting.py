@@ -143,7 +143,7 @@ class FCS_spectrum():
         verbosity :
             OPTIONAL int with default 1. Tunes the amount of command line 
             feedback, with more feedback at higher number. Currently meaningful 
-            levels are 0, 1, 2.
+            levels are 0 ... 3.
         '''
         # Acquisition metadata and technical settings
         
@@ -340,11 +340,8 @@ class FCS_spectrum():
         Or that's the idea at least.
         '''
         n_species = 0
-        while True:
-            if f'cpms_{n_species}' in params.keys():
-                n_species += 1
-            else:
-                break
+        while f'cpms_{n_species}' in params.keys():
+            n_species += 1
         return n_species
 
 
@@ -385,27 +382,29 @@ class FCS_spectrum():
                                      numeric_precision = 1e-4,
                                      N_pop_array = None,
                                      mp_pool = None,
-                                     max_iter_inner = 1E3,
-                                     max_iter_outer = 30,
+                                     max_iter_inner = 1E2,
+                                     max_iter_outer = 50,
                                      max_lagrange_mul = 100
                                      ):
                     
-        verbose = self.verbosity > 2
+        verbose = self.verbosity > 1
         
         # Read out iniital parameters and set up fit
         n_species = self.get_n_species(params)
                     
-        if incomplete_sampling_correction:
-            N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        else:
-            N_avg_obs_array = np.ones(n_species) / n_species
-            
         stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         
         # Initialize amplitudes and construct  N_population array for model functions as attribute 
         if N_pop_array == None:
             # Initalize from nothing
+            if incomplete_sampling_correction:
+                N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+            else:
+                N_avg_obs_array = np.ones(n_species) / n_species
+                
+            if verbose:
+                print(f'Initializing flat amp_array for {n_species} species as N_pop_array is empty')
             if spectrum_parameter  == 'Amplitude':
                 amp_array = N_avg_obs_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
             elif spectrum_parameter == 'N_monomers':
@@ -416,6 +415,8 @@ class FCS_spectrum():
             
         else:
             # We have an initial array
+            if verbose:
+                print(f'Initializing amp_array with {n_species} species from pre-initialized N_pop_array')
             if spectrum_parameter  == 'Amplitude':
                 amp_array = N_pop_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
             elif spectrum_parameter == 'N_monomers':
@@ -461,49 +462,60 @@ class FCS_spectrum():
         iterator_outer = 1
         
         # lmfit minimizer for other parameters
-        fitter = lmfit.Minimizer(fcn = self.negloglik_global_fit, 
-                                    params = params, 
-                                    args = (use_FCS, 
-                                            use_PCH, 
-                                            time_resolved_PCH,
-                                            spectrum_type, 
-                                            spectrum_parameter,
-                                            labelling_correction, 
-                                            incomplete_sampling_correction
-                                            ),
-                                    kws = {'i_bin_time': i_bin_time,
-                                           'numeric_precision': numeric_precision,
-                                           'mp_pool': mp_pool},
-                                    calc_covar = False)
+        fitter = lmfit.Minimizer(self.negloglik_global_fit, 
+                                 params, 
+                                 fcn_args = (use_FCS, 
+                                             use_PCH, 
+                                             time_resolved_PCH,
+                                             spectrum_type, 
+                                             spectrum_parameter,
+                                             labelling_correction, 
+                                             incomplete_sampling_correction
+                                             ),
+                                 fcn_kws = {'i_bin_time': i_bin_time,
+                                            'numeric_precision': numeric_precision,
+                                            'mp_pool': mp_pool},
+                                 calc_covar = False)
         
         while True:
             if verbose:
-                print(f'Iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
+                print(f'Outer loop iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
 
             NLL_array_inner = np.zeros(max_iter_inner)
             
             iterator_inner = 0
             while True:
-                
-                # Perform exactly one MLE iteration of the other parameters 
+
+                # Perform three MLE iterations of the other parameters 
                 # besides the spectrum, and get neg log likelihood NLL
                 minimization_result = fitter.minimize(method = 'nelder',
                                                       params = params,
-                                                      max_nfev = 1)
+                                                      max_nfev = 3)
                 params = minimization_result.params
                 NLL = minimization_result.residual
                 NLL_array_inner[iterator_inner] = NLL
                 
-                # Update amplitudes array
+                # Update self._N_pop_array from amplitudes array
                 if spectrum_parameter  == 'Amplitude':
                     labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-                    amp_array = self._N_pop_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
+                    self._N_pop_array = amp_array / (stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
                 elif spectrum_parameter == 'N_monomers':
-                    amp_array = self._N_pop_array * stoichiometry_array
+                    self._N_pop_array = amp_array / stoichiometry_array
                 else: # spectrum_parameter == 'N_oligomers'
-                    amp_array = self._N_pop_array
+                    self._N_pop_array = amp_array
+                self._N_pop_array *= params['N_pop_total'].value
 
-                amp_array /= amp_array.sum()
+                
+                # # Update amplitudes array
+                # if spectrum_parameter  == 'Amplitude':
+                #     labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                #     amp_array = self._N_pop_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
+                # elif spectrum_parameter == 'N_monomers':
+                #     amp_array = self._N_pop_array * stoichiometry_array
+                # else: # spectrum_parameter == 'N_oligomers'
+                #     amp_array = self._N_pop_array
+
+                # amp_array /= amp_array.sum()
                 
                 # Recalculate explicit FCS model, and from that weighted residuals
                 # on population statistics alone
@@ -529,7 +541,7 @@ class FCS_spectrum():
                 NLL_gradient = np.mean(2 * weighted_residual * tauD__tau_array / self.data_FCS_sigma, 
                                        axis = 1)
                 NLL_grad_length = np.sqrt(np.sum(NLL_gradient**2))
-                
+
                 # first order derivative of entropy/CONTIN derivative
                 if _reg_method:
                     # Maximum entropy gradient
@@ -549,7 +561,7 @@ class FCS_spectrum():
                     if (iterator_inner + 1) >= max_iter_inner:
                         # Iteration limit hit
                         if verbose:
-                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current chi-square: {NLL_array_inner[iterator_inner]}')
+                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current NLL: {NLL_array_inner[iterator_inner]}')
                         break
                     
                     # Check if gradients for S and chi-square are parallel, which they
@@ -561,7 +573,7 @@ class FCS_spectrum():
                     if test_stat < convergence_threshold_par_grad: 
                         # gradients approximately parallel - stop inner loop
                         if verbose:
-                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (converged), current chi-square: {NLL_array_inner[iterator_inner]}')
+                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (converged), current NLL: {NLL_array_inner[iterator_inner]}')
                         break
 
                 # We continue - In that case update amp_array
@@ -616,7 +628,7 @@ class FCS_spectrum():
                     # High S_grad_length/NLL_grad_length implies that we had too much weight 
                     # on chi-square (too-high lagrange_mul), and vice versa, so
                     # we change lagrange_mul based on that ratio (nonlinearly, and 
-                    # witha bit of a gradient boost)
+                    # with a bit of a gradient boost)
                 lagrange_mul_del_new = np.sqrt(NLL_grad_length/S_grad_length)
                                 
                 lagrange_mul *= lagrange_mul_del_new * lagrange_mul_del_old**(1/3)
@@ -629,8 +641,8 @@ class FCS_spectrum():
                     
                 lagrange_mul_array[iterator_outer] = lagrange_mul
                 
-                # Another stop criterion comes in here: If neither lagrange_mul nor
-                # chi-square have really changed for three iterations
+                # Another stop criterion comes in here: If neither lagrange_mul 
+                # nor chi-square have really changed for three iterations
                 if iterator_outer >= 3:
                     
                     lagrange_mul_recent = lagrange_mul_array[iterator_outer-2:iterator_outer+1]
@@ -639,7 +651,7 @@ class FCS_spectrum():
                     NLL_recent = NLL_array_outer[iterator_outer-2:iterator_outer+1]
                     NLL_recent_rel_span = (np.max(NLL_recent) - np.min(NLL_recent)) / np.mean(NLL_recent)
                     
-                    if lagrange_mul_recent_rel_span < 0.01 and NLL_recent_rel_span < 0.001:
+                    if lagrange_mul_recent_rel_span < 0.01 and NLL_recent_rel_span < 0.01:
                         if verbose:
                             print(f'Stopping outer loop after {iterator_outer} iterations (no longer changing)')
                         break
@@ -653,7 +665,7 @@ class FCS_spectrum():
                     print(f'Stopping outer loop after {iterator_outer} iterations (converged)')
                 break
         
-        return params, self._N_pop_array, lagrange_mul
+        return minimization_result, self._N_pop_array, lagrange_mul
 
     
     #%% Penalty terms in fitting
@@ -821,7 +833,7 @@ class FCS_spectrum():
         Chi-square without normalization for parameter number for FCS fitting 
         with full labelling.
         '''
-                        
+        
         # Get model
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             acf_model = self.get_acf_full_labelling_reg(params)
@@ -1880,7 +1892,6 @@ class FCS_spectrum():
 
     def get_acf_full_labelling_reg(self, 
                                    params):
-                
         n_species = self.get_n_species(params)
             
         # Extract parameters
@@ -2911,7 +2922,7 @@ class FCS_spectrum():
             print('   Initial parameters:')
             [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
             
-        if self.verbosity > 1:
+        if self.verbosity > 2:
             print('   Constants & dep. variables:')
             [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
 
@@ -2956,8 +2967,8 @@ class FCS_spectrum():
                                                                                               N_pop_array = None,
                                                                                               numeric_precision = self.numeric_precision,
                                                                                               mp_pool = mp_pool,
-                                                                                              max_iter_inner = 1E3,
-                                                                                              max_iter_outer = 30,
+                                                                                              max_iter_inner = 1E2,
+                                                                                              max_iter_outer = 50,
                                                                                               max_lagrange_mul = 100
                                                                                               )
                 
@@ -2995,8 +3006,8 @@ class FCS_spectrum():
                                                                                                   N_pop_array = N_pop_array,
                                                                                                   numeric_precision = inc_precision,
                                                                                                   mp_pool = mp_pool,
-                                                                                                  max_iter_inner = 1E3,
-                                                                                                  max_iter_outer = 30,
+                                                                                                  max_iter_inner = 1E2,
+                                                                                                  max_iter_outer = 50,
                                                                                                   max_lagrange_mul = 100
                                                                                                   )
 
