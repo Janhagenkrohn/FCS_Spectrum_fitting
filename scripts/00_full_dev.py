@@ -40,16 +40,17 @@ in_dir_names.extend([os.path.join(glob_dir, r'3a\Exports')])
 # in_dir_names.extend([os.path.join(glob_dir, r'3b\Exports')])
 # in_dir_names.extend([os.path.join(glob_dir, r'3c\Exports')])
 
-alpha_label.append(1.) # 50 nM in 20 µM
-# alpha_label.append(1.) # 50 nM in 20 µM
-# alpha_label.append(1.) # 50 nM in 20 µM
+alpha_label.append(1.) 
+# alpha_label.append(1.) 
+# alpha_label.append(1.) 
+
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, r'Testfit\Gausstest-new')
+save_path = os.path.join(glob_dir, r'Testfit\MEM_test_new')
 
 
 
@@ -62,8 +63,8 @@ labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
 n_species = 100
-spectrum_type = 'par_Gauss' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter = 'N_monomers' # 'Amplitude', 'N_monomers', 'N_oligomers',
+spectrum_type = 'reg_MEM' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter = 'Amplitude' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking = False
@@ -194,25 +195,41 @@ for i_file, dir_name in enumerate(in_dir_names):
                                       data_PCH_hist = data_PCH_hist if use_PCH else None,
                                       labelling_efficiency = labelling_efficiency,
                                       numeric_precision = numeric_precision,
-                                      verbosity = 1
+                                      verbosity = 2
                                       )
         
-        
-        fit_result = fitter.run_fit(use_FCS = use_FCS, # bool
-                                    use_PCH = use_PCH, # bool
-                                    time_resolved_PCH = time_resolved_PCH, # bool
-                                    spectrum_type = spectrum_type, # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-                                    spectrum_parameter = spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
-                                    oligomer_type = oligomer_type, #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
-                                    labelling_correction = labelling_correction, # bool
-                                    incomplete_sampling_correction = incomplete_sampling_correction, # bool
-                                    n_species = n_species, # int
-                                    tau_diff_min = tau_diff_min, # float
-                                    tau_diff_max = tau_diff_max, # float
-                                    use_blinking = use_blinking, # bool
-                                    use_parallel = use_parallel, # Bool
-                                    reg_weight = reg_weight # Float
-                                    )
+        if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
+            fit_result = fitter.run_fit(use_FCS = use_FCS, # bool
+                                        use_PCH = use_PCH, # bool
+                                        time_resolved_PCH = time_resolved_PCH, # bool
+                                        spectrum_type = spectrum_type, # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+                                        spectrum_parameter = spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
+                                        oligomer_type = oligomer_type, #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+                                        labelling_correction = labelling_correction, # bool
+                                        incomplete_sampling_correction = incomplete_sampling_correction, # bool
+                                        n_species = n_species, # int
+                                        tau_diff_min = tau_diff_min, # float
+                                        tau_diff_max = tau_diff_max, # float
+                                        use_blinking = use_blinking, # bool
+                                        use_parallel = use_parallel # Bool
+                                        )
+            
+        else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
+            # Here we get more complex output
+            fit_result, N_pop_array, lagrange_mul = fitter.run_fit(use_FCS = use_FCS, # bool
+                                                                   use_PCH = use_PCH, # bool
+                                                                   time_resolved_PCH = time_resolved_PCH, # bool
+                                                                   spectrum_type = spectrum_type, # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+                                                                   spectrum_parameter = spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
+                                                                   oligomer_type = oligomer_type, #  'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+                                                                   labelling_correction = labelling_correction, # bool
+                                                                   incomplete_sampling_correction = incomplete_sampling_correction, # bool
+                                                                   n_species = n_species, # int
+                                                                   tau_diff_min = tau_diff_min, # float
+                                                                   tau_diff_max = tau_diff_max, # float
+                                                                   use_blinking = use_blinking, # bool
+                                                                   use_parallel = use_parallel # Bool
+                                                                   )
         
         if not fit_result == None:
             fit_params = fit_result.params
@@ -226,13 +243,20 @@ for i_file, dir_name in enumerate(in_dir_names):
             # Write fit results
             fit_result_dict = {}            
             fit_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['reg_weight'] = reg_weight
+            
             for key in fit_params.keys():
+                # Fit parameters
                 fit_result_dict[key + '_val'] = fit_params[key].value
                 fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
                 if not fit_params[key].stderr == None:
                     fit_result_dict[key + '_err'] = fit_params[key].stderr
+                    
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                # Special stuff for regularized fitting
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                for i_spec in range(n_species):
+                    fit_result_dict[f'N_pop_{i_spec}'] = N_pop_array[i_spec]
+                    
             fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
             
             if not os.path.isfile(fit_res_full_path):
@@ -251,20 +275,26 @@ for i_file, dir_name in enumerate(in_dir_names):
             if n_species > 1:
                 N_result_dict = {}
                 tau_diff_max_result_dict = {}
+                
+                # Metadata
                 N_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
                 tau_diff_max_result_dict['file'] = in_file_names_FCS[i_file] if use_FCS else in_file_names_PCH[i_file] 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    N_result_dict['reg_weight'] = reg_weight
-                    tau_diff_max_result_dict['reg_weight'] = reg_weight
+                    N_result_dict['lagrange_mul'] = lagrange_mul
+                    tau_diff_max_result_dict['lagrange_mul'] = lagrange_mul
+                    
+                # Species parameters
                 for i_spec in range(n_species):
-                    N_result_dict[f'N_avg_pop_{i_spec}'] = fit_params[f'N_avg_pop_{i_spec}'].value
+                    if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
+                        N_result_dict[f'N_avg_pop_{i_spec}'] = fit_params[f'N_avg_pop_{i_spec}'].value
+                    else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
+                        N_result_dict[f'N_avg_pop_{i_spec}'] = N_pop_array[i_spec]
                     tau_diff_max_result_dict[f'tau_diff_{i_spec}'] = fit_params[f'tau_diff_{i_spec}'].value
                     
                 if incomplete_sampling_correction and not spectrum_type == 'discrete':
                     # Additional difference between sample-level and observation-level N
                     for i_spec in range(n_species):
                         N_result_dict[f'N_avg_obs_{i_spec}'] = fit_params[f'N_avg_obs_{i_spec}'].value
-                        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
                 
                 fit_result_N_df = pd.DataFrame(N_result_dict, index = [1]) 
                 fit_result_tau_diff_df = pd.DataFrame(tau_diff_max_result_dict, index = [1]) 
@@ -296,10 +326,19 @@ for i_file, dir_name in enumerate(in_dir_names):
             # Show and write fits themselves
             if use_FCS:
                 if not labelling_correction:
-                    model_FCS = fitter.get_acf_full_labelling(fit_params)
+                    if spectrum_type == 'discrete':
+                        model_FCS = fitter.get_acf_full_labelling(fit_params)
+                    elif  spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
+                        model_FCS = fitter.get_acf_full_labelling_par(fit_params)
+                    else: #  spectrum_type in ['reg_MEM', 'reg_CONTIN']
+                        model_FCS = fitter.get_acf_full_labelling_reg(fit_params)
+
                 else:
-                    model_FCS = fitter.get_acf_partial_labelling(fit_params)
-                
+                    if spectrum_type == 'discrete':
+                        model_FCS = fitter.get_acf_partial_labelling(fit_params)
+                    else: # spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp', 'reg_MEM', 'reg_CONTIN']:
+                        model_FCS = fitter.get_acf_partial_labelling_par_reg(fit_params)
+
                 # Plot FCS fit
                 fig, ax = plt.subplots(nrows=1, ncols=1)
                 ax.semilogx(data_FCS_tau_s,
@@ -349,6 +388,7 @@ for i_file, dir_name in enumerate(in_dir_names):
                 if not labelling_correction:
                     model_PCH = fitter.get_pch_full_labelling(fit_params,
                                                               t_bin = data_PCH_bin_times[0],
+                                                              spectrum_type = spectrum_type,
                                                               time_resolved_PCH = time_resolved_PCH,
                                                               crop_output = True,
                                                               numeric_precision = np.min(numeric_precision),
@@ -392,6 +432,7 @@ for i_file, dir_name in enumerate(in_dir_names):
                         if not labelling_correction:
                             model_PCH = fitter.get_pch_full_labelling(fit_params,
                                                                       t_bin = data_PCH_bin_times[i_bin_time],
+                                                                      spectrum_type = spectrum_type,
                                                                       time_resolved_PCH = time_resolved_PCH,
                                                                       crop_output = True,
                                                                       numeric_precision = np.min(numeric_precision),
