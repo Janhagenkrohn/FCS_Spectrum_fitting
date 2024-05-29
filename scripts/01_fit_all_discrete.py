@@ -32,12 +32,17 @@ from functions import fitting
 in_dir_names= []
 alpha_label = []
 # glob_dir = '/fs/pool/pool-schwille-spt/Experiment_analysis/20231117_JHK_NKaletta_ParM_oligomerization'
-glob_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/simFCS2_simulations'
+glob_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/'
 
 
 ''' Labelled protein fraction'''
-in_dir_names.extend([os.path.join(glob_dir, 'MEM_testbatch')])
-
+in_dir_names.extend([os.path.join(glob_dir, 'simFCS2_simulations/3a/Exports')])
+alpha_label.append(1.) 
+in_dir_names.extend([os.path.join(glob_dir, 'simFCS2_simulations/3b/Exports')])
+alpha_label.append(1.) 
+in_dir_names.extend([os.path.join(glob_dir, 'simFCS2_simulations/3c/Exports')])
+alpha_label.append(1.) 
+in_dir_names.extend([os.path.join(glob_dir, 'simFCS2_simulations/3d/Exports')])
 alpha_label.append(1.) 
 
 
@@ -46,8 +51,7 @@ file_name_pattern_PCH = '*batch*_PCMH_ch0*' # Dual-channel PCH
 file_name_pattern_FCS = '*batch*_ACF_ch0*' # CCF
 
 # Output dir for result file writing
-save_path = os.path.join(glob_dir, 'Testfit/MEM_test_new')
-
+save_path ='/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240529_discrete_fits/'
 
 
 #%% Fit settings
@@ -58,8 +62,8 @@ labelling_correction = False
 labelling_efficiency = 1.
 incomplete_sampling_correction = False
 
-n_species = 70
-spectrum_type = 'reg_MEM' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+n_species = 100
+spectrum_type = 'par_Gauss' # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter = 'N_oligomers' # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type = 'naive' # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
@@ -80,19 +84,17 @@ FCS_max_lag_time = np.inf  # Use np.inf to use full range of data in .csv file
 
 ### PCH settings
 use_PCH = False
-time_resolved_PCH = True
+time_resolved_PCH = False
 
 # Shortest and longest bin times to consider
 PCH_min_bin_time = 0. # Use 0. to use full range of data in .csv file
 PCH_max_bin_time = 5E-4 # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
-use_parallel = True # Mostly for multi-species PCMH
+use_parallel = True # Mostly for multi-species PCH
 numeric_precision = np.array([1E-3, 1E-4, 1E-5]) # PCH requires numerical precision cutoff, which is set here
 
 command_line_mode = True # if true, suppresses figure display
-
-
 
 #%% Metadata/calibration data
 FCS_psf_width_nm = 210. # Roughly
@@ -482,7 +484,7 @@ for i_file, dir_name in enumerate(in_dir_names):
                 else:
                     # Auto-close figure to avoid pileup
                     plt.close()
-                
+
                 # Write spreadsheet
                 out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 
                             str(data_PCH_bin_times[0]): data_PCH_hist[:,0]}

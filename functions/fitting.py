@@ -382,8 +382,8 @@ class FCS_spectrum():
                                      numeric_precision = 1e-4,
                                      N_pop_array = None,
                                      mp_pool = None,
-                                     max_iter_inner = 1E2,
-                                     max_iter_outer = 50,
+                                     max_iter_inner = 2.5E4,
+                                     max_iter_outer = 30,
                                      max_lagrange_mul = 100
                                      ):
                     
@@ -461,43 +461,63 @@ class FCS_spectrum():
         lagrange_mul_del_old = 1
         iterator_outer = 1
         
-        # lmfit minimizer for other parameters
-        fitter = lmfit.Minimizer(self.negloglik_global_fit, 
-                                 params, 
-                                 fcn_args = (use_FCS, 
-                                             use_PCH, 
-                                             time_resolved_PCH,
-                                             spectrum_type, 
-                                             spectrum_parameter,
-                                             labelling_correction, 
-                                             incomplete_sampling_correction
-                                             ),
-                                 fcn_kws = {'i_bin_time': i_bin_time,
-                                            'numeric_precision': numeric_precision,
-                                            'mp_pool': mp_pool},
-                                 calc_covar = False)
-        
+
         while True:
             if verbose:
                 print(f'Outer loop iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
 
             NLL_array_inner = np.zeros(max_iter_inner)
             
+            # lmfit minimizer for other parameters
+            # We create a new instance with every outer iteration to ensure 
+            # regular reset of the function evaluation count of the Minimizer 
+            # object, which can otherwise apparently overflow and cause issues
+            fitter = lmfit.Minimizer(self.negloglik_global_fit, 
+                                      params, 
+                                      fcn_args = (use_FCS, 
+                                                  use_PCH, 
+                                                  time_resolved_PCH,
+                                                  spectrum_type, 
+                                                  spectrum_parameter,
+                                                  labelling_correction, 
+                                                  incomplete_sampling_correction
+                                                  ),
+                                      fcn_kws = {'i_bin_time': i_bin_time,
+                                                'numeric_precision': numeric_precision,
+                                                'mp_pool': mp_pool},
+                                      calc_covar = False)
+            
             iterator_inner = 0
             while True:
 
-                # Perform three MLE iterations of the other parameters 
+                # Perform one MLE iteration of the other parameters 
                 # besides the spectrum, and get neg log likelihood NLL
                 minimization_result = fitter.minimize(method = 'nelder',
                                                       params = params,
-                                                      max_nfev = 3)
+                                                      max_nfev = 1)
+                # minimization_result = lmfit.minimize(self.negloglik_global_fit, 
+                #                                      params,
+                #                                      method = 'nelder',
+                #                                      args = (use_FCS, 
+                #                                              use_PCH, 
+                #                                              time_resolved_PCH,
+                #                                              spectrum_type, 
+                #                                              spectrum_parameter,
+                #                                              labelling_correction, 
+                #                                              incomplete_sampling_correction
+                #                                              ),
+                #                                      kws = {'i_bin_time': i_bin_time,
+                #                                             'numeric_precision': numeric_precision,
+                #                                             'mp_pool': mp_pool},
+                #                                      calc_covar = False)
+
                 params = minimization_result.params
                 NLL = minimization_result.residual
                 NLL_array_inner[iterator_inner] = NLL
                 
                 # Update self._N_pop_array from amplitudes array
+                labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
                 if spectrum_parameter  == 'Amplitude':
-                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
                     self._N_pop_array = amp_array / (stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
                 elif spectrum_parameter == 'N_monomers':
                     self._N_pop_array = amp_array / stoichiometry_array
@@ -556,7 +576,7 @@ class FCS_spectrum():
                 S_grad_length = np.sqrt(np.sum(S_gradient**2))
                 
                 # Once in a while, check for convergence 
-                if (iterator_inner + 1) % 100 == 0 and iterator_inner > 1:
+                if (iterator_inner + 1) % 500 == 0 and iterator_inner > 1:
                     
                     if (iterator_inner + 1) >= max_iter_inner:
                         # Iteration limit hit
@@ -596,8 +616,8 @@ class FCS_spectrum():
                 amp_array /= amp_array.sum()
                 
                 # Update self._N_pop_array from amplitudes array
+                labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
                 if spectrum_parameter  == 'Amplitude':
-                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
                     self._N_pop_array = amp_array / (stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
                 elif spectrum_parameter == 'N_monomers':
                     self._N_pop_array = amp_array / stoichiometry_array
@@ -2967,8 +2987,8 @@ class FCS_spectrum():
                                                                                               N_pop_array = None,
                                                                                               numeric_precision = self.numeric_precision,
                                                                                               mp_pool = mp_pool,
-                                                                                              max_iter_inner = 1E2,
-                                                                                              max_iter_outer = 50,
+                                                                                              max_iter_inner = 2.5E4,
+                                                                                              max_iter_outer = 30,
                                                                                               max_lagrange_mul = 100
                                                                                               )
                 
@@ -3006,8 +3026,8 @@ class FCS_spectrum():
                                                                                                   N_pop_array = N_pop_array,
                                                                                                   numeric_precision = inc_precision,
                                                                                                   mp_pool = mp_pool,
-                                                                                                  max_iter_inner = 1E2,
-                                                                                                  max_iter_outer = 50,
+                                                                                                  max_iter_inner = 2.5E4,
+                                                                                                  max_iter_outer = 30,
                                                                                                   max_lagrange_mul = 100
                                                                                                   )
 
