@@ -18,12 +18,13 @@ simulation of a distribution of particle sizes
 '''
 
 
-oligomer_types = ['spherical_shell', 'sherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+# oligomer_types = ['spherical_shell', 'spherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+oligomer_types = ['spherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 
 label_efficiencies = [1E-4, 1e-2, 1e-1, 1e-0]
 save_names = []
-[save_names.append([f'1peak_mu10_sigma5_label1e-{log_le}']) for log_le in [4, 2, 1, 0]]
+[save_names.append(f'3peaks_mu5-20-50_sigma2-30-10_label1e-{log_le}') for log_le in [4, 2, 1, 0]]
 
 # Total number of particles to consider
 N_total = 10
@@ -32,14 +33,14 @@ N_total = 10
 # Relative species abundances - will be renormalized and scaled with N_total
 # Many species are needed as this is actually not Gaussian but lognormal 
 n_species = 100
-# gauss_params = np.array([
-#     [1, 5, 2],
-#     [1E-3, 20, 30],
-#     [1e-10, 50, 10]]) # relative AUC, mean, sigma for each population
-
 gauss_params = np.array([
-    [1E-3, 10, 5]
-    ]) # relative AUC, mean, sigma for each population
+    [1, 5, 2],
+    [1E-3, 20, 30],
+    [1e-10, 50, 10]]) # relative AUC, mean, sigma for each population
+
+# gauss_params = np.array([
+#     [1E-3, 10, 5]
+#     ]) # relative AUC, mean, sigma for each population
 
 
 monomer_brightness = 10000
@@ -51,24 +52,28 @@ n_acf_data_points = 200
 
 psf_aspect_ratio= 5
 
-noise_scaling_factor = 1e-8
+
+add_noise = False
+noise_scaling_factor = 1e-4
 
 save_folder_glob = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f'
 
 for oligomer_type in oligomer_types:
+    print(f'Simulating oligomer type {oligomer_type}...')
     save_folder = os.path.join(save_folder_glob, oligomer_type)
     
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
             
-    for i_simulation, label_efficiency in label_efficiencies:
-        
+    for i_simulation, label_efficiency in enumerate(label_efficiencies):
+        print(f'Starting simulation number {i_simulation} with lablling efficiency {label_efficiency}...')
+
         save_name = save_names[i_simulation]
     
 
         
         #%% Processing
-        
+        print('Parameter setup...')
         stoichiometry_array = np.logspace(start = 0, 
                                           stop = np.log10(gauss_params[-1, 1] + (gauss_params[-1, 2]**8 if gauss_params[-1, 2]**8 > 2. else 2.)), 
                                           num = n_species)
@@ -108,7 +113,8 @@ for oligomer_type in oligomer_types:
         pointer = 0
         
         for i_stoichiometry, stoichiometry in enumerate(stoichiometry_array):
-            
+            print(f'Stoichiometry {stoichiometry} (no. {i_stoichiometry} of {len(stoichiometry_array)})...')
+
             # Parameterize Binomial dist object
             binomial_dist = sstats.binom(stoichiometry, 
                                          label_efficiency)
@@ -125,55 +131,65 @@ for oligomer_type in oligomer_types:
             elif oligomer_type == 'double_filament':
                 axial_ratio = stoichiometry / 2.
                 tau_diff_array[i_stoichiometry] = monomer_tau_diff * 2. * axial_ratio / (2. * np.log(axial_ratio) + 0.632 + 1.165 * axial_ratio ** (-1.) + 0.1 * axial_ratio ** (-2.))
+            else:
+                raise Exception(f"Invalid oligomer_type. Must be 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament', got {oligomer_type}")
                 
-                
+            # Normalized correlation 
+            g_norm_spec = 1 / (1 + tau/tau_diff_array[i_stoichiometry]) / np.sqrt(1 + tau / (np.square(psf_aspect_ratio) * tau_diff_array[i_stoichiometry]))
+
             for i_labelling in range(int(stoichiometry)):
+                if i_labelling % 10000 == 0:
+                    print(f'Label efficiency {i_labelling} ({np.round(i_labelling / stoichiometry * 100, 3)} %)...')
+                    
                 # Get species parameters
                 effective_species_tau_diff[pointer] = tau_diff_array[i_stoichiometry]
                 effective_species_stoichiometry[pointer] = stoichiometry
                 effective_species_cpms[pointer] = (i_labelling + 1) * monomer_brightness 
                 effective_species_N[pointer] = distribution_y[i_stoichiometry] * binomial_dist.pmf(i_labelling + 1)
-                
-                # Simulate ACF for this species
-                g_norm = 1 / (1 + tau/effective_species_tau_diff[pointer]) / np.sqrt(1 + tau / (np.square(psf_aspect_ratio) * effective_species_tau_diff[pointer]))
-                if np.any(np.isnan(g_norm)): raise Exception('NaN in g_norm!')
-                acf_num += g_norm * effective_species_N[pointer] * effective_species_cpms[pointer]**2
-                if np.any(np.isnan(acf_num)): raise Exception('NaN in acf_num!')
-                acf_den += effective_species_N[pointer] * effective_species_cpms[pointer]
-                
+                                
                 species_weights[i_stoichiometry] += effective_species_N[pointer] * effective_species_cpms[pointer]**2
                 species_signal[i_stoichiometry] += effective_species_N[pointer] * effective_species_cpms[pointer]
-                # Get a noise curve for this species
-                # Model that we work with (not accurate by any means, but sort of captures the basic trends): 
-                    # Gaussian noise
-                    # SD per data point is linear with relation of molecular brightness and tau
-                    # Variance per data point is proportional to 1/g_norm
-                    # Variance overall is proportional to 1/(1-(probability to have 0 particles in PSF of this species at given time))
-                    # SD has an arbitrary user-supplied SD scaling factor
-                    # Variance adds up species-wise with weights given by ACF amplitude weights
                 
-                acf_noise_var_spec = ((tau * effective_species_cpms[pointer])**-2 / # Term for photon shot noise
-                                      g_norm * # term for survival function for a particle to still be in PFS
-                                      sstats.poisson(effective_species_N[pointer]).pmf(0) * # Term for dead time from zero particles in observation volume
-                                      noise_scaling_factor**2) # Scaling factor
-                if np.any(np.isnan(acf_noise_var_spec)): raise Exception('NaN in acf_noise_var_spec!')
-                if np.any(np.isinf(acf_noise_var_spec)): raise Exception('Inf in acf_noise_var_spec!')
-        
-                # Add to total variance 
-                acf_noise_var_num += acf_noise_var_spec * effective_species_N[pointer] * effective_species_cpms[pointer]**2
-                acf_noise_var_den += effective_species_N[pointer] * effective_species_cpms[pointer]
+                if add_noise:
+                    # Get a noise curve for this species
+                    # Model that we work with (not accurate by any means, but sort of captures the basic trends): 
+                        # Gaussian noise
+                        # SD per data point is linear with relation of molecular brightness and tau
+                        # Variance per data point is proportional to 1/g_norm
+                        # Variance overall is proportional to 1/(1-(probability to have 0 particles in PSF of this species at given time))
+                        # SD has an arbitrary user-supplied SD scaling factor
+                        # Variance adds up species-wise with weights given by ACF amplitude weights
+                    
+                    acf_noise_var_spec = ((tau * effective_species_cpms[pointer])**-2 / # Term for photon shot noise
+                                          g_norm_spec * # term for survival function for a particle to still be in PFS
+                                          (sstats.poisson(effective_species_N[pointer]).pmf(0) + 1e-6) * # Term for dead time from zero particles in observation volume
+                                          noise_scaling_factor**2) # Scaling factor
+                    if np.any(np.isnan(acf_noise_var_spec)): raise Exception('NaN in acf_noise_var_spec!')
+                    if np.any(np.isinf(acf_noise_var_spec)): raise Exception('Inf in acf_noise_var_spec!')
+            
+                    # Add to total variance 
+                    acf_noise_var_num += acf_noise_var_spec * effective_species_N[pointer] * effective_species_cpms[pointer]**2
+                    acf_noise_var_den += effective_species_N[pointer] * effective_species_cpms[pointer]
                 
                 pointer += 1
+                
+            # Get correlation fucntion weights for this species
+
+            acf_num += g_norm_spec * species_weights[i_stoichiometry]
+            acf_den += species_signal[i_stoichiometry]
+
         
         # Get total ACF            
         acf = acf_num / acf_den**2
         
         # Get uncertainty, normalizing by ACF weights
-        sd_acf = np.sqrt(acf_noise_var_num / acf_noise_var_den**2 / acf_num[0] * acf_den[0]**2)
-        
-        # Get noise term
-        acf_noise = acf + np.random.standard_normal(size = n_acf_data_points) * sd_acf
-        
+        if add_noise:
+            sd_acf = np.sqrt(acf_noise_var_num / acf_noise_var_den**2 / acf_num[0] * acf_den[0]**2)
+            # Get noise term
+            acf_noise = acf + np.random.standard_normal(size = n_acf_data_points) * sd_acf
+        else:
+            sd_acf = np.ones_like(acf)
+            acf_noise = acf
         
         #%% Write parameters        
         
