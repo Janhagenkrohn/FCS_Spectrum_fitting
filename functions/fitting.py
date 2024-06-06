@@ -58,7 +58,8 @@ class FCS_spectrum():
                  labelling_efficiency = 1.,
                  numeric_precision = np.array([1E-3, 1E-4, 1E-5]),
                  PCH_fitting_accurate = False,
-                 verbosity = 1
+                 verbosity = 1,
+                 job_prefix = ''
                  ):
         '''
         Class for single or combined fitting of FCS and/or PCH.
@@ -161,8 +162,17 @@ class FCS_spectrum():
             OPTIONAL int with default 1. Tunes the amount of command line 
             feedback, with more feedback at higher number. Currently meaningful 
             levels are 0 ... 3.
+        job_prefix :
+            A user-defined string that is printed as a preamble to most command 
+            line output from this instance, meant as a means of keeping track 
+            for example when you have large batches running in parallel
         '''
         # Acquisition metadata and technical settings
+        
+        if type(job_prefix) == str:
+            self.job_prefix = job_prefix
+        else:
+            raise ValueError('job_prefix must be string')
         
         # This parameter is actually currently unused...Whatever.
         if utils.isfloat(FCS_psf_width_nm):
@@ -170,12 +180,12 @@ class FCS_spectrum():
                 self.FCS_psf_width_nm = FCS_psf_width_nm
                 self.FCS_possible = True
             else:
-                raise ValueError('FCS_psf_width_nm must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0')
         elif utils.isempty(FCS_psf_width_nm):
             self.psf_width = None
             self.FCS_possible = False
         else:
-            raise ValueError('FCS_psf_width_nm must be float > 0')
+            raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0')
 
 
         if utils.isfloat(FCS_psf_aspect_ratio):
@@ -183,12 +193,12 @@ class FCS_spectrum():
                 self.FCS_psf_aspect_ratio = FCS_psf_aspect_ratio
                 self.FCS_possible = True
             else:
-                raise ValueError('FCS_psf_aspect_ratio must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
         elif utils.isempty(FCS_psf_aspect_ratio):
             self.FCS_psf_aspect_ratio = None
             self.FCS_possible = False
         else:
-            raise ValueError('FCS_psf_aspect_ratio must be float > 0')
+            raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
 
 
         if utils.isfloat(PCH_Q):
@@ -196,12 +206,12 @@ class FCS_spectrum():
                 self.PCH_Q = PCH_Q
                 self.PCH_possible = True
             else:
-                raise ValueError('FCS_psf_aspect_ratio must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
         elif utils.isempty(PCH_Q):
             self.PCH_Q = None
             self.PCH_possible = False
         else:
-            raise ValueError('FCS_psf_aspect_ratio must be float > 0')
+            raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
 
 
         if utils.isfloat(acquisition_time_s):
@@ -209,14 +219,14 @@ class FCS_spectrum():
                 self.acquisition_time_s = acquisition_time_s
                 self.incomplete_sampling_possible = True
             else: 
-                raise ValueError('acquisition_time_s must be empty value or float > 0')
+                raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0')
                 
         elif utils.isempty(acquisition_time_s):
             self.acquisition_time_s = None
             self.incomplete_sampling_possible = False
             
         else:
-            raise ValueError('acquisition_time_s must be empty value or float > 0')
+            raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0')
     
     
         if utils.isfloat(numeric_precision) and numeric_precision > 0. and numeric_precision < 1.:
@@ -230,16 +240,16 @@ class FCS_spectrum():
                 self.numeric_precision = numeric_precision
                 self.precision_incremental = True
             else:
-                raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
+                raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
         else:
-            raise ValueError('numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
+            raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
 
 
         if utils.isint(verbosity):
             self.verbosity = verbosity
             
         else:
-            raise ValueError('verbosity must be int')
+            raise ValueError(f'[{self.job_prefix}] verbosity must be int')
             
             
         # FCS input data to be fitted
@@ -250,7 +260,7 @@ class FCS_spectrum():
             self.data_FCS_tau_s = np.array(data_FCS_tau_s)
             self.FCS_possible = True
         else:
-            raise ValueError('data_FCS_tau_s must be array (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_tau_s must be array (or can be left empty for PCH only)')
             
             
         if utils.isempty(data_FCS_G) or not self.FCS_possible:
@@ -261,9 +271,9 @@ class FCS_spectrum():
             if data_FCS_G.shape[0] == data_FCS_tau_s.shape[0]:
                 self.data_FCS_G = data_FCS_G
             else:
-                raise ValueError('data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+                raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
         else:
-            raise ValueError('data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
 
 
         if utils.isempty(data_FCS_sigma) or not self.FCS_possible:
@@ -274,9 +284,9 @@ class FCS_spectrum():
             if data_FCS_sigma.shape[0] == data_FCS_tau_s.shape[0]:
                 self.data_FCS_sigma = data_FCS_sigma
             else:
-                raise ValueError('data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+                raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
         else:
-            raise ValueError('data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
 
 
         # PC(M)H input data to be fitted
@@ -287,7 +297,7 @@ class FCS_spectrum():
             self.data_PCH_bin_times = np.array(data_PCH_bin_times)
             self.PCH_possible = True
         else:
-            raise ValueError('data_PCH_bin_times must be float or array (or can be left empty for FCS only)')
+            raise ValueError(f'[{self.job_prefix}] data_PCH_bin_times must be float or array (or can be left empty for FCS only)')
 
 
         if utils.isempty(data_PCH_hist) or not self.PCH_possible:
@@ -307,25 +317,25 @@ class FCS_spectrum():
                 data_PCH_norm = data_PCH_hist / data_PCH_hist.sum(axis=0)
                 for i_bin_time in range(data_PCH_bin_times.shape[0]):
                     data_PCH_sigma[:,i_bin_time] = np.where(data_PCH_hist[:,i_bin_time] > 0,
-                                                            np.sqrt(data_PCH_hist[:,i_bin_time] * (1 - data_PCH_norm)),
+                                                            np.sqrt(data_PCH_hist[:,i_bin_time] * (1 - data_PCH_norm[:,i_bin_time])),
                                                             self.PCH_n_photons_max[i_bin_time])
                 self.data_PCH_sigma = data_PCH_sigma
                 
             else:
-                raise ValueError('data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
+                raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
         else:
-            raise ValueError('data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
+            raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
 
         if self.PCH_possible:
             if type(PCH_fitting_accurate) == bool:
                 self.PCH_fitting_accurate = PCH_fitting_accurate
             else:
-                raise ValueError('PCH_fitting_accurate must be bool (ignored if no PCH is loaded).')
+                raise ValueError(f'[{self.job_prefix}] PCH_fitting_accurate must be bool (ignored if no PCH is loaded).')
 
         if utils.isfloat(labelling_efficiency) and labelling_efficiency > 0. and labelling_efficiency <= 1.:
             self.labelling_efficiency = labelling_efficiency
         else:
-            raise ValueError('labelling_efficiency must be float with 0 < labelling_efficiency <= 1.')
+            raise ValueError(f'[{self.job_prefix}] labelling_efficiency must be float with 0 < labelling_efficiency <= 1.')
 
 
 
@@ -430,35 +440,39 @@ class FCS_spectrum():
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         
         # Initialize amplitudes and construct  N_population array for model functions as attribute 
-        if N_pop_array == None:
-            # Initalize from nothing
-            if incomplete_sampling_correction:
-                N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-            else:
-                N_avg_obs_array = np.ones(n_species) / n_species
-                
-            if verbose:
-                print(f'Initializing flat amp_array for {n_species} species as N_pop_array is empty')
-            if spectrum_parameter  == 'Amplitude':
-                amp_array = N_avg_obs_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
-            elif spectrum_parameter == 'N_monomers':
-                amp_array = N_avg_obs_array * stoichiometry_array * stoichiometry_binwidth_array
-            else: # spectrum_parameter == 'N_oligomers'
-                amp_array = N_avg_obs_array * stoichiometry_binwidth_array
-            self._N_pop_array = N_avg_obs_array
-            
-        else:
-            # We have an initial array
-            if verbose:
-                print(f'Initializing amp_array with {n_species} species from pre-initialized N_pop_array')
-            if spectrum_parameter  == 'Amplitude':
-                amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
-            elif spectrum_parameter == 'N_monomers':
-                amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array
-            else: # spectrum_parameter == 'N_oligomers'
-                amp_array = N_pop_array * stoichiometry_binwidth_array
-            self._N_pop_array = N_pop_array
+        if not utils.isiterable(N_pop_array):
+            if N_pop_array == None:
+                # Initalize from nothing
+                if incomplete_sampling_correction:
+                    N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+                else:
+                    N_avg_obs_array = np.ones(n_species) / n_species
+                    
+                if verbose:
+                    print(f'[{self.job_prefix}] Initializing flat amp_array for {n_species} species as N_pop_array is empty')
+                if spectrum_parameter  == 'Amplitude':
+                    amp_array = N_avg_obs_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
+                elif spectrum_parameter == 'N_monomers':
+                    amp_array = N_avg_obs_array * stoichiometry_array * stoichiometry_binwidth_array
+                else: # spectrum_parameter == 'N_oligomers'
+                    amp_array = N_avg_obs_array * stoichiometry_binwidth_array
+                self._N_pop_array = N_avg_obs_array
+            raise Exception(f'[{self.job_prefix}] Invalid N_pop_array: Must be None, or np.array with non-negative initial estimates')
 
+        else:
+            if np.all(N_pop_array >= 0.) and np.sum(N_pop_array) > 0. :
+                # We have an initial array
+                if verbose:
+                    print(f'[{self.job_prefix}] Initializing amp_array with {n_species} species from pre-initialized N_pop_array')
+                if spectrum_parameter  == 'Amplitude':
+                    amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
+                elif spectrum_parameter == 'N_monomers':
+                    amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array
+                else: # spectrum_parameter == 'N_oligomers'
+                    amp_array = N_pop_array * stoichiometry_binwidth_array
+                self._N_pop_array = N_pop_array
+            else:
+                raise Exception(f'[{self.job_prefix}] Invalid N_pop_array: Must be None, or np.array with non-negative initial estimates')
         amp_array /= amp_array.sum()
             
         # Ensure integer iteration count limits
@@ -471,7 +485,7 @@ class FCS_spectrum():
         elif spectrum_type == 'reg_CONTIN':
             _reg_method = False
         else:
-            raise Exception(f'Invalid spectrum_type: Must be "MEM" or "CONTIN", got {spectrum_type}')
+            raise Exception(f'[{self.job_prefix}] Invalid spectrum_type: Must be "MEM" or "CONTIN", got {spectrum_type}')
 
 
         # Declare some variables...
@@ -493,7 +507,7 @@ class FCS_spectrum():
 
         while True:
             if verbose:
-                print(f'Outer loop iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
+                print(f'[{self.job_prefix}] Outer loop iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
 
             NLL_array_inner = np.zeros(max_iter_inner)
             
@@ -514,6 +528,7 @@ class FCS_spectrum():
                                       fcn_kws = {'i_bin_time': i_bin_time,
                                                 'numeric_precision': numeric_precision,
                                                 'mp_pool': mp_pool},
+                                      nan_policy = 'propagate',
                                       calc_covar = False)
             
             iterator_inner = 0
@@ -524,7 +539,7 @@ class FCS_spectrum():
                 minimization_result = fitter.minimize(method = 'nelder',
                                                       params = params,
                                                       max_nfev = 1)
-                # minimization_result = lmfit.minimize(self.negloglik_global_fit, 
+                # minimization_result = lmfit.minimize(self.negloglik_global_fit,
                 #                                      params,
                 #                                      method = 'nelder',
                 #                                      args = (use_FCS, 
@@ -570,7 +585,12 @@ class FCS_spectrum():
                 # on population statistics alone
                 G_fit = np.dot(self.tau__tau_diff_array, 
                                self._N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)) * 2**(-3/2)
-                weighted_residual = (G_fit - self.data_FCS_G) / self.data_FCS_sigma
+                
+                # # Amplitude is locally optimized to stabilize fit
+                G0 = sminimize_scalar(lambda G0: np.sum(((G_fit * G0 + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma)**2)).x
+                G_fit_scale = G_fit * G0
+                
+                weighted_residual = (G_fit_scale + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma
                 
                 # Calculation of regularization terms
                 # These actually used only implicitly, so we only show them for reference
@@ -610,7 +630,7 @@ class FCS_spectrum():
                     if (iterator_inner + 1) >= max_iter_inner:
                         # Iteration limit hit
                         if verbose:
-                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current NLL: {NLL_array_inner[iterator_inner]}')
+                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current NLL: {NLL_array_inner[iterator_inner]}')
                         break
                     
                     # Check if gradients for S and chi-square are parallel, which they
@@ -622,7 +642,7 @@ class FCS_spectrum():
                     if test_stat < REG_CONV_THRESH_INNER: 
                         # gradients approximately parallel - stop inner loop
                         if verbose:
-                            print(f'Stopping inner loop after {iterator_inner + 1} iterations (converged), current NLL: {NLL_array_inner[iterator_inner]}')
+                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (converged), current NLL: {NLL_array_inner[iterator_inner]}')
                         break
 
                 # We continue - In that case update amp_array
@@ -631,7 +651,7 @@ class FCS_spectrum():
                 alpha_f = NLL_grad_length / S_grad_length / lagrange_mul
                 
                 # search direction construct
-                e_G = alpha_f * S_gradient - NLL_gradient # del Q
+                e_G = alpha_f * S_gradient - NLL_gradient / 2 # del Q
         
                 # update amp_array
                 amp_array += amp_array * e_G * REG_GRADIENT_SCALING
@@ -663,7 +683,7 @@ class FCS_spectrum():
             if iterator_outer >= max_iter_outer:
                 # Iteration limit hit 
                 if verbose:
-                    print(f'Stopping outer loop after {iterator_outer} iterations (iteration limit)')
+                    print(f'[{self.job_prefix}] Stopping outer loop after {iterator_outer} iterations (iteration limit)')
                 break
             
             NLL_array_outer[iterator_outer] = NLL_array_inner[iterator_inner]
@@ -702,7 +722,7 @@ class FCS_spectrum():
                     
                     if lagrange_mul_recent_rel_span < REG_CONV_THRESH_OUTER and NLL_recent_rel_span < REG_CONV_THRESH_OUTER:
                         if verbose:
-                            print(f'Stopping outer loop after {iterator_outer} iterations (no longer changing)')
+                            print(f'[{self.job_prefix}] Stopping outer loop after {iterator_outer} iterations (no longer changing)')
                         break
                 
                 lagrange_mul_del_old = np.copy(lagrange_mul_del_new)
@@ -711,7 +731,7 @@ class FCS_spectrum():
             else:
                 # Convergence criterion hit - stop outer loop
                 if verbose:
-                    print(f'Stopping outer loop after {iterator_outer} iterations (converged)')
+                    print(f'[{self.job_prefix}] Stopping outer loop after {iterator_outer} iterations (converged)')
                 break
         
         return minimization_result, self._N_pop_array, lagrange_mul
@@ -1046,7 +1066,7 @@ class FCS_spectrum():
         
         return negloglik
 
-    
+    @staticmethod
     def PCH_chisq(pch_data,
                   pch_model,
                   pch_sigma):
@@ -1071,7 +1091,7 @@ class FCS_spectrum():
         elif spectrum_parameter == 'N_oligomers':
             reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
         else:
-            raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
         
         # Normalize
         frequency_array = reg_target / reg_target.sum()
@@ -1104,7 +1124,7 @@ class FCS_spectrum():
         elif spectrum_parameter == 'N_oligomers':
             reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
         else:
-            raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
             
         # Normalize
         frequency_array = reg_target / reg_target.sum()
@@ -1463,8 +1483,8 @@ class FCS_spectrum():
         pch *= sspecial.gamma(photon_counts_array)
         
         # A simpler prefactor
-        pch *=  1 / self.PCH_Q / np.sqrt(2.) / sspecial.factorial(photon_counts_array)
-        
+        pch *=  1 / self.PCH_Q / np.sqrt(np.pi) / sspecial.factorial(photon_counts_array)
+
         return pch
     
     
@@ -1498,8 +1518,8 @@ class FCS_spectrum():
                                      PCH_n_photons_max)
 
         # Apply correction
-        pch /= (1 + F)
-        pch[0] += 2**(-3/2) / self.PCH_Q * cpm_eff * F
+        pch[0] += 2**(-3/2) * cpm_eff * F / self.PCH_Q
+        pch /= (1 + F)**2
         
         return pch
         
@@ -1814,9 +1834,9 @@ class FCS_spectrum():
         pch_single_particle *= sspecial.gamma(photon_counts_array)
         
         # Apply prefactors
-        pch_single_particle *=  1 / PCH_Q / np.sqrt(2.) / sspecial.factorial(photon_counts_array)
-        pch_single_particle /= (1 + F)
-        pch_single_particle[0] += 2**(-3/2) / PCH_Q * t_bin * cpms_spec * F
+        pch_single_particle *=  1 / PCH_Q / np.sqrt(np.pi) / sspecial.factorial(photon_counts_array)
+        pch_single_particle[0] += 2**(-3/2) * t_bin * cpms_spec * F / PCH_Q
+        pch_single_particle /= (1 + F)**2
 
         
         ### Weights for observation of 1, 2, 3, 4, ... particles
@@ -1832,7 +1852,6 @@ class FCS_spectrum():
         
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
-
         
         ### Put weights and fundamental PCH together for full PCH
         # Initialize a long array of zeros to contain the full PCH
@@ -1916,25 +1935,25 @@ class FCS_spectrum():
                                   ):
         
         if not utils.isfloat(F) or F < 0.:
-            raise Exception('Invalid input for F: Must be float >= 0.') 
+            raise Exception(f'[{self.job_prefix}] Invalid input for F: Must be float >= 0.') 
 
         if not utils.isfloat(t_bin) or t_bin <= 0.:
-            raise Exception('Invalid input for t_bin: Must be float > 0.') 
+            raise Exception(f'[{self.job_prefix}] Invalid input for t_bin: Must be float > 0.') 
 
         if not utils.isiterable(cpms_array):
-            raise Exception('Invalid input for cpms_array: Must be array.') 
+            raise Exception(f'[{self.job_prefix}] Invalid input for cpms_array: Must be array.') 
             
         if not utils.isiterable(N_avg_array):
-            raise Exception('Invalid input for N_avg_array: Must be array.')
+            raise Exception(f'[{self.job_prefix}] Invalid input for N_avg_array: Must be array.')
            
         if not cpms_array.shape[0] == N_avg_array.shape[0]:
-            raise Exception('cpms_array and N_avg_array must have same length.')
+            raise Exception(f'[{self.job_prefix}] cpms_array and N_avg_array must have same length.')
            
         if not type(crop_output) == bool:
-            raise Exception('Invalid input for crop_output: Must be bool.')
+            raise Exception(f'[{self.job_prefix}] Invalid input for crop_output: Must be bool.')
             
         if not utils.isfloat(numeric_precision) or numeric_precision <= 0. or numeric_precision >= 1.:
-            raise Exception('Invalid input for numeric_precision: Must be float, 0 < numeric_precision < 1.') 
+            raise Exception(f'[{self.job_prefix}] Invalid input for numeric_precision: Must be float, 0 < numeric_precision < 1.') 
 
         if type(mp_pool) == multiprocessing.Pool:
             # Parallel execution
@@ -2086,7 +2105,7 @@ class FCS_spectrum():
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
-        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / cpms_array / labelling_efficiency_array)  * 2**(-3/2) 
+        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / cpms_array / labelling_efficiency_array) * 2**(-3/2) 
         
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
@@ -2150,9 +2169,9 @@ class FCS_spectrum():
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            N_eff_array = self._N_pop_array * stoichiometry_binwidth_array * 2**(-3/2) # Gamma correction
+            N_eff_array = self._N_pop_array * stoichiometry_binwidth_array# * 2**(-3/2) # Gamma correction
         else:
-            N_eff_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * stoichiometry_binwidth_array * 2**(-3/2) # Gamma correction
+            N_eff_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * stoichiometry_binwidth_array# * 2**(-3/2) # Gamma correction
 
         if time_resolved_PCH:
             # Bin time correction
@@ -2195,7 +2214,7 @@ class FCS_spectrum():
         
         stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * 2**(-3/2) # Gamma correction
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) #* 2**(-3/2) # Gamma correction
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         if time_resolved_PCH:
@@ -2288,10 +2307,10 @@ class FCS_spectrum():
                                           ):
         
         if not utils.isiterable(tau_diff_array):
-            raise Exception("Invalid input for tau_diff_array - must be np.array")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_array - must be np.array")
             
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         # The monomer by definition has stoichiometry 1, so we start with the second element
         fold_changes = tau_diff_array[1:] / tau_diff_array[0]
@@ -2395,25 +2414,25 @@ class FCS_spectrum():
                                ):
         
         if use_FCS and not self.FCS_possible:
-            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
         if use_PCH and not self.PCH_possible:
-            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
             
         if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not (utils.isint(n_species) and n_species > 0):
-            raise Exception("Invalid input for n_species - must be int > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 0")
         
         if not (utils.isfloat(tau_diff_min) and tau_diff_min > 0):
-            raise Exception("Invalid input for tau_diff_min - must be float > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0")
 
         if not (utils.isfloat(tau_diff_max) and tau_diff_max > 0):
-            raise Exception("Invalid input for tau_diff_max - must be float > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float > 0")
 
         if type(use_blinking) != bool:
-            raise Exception("Invalid input for use_blinking - must be bool")
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool")
 
 
         initial_params = lmfit.Parameters()
@@ -2505,22 +2524,22 @@ class FCS_spectrum():
                           ):
     
         if use_FCS and not self.FCS_possible:
-            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
         if use_PCH and not self.PCH_possible:
-            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
                     
         if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
             
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
-            raise Exception("Invalid input for n_species - must be int >= 10 for regularized fitting")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for regularized fitting")
             
         tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
                                                  tau_diff_max, 
@@ -2650,19 +2669,19 @@ class FCS_spectrum():
     
         # OLD STUFF, NOT FUNCTIONAL ANY MORE
         if use_FCS and not self.FCS_possible:
-            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
         if use_PCH and not self.PCH_possible:
-            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
                     
         if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
             
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            raise Exception("Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
             
         # Extract a bunch of arrays from Gauss fit results
         n_species = self.get_n_species(gauss_fit_params)
@@ -2711,7 +2730,7 @@ class FCS_spectrum():
             else:
                 # Dummy
                 initial_params.add(f'N_avg_obs_{i_spec}', 
-                                   expr = f'N_avg_pop_{i_spec}', 
+                                   value = 1., 
                                    vary = False)
 
             if use_FCS or (use_PCH and time_resolved_PCH):
@@ -2785,22 +2804,22 @@ class FCS_spectrum():
                           ):
     
         if use_FCS and not self.FCS_possible:
-            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
         if use_PCH and not self.PCH_possible:
-            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
 
         if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-            raise Exception("Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
 
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception("Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
 
         if not (utils.isint(n_species) and n_species >= 10):
-            raise Exception("Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
             
         tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
                                                  tau_diff_max, 
@@ -2808,6 +2827,8 @@ class FCS_spectrum():
         
         stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
                                                                                                        oligomer_type)
+        stoichiometry = stoichiometry.astype(np.float64)
+        
         # Can be fewer here than originally intended, depending on settings
         n_species = stoichiometry.shape[0]
         
@@ -2882,7 +2903,7 @@ class FCS_spectrum():
                                    value = 1., 
                                    vary = False)
             else:
-                raise Exception("Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+                raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
             
             
             # Define particle numbers via parameterized distributions
@@ -2993,53 +3014,53 @@ class FCS_spectrum():
         
         # A bunch of input and compatibility checks
         if use_FCS and not self.FCS_possible:
-            raise Exception('Cannot run FCS fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
         if use_PCH and not self.PCH_possible:
-            raise Exception('Cannot run PCH fit - not all required attributes set in class')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
 
         if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception('Cannot run PCMH fit - PSF aspect ratio must be set')
+            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not spectrum_type in ['discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-            raise Exception(f"Invalid input for spectrum_type - must be one out of 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'. Got {spectrum_type}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'. Got {spectrum_type}")
 
         if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
-            raise Exception(f"Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {spectrum_parameter}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {spectrum_parameter}")
     
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] or spectrum_type == 'discrete'):
-            raise Exception(f"Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'. Got {oligomer_type}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'. Got {oligomer_type}")
         
         if type(labelling_correction) != bool:
-            raise Exception(f"Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
 
         if type(incomplete_sampling_correction) != bool:
-            raise Exception(f"Invalid input for incomplete_sampling_correction - must be bool. Got {incomplete_sampling_correction}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for incomplete_sampling_correction - must be bool. Got {incomplete_sampling_correction}")
 
         if incomplete_sampling_correction and spectrum_type == 'discrete':
-            raise Exception("incomplete_sampling_correction does not work for spectrum_type 'discrete' and must be set to false")
+            raise Exception(f"[{self.job_prefix}] incomplete_sampling_correction does not work for spectrum_type 'discrete' and must be set to false")
 
         if not (utils.isint(n_species) and n_species > 0):
-            raise Exception(f"Invalid input for n_species - must be int > 0. Got {n_species}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 0. Got {n_species}")
         
         if n_species < 10 and spectrum_type != 'discrete':
-            raise Exception("For any spectrum_type other than 'discrete', use n_species >= 10")
+            raise Exception(f"[{self.job_prefix}] For any spectrum_type other than 'discrete', use n_species >= 10")
 
         if not (utils.isfloat(tau_diff_min) and tau_diff_min > 0):
-            raise Exception(f"Invalid input for tau_diff_min - must be float > 0. Got {tau_diff_min}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0. Got {tau_diff_min}")
 
         if not (utils.isfloat(tau_diff_max) and tau_diff_max > 0):
-            raise Exception(f"Invalid input for tau_diff_max - must be float > 0. Got {tau_diff_max}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float > 0. Got {tau_diff_max}")
 
         if type(use_blinking) != bool:
-            raise Exception(f"Invalid input for use_blinking - must be bool. Got {use_blinking}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool. Got {use_blinking}")
 
         if not (utils.isint(i_bin_time) and i_bin_time >= 0):
-            raise Exception(f"Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
+            raise Exception(f"[{self.job_prefix}] Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             if type(gauss_before_reg) != bool:
-                raise Exception(f"Invalid input for gauss_before_reg - must be bool if spectrum_type is 'reg_MEM' or 'reg_CONTIN'. Got {gauss_before_reg}")
+                raise Exception(f"[{self.job_prefix}] Invalid input for gauss_before_reg - must be bool if spectrum_type is 'reg_MEM' or 'reg_CONTIN'. Got {gauss_before_reg}")
 
 
 
@@ -3060,7 +3081,7 @@ class FCS_spectrum():
             initial_params = self.set_up_params_par(use_FCS, 
                                                     use_PCH, 
                                                     time_resolved_PCH,
-                                                    spectrum_type,
+                                                    ('par_Gauss' if spectrum_type in ['reg_MEM', 'reg_CONTIN'] else spectrum_type),
                                                     spectrum_parameter, 
                                                     oligomer_type, 
                                                     incomplete_sampling_correction, 
@@ -3088,13 +3109,13 @@ class FCS_spectrum():
 
         if self.verbosity > 0:
             if spectrum_type in ['reg_MEM', 'reg_CONTIN'] and gauss_before_reg:
-                print('   --- Initial Gauss fit ---')
-            print('   Initial parameters:')
-            [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
+                print(f'[{self.job_prefix}]    --- Initial Gauss fit ---')
+            print(f'[{self.job_prefix}]    Initial parameters:')
+            [print(f'[{self.job_prefix}] {key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
             
         if self.verbosity > 2:
-            print('   Constants & dep. variables:')
-            [print(f'{key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
+            print(f'[{self.job_prefix}]    Constants & dep. variables:')
+            [print(f'[{self.job_prefix}] {key}: {initial_params[key].value}') for key in initial_params.keys() if not initial_params[key].vary]
 
         if use_parallel:
             mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
@@ -3156,7 +3177,7 @@ class FCS_spectrum():
                     
                     # Re-fit with regularization
                     if self.verbosity > 0:
-                        print('   --- Regularized-spectrum re-fit ---')                        
+                        print(f'[{self.job_prefix}]    --- Regularized-spectrum re-fit ---')                        
                     fit_result, N_pop_array, lagrange_mul = self.regularized_minimization_fit(initial_params,
                                                                                               use_FCS,
                                                                                               use_PCH,
@@ -3193,10 +3214,24 @@ class FCS_spectrum():
                                                                                               )
                 
             else:
+                if self.PCH_fitting_accurate:
+                    # For early, lower-precision fits we also go to the fast least-squares approximation!
+                    fit_PCH_accurate = True
+                    self.PCH_fitting_accurate = False
+                else:
+                    # Leave a marker that we stick to least-squares approximation anyway
+                    fit_PCH_accurate = False
+                    
+
                 # we use incremental precision fitting
                 for i_inc, inc_precision in enumerate(self.numeric_precision):
+                    
                     if self.verbosity > 0:
-                        print(f'Numeric precision increment {i_inc} of {self.numeric_precision.shape[0]}')
+                        print(f'[{self.job_prefix}] Numeric precision increment {i_inc+1} of {self.numeric_precision.shape[0]}')
+                        
+                    if i_inc == self.numeric_precision.shape[0] - 1:
+                        # Last iteration: Switch from least-squares to MLE fitting now if needed
+                        self.PCH_fitting_accurate = fit_PCH_accurate
 
                     if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
 
@@ -3250,7 +3285,7 @@ class FCS_spectrum():
                         
                         # Re-fit with regularization
                         if self.verbosity > 0 and i_inc == 0:
-                            print('   --- Regularized-spectrum re-fit ---')                            
+                            print(f'[{self.job_prefix}]    --- Regularized-spectrum re-fit ---')                            
                         fit_result, N_pop_array, lagrange_mul = self.regularized_minimization_fit(initial_params,
                                                                                                   use_FCS,
                                                                                                   use_PCH,
