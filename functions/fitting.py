@@ -496,16 +496,18 @@ class FCS_spectrum():
         
         # iteration settings
             
-            
         # Initial value of Lagrange multiplier
         lagrange_mul = 20
         lagrange_mul_array = np.zeros(max_iter_outer)
         NLL_array_outer = np.zeros(max_iter_outer)
         lagrange_mul_del_old = 1
         iterator_outer = 1
-        
+
 
         while True:
+            # Outer iteration is an iterative tuning of the lagrange multiplier,
+            # i.e., the regularization weight
+            
             if verbose:
                 print(f'[{self.job_prefix}] Outer loop iteration {iterator_outer}: lagrange_mul = {lagrange_mul}')
 
@@ -532,65 +534,44 @@ class FCS_spectrum():
                                       calc_covar = False)
             
             iterator_inner = 0
+            N_pop_tot_del = 1. # Initial value
             while True:
-
-                # Perform one MLE iteration of the other parameters 
-                # besides the spectrum, and get neg log likelihood NLL
-                minimization_result = fitter.minimize(method = 'nelder',
-                                                      params = params,
-                                                      max_nfev = 1)
-                # minimization_result = lmfit.minimize(self.negloglik_global_fit,
-                #                                      params,
-                #                                      method = 'nelder',
-                #                                      args = (use_FCS, 
-                #                                              use_PCH, 
-                #                                              time_resolved_PCH,
-                #                                              spectrum_type, 
-                #                                              spectrum_parameter,
-                #                                              labelling_correction, 
-                #                                              incomplete_sampling_correction
-                #                                              ),
-                #                                      kws = {'i_bin_time': i_bin_time,
-                #                                             'numeric_precision': numeric_precision,
-                #                                             'mp_pool': mp_pool},
-                #                                      calc_covar = False)
-
-                params = minimization_result.params
-                NLL = minimization_result.residual
-                NLL_array_inner[iterator_inner] = NLL
+                # Each inner iteration is a cycle of three optimizations:
+                # 1. Single scalar optimization (until converged) of total particle number based 
+                #    on correlation function alone
+                # 2. MEM-/ or CONTIN-regularized single iteration of spectrum 
+                #    amplitudes, i.e. species-wise particle numbers
+                # 3. lmfit/scipy-based MLE increment (1 iteration) of "other" parameters 
+                #    not affected by regularization, which can involve any of
+                #    the likelihood function terms implemented in this class,
+                #    also PC(M)H
                 
-                # Update self._N_pop_array from amplitudes array
-                labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-                if spectrum_parameter  == 'Amplitude':
-                    self._N_pop_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
-                elif spectrum_parameter == 'N_monomers':
-                    self._N_pop_array = amp_array / stoichiometry_binwidth_array / stoichiometry_array
-                else: # spectrum_parameter == 'N_oligomers'
-                    self._N_pop_array = amp_array / stoichiometry_binwidth_array
-                self._N_pop_array *= params['N_pop_total'].value
-
+                ### Step 1: Total particle number
+                # We do this on population-level particle numbers, not observation-level
                 
-                # # Update amplitudes array
-                # if spectrum_parameter  == 'Amplitude':
-                #     labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-                #     amp_array = self._N_pop_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
-                # elif spectrum_parameter == 'N_monomers':
-                #     amp_array = self._N_pop_array * stoichiometry_array
-                # else: # spectrum_parameter == 'N_oligomers'
-                #     amp_array = self._N_pop_array
-
-                # amp_array /= amp_array.sum()
+                if incomplete_sampling_correction:
+                    # Recalculate if needed
+                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
                 
+                temp_n_array = self._N_pop_array / np.sum(self._N_pop_array)
+                
+                w_array = temp_n_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)* 2**(-3/2) 
+                w_array /= np.sum(temp_n_array * stoichiometry_binwidth_array * stoichiometry_array)**2
+                
+                N_pop_tot_del = sminimize_scalar(lambda N_pop_total: np.sum(((np.dot(self.tau__tau_diff_array, 
+                                                                                     w_array)
+                                                                               / N_pop_tot_del + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma)**2)).x
+                self._N_pop_array = temp_n_array * N_pop_tot_del
+                
+                
+                
+                ### Step 2 (which is far more code than 1 and 3): Species amplitudes
                 # Recalculate explicit FCS model, and from that weighted residuals
                 # on population statistics alone
                 G_fit = np.dot(self.tau__tau_diff_array, 
-                               self._N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)) * 2**(-3/2)
+                               w_array) / N_pop_tot_del
                 
-                # # Amplitude is locally optimized to stabilize fit
-                G0 = sminimize_scalar(lambda G0: np.sum(((G_fit * G0 + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma)**2)).x
-                G_fit_scale = G_fit * G0
-                
-                weighted_residual = (G_fit_scale + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma
+                weighted_residual = (G_fit + params['acf_offset'].value - self.data_FCS_G) / self.data_FCS_sigma
                 
                 # Calculation of regularization terms
                 # These actually used only implicitly, so we only show them for reference
@@ -607,9 +588,9 @@ class FCS_spectrum():
 
                 # Gradients
                 # First order derivative of least-squares
-                NLL_gradient = np.mean(2 * weighted_residual * tauD__tau_array / self.data_FCS_sigma, 
-                                       axis = 1)
-                NLL_grad_length = np.sqrt(np.sum(NLL_gradient**2))
+                chisq_gradient = np.mean(2 * weighted_residual * tauD__tau_array / self.data_FCS_sigma, 
+                                         axis = 1)
+                chisq_grad_length = np.sqrt(np.sum(chisq_gradient**2))
 
                 # first order derivative of entropy/CONTIN derivative
                 if _reg_method:
@@ -623,35 +604,12 @@ class FCS_spectrum():
                                    )
                                 
                 S_grad_length = np.sqrt(np.sum(S_gradient**2))
-                
-                # Once in a while, check for convergence 
-                if (iterator_inner + 1) % 500 == 0 and iterator_inner > 1:
-                    
-                    if (iterator_inner + 1) >= max_iter_inner:
-                        # Iteration limit hit
-                        if verbose:
-                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current NLL: {NLL_array_inner[iterator_inner]}')
-                        break
-                    
-                    # Check if gradients for S and chi-square are parallel, which they
-                    # should be at the optimal point for a given Lagrange multiplier
-                    S_direction = S_gradient / S_grad_length                        
-                    NLL_direction = NLL_gradient / NLL_grad_length
-                    test_stat = 0.5 * np.sum((S_direction - NLL_direction)**2)
-
-                    if test_stat < REG_CONV_THRESH_INNER: 
-                        # gradients approximately parallel - stop inner loop
-                        if verbose:
-                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (converged), current NLL: {NLL_array_inner[iterator_inner]}')
-                        break
-
-                # We continue - In that case update amp_array
-                
+                                
                 # Scaling factor from Euclician norms of gradients
-                alpha_f = NLL_grad_length / S_grad_length / lagrange_mul
+                alpha_f = chisq_grad_length / S_grad_length / lagrange_mul
                 
                 # search direction construct
-                e_G = alpha_f * S_gradient - NLL_gradient / 2 # del Q
+                e_G = alpha_f * S_gradient - chisq_gradient / 2 # del Q
         
                 # update amp_array
                 amp_array += amp_array * e_G * REG_GRADIENT_SCALING
@@ -665,16 +623,66 @@ class FCS_spectrum():
                 amp_array /= amp_array.sum()
                 
                 # Update self._N_pop_array from amplitudes array
-                labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                # amp_array -> temp_n_array -> noramlize -> scale to real N
+                if incomplete_sampling_correction:
+                    # Recalculate if needed
+                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                    
                 if spectrum_parameter  == 'Amplitude':
-                    self._N_pop_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
+                    temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
                 elif spectrum_parameter == 'N_monomers':
-                    self._N_pop_array = amp_array / stoichiometry_binwidth_array * stoichiometry_array
+                    temp_n_array = amp_array / stoichiometry_binwidth_array * stoichiometry_array
                 else: # spectrum_parameter == 'N_oligomers'
-                    self._N_pop_array = amp_array * stoichiometry_binwidth_array
-                self._N_pop_array *= params['N_pop_total'].value
+                    temp_n_array = amp_array * stoichiometry_binwidth_array
+                self._N_pop_array = temp_n_array / temp_n_array.sum() * N_pop_tot_del
                 
-                # Iterate
+                
+                
+                ### Step 3: MLE iteration of other parameters 
+                # Also to get neg log likelihood NLL
+                minimization_result = fitter.minimize(method = 'nelder',
+                                                      params = params,
+                                                      max_nfev = 1)
+
+                params = minimization_result.params
+                NLL = minimization_result.residual
+                NLL_array_inner[iterator_inner] = NLL
+                
+                if incomplete_sampling_correction:
+                    # If and only if we have incomplete labelling correction, we have to recalculate the spectrum here
+                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                    if spectrum_parameter  == 'Amplitude':
+                        temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
+                    elif spectrum_parameter == 'N_monomers':
+                        temp_n_array = amp_array / stoichiometry_binwidth_array / stoichiometry_array
+                    else: # spectrum_parameter == 'N_oligomers'
+                        temp_n_array = amp_array / stoichiometry_binwidth_array
+                    self._N_pop_array = temp_n_array / temp_n_array.sum() * N_pop_tot_del
+                    
+                    
+                # Once in a while, check for convergence 
+                if (iterator_inner + 1) % 500 == 0 and iterator_inner > 1:
+                    
+                    if (iterator_inner + 1) >= max_iter_inner:
+                        # Iteration limit hit
+                        if verbose:
+                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (iteration limit), current NLL: {NLL_array_inner[iterator_inner]}')
+                        break
+                    
+                    # Check if gradients for S and chi-square are parallel, which they
+                    # should be at the optimal point for a given Lagrange multiplier
+                    S_direction = S_gradient / S_grad_length                        
+                    NLL_direction = chisq_gradient / chisq_grad_length
+                    test_stat = 0.5 * np.sum((S_direction - NLL_direction)**2)
+
+                    if test_stat < REG_CONV_THRESH_INNER: 
+                        # gradients approximately parallel - stop inner loop
+                        if verbose:
+                            print(f'[{self.job_prefix}] Stopping inner loop after {iterator_inner + 1} iterations (converged), current NLL: {NLL_array_inner[iterator_inner]}')
+                        break
+
+
+                ### Inner iteration done: on to next
                 iterator_inner +=1 
                 
             # Inner iteration stopped - check for globally optimal solution
@@ -693,12 +701,12 @@ class FCS_spectrum():
                 # chi-square gradients. 
                     # So, we reduce lagrange_mul if we had on overfit (too-low chi-sq),
                     # and we increase lagrange_mul if we had an underfit
-                # For this, we use the ratio S_grad_length / NLL_grad_length:
-                    # High S_grad_length/NLL_grad_length implies that we had too much weight 
+                # For this, we use the ratio S_grad_length / chisq_grad_length:
+                    # High S_grad_length/chisq_grad_length implies that we had too much weight 
                     # on chi-square (too-high lagrange_mul), and vice versa, so
                     # we change lagrange_mul based on that ratio (nonlinearly, and 
                     # with a bit of a gradient boost)
-                lagrange_mul_del_new = np.sqrt(NLL_grad_length/S_grad_length)
+                lagrange_mul_del_new = np.sqrt(chisq_grad_length/S_grad_length)
                                 
                 lagrange_mul *= lagrange_mul_del_new * lagrange_mul_del_old**(1/3)
                 
@@ -1372,6 +1380,11 @@ class FCS_spectrum():
         
         negloglik = 0.
         
+        # We count the terms in the NLL function and normalize to get an 
+        # absolute value that does not depend too much on the number of 
+        # likelihood terms used
+        n_negloglik_terms = 0 
+        
         if use_FCS:
             # Correlation function is being fitted
             if spectrum_type in ['reg_CONTIN', 'reg_MEM', 'par_Gauss', 'par_Gamma', 'par_LogNorm', 'par_StrExp']:
@@ -1386,6 +1399,7 @@ class FCS_spectrum():
                     negloglik += self.fcs_chisq_partial_labelling(params,) / 2.
                 else: # not labelling_correction
                     negloglik += self.fcs_chisq_full_labelling(params) / 2.
+            n_negloglik_terms += 1
                 
                 
         if use_PCH and (not time_resolved_PCH):
@@ -1401,6 +1415,7 @@ class FCS_spectrum():
                                                                       i_bin_time = i_bin_time,
                                                                       numeric_precision = numeric_precision,
                                                                       mp_pool = mp_pool)
+            n_negloglik_terms += 1
                 
         elif use_PCH and time_resolved_PCH:
             # PCMH fit
@@ -1414,6 +1429,7 @@ class FCS_spectrum():
                                                                 spectrum_type = spectrum_type,
                                                                 numeric_precision = numeric_precision,
                                                                 mp_pool = mp_pool)
+            n_negloglik_terms += 1
                 
             
         if incomplete_sampling_correction:
@@ -1426,8 +1442,9 @@ class FCS_spectrum():
             else: # not labelling_correction
                 negloglik += self.negloglik_incomplete_sampling_full_labelling(params,
                                                                                spectrum_type = spectrum_type)
-        
-        return negloglik
+            n_negloglik_terms += 1
+            
+        return negloglik / n_negloglik_terms
 
 
 
@@ -2081,7 +2098,7 @@ class FCS_spectrum():
         for i_spec in range(n_species):
             g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
             acf_num += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / cpms_array[i_spec] / labelling_efficiency_array[i_spec])
-            acf_den += N_avg_array[i_spec] * cpms_array[i_spec] * labelling_efficiency_array[i_spec]
+            acf_den += N_avg_array[i_spec] * cpms_array[i_spec] * stoichiometry_binwidth_array[i_spec]
         
         acf = acf_num / acf_den**2 * 2**(-3/2) 
 
@@ -2110,7 +2127,7 @@ class FCS_spectrum():
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
         
-        acf /= np.sum(N_avg_array * cpms_array * labelling_efficiency_array)**2
+        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
@@ -2169,9 +2186,9 @@ class FCS_spectrum():
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            N_eff_array = self._N_pop_array * stoichiometry_binwidth_array# * 2**(-3/2) # Gamma correction
+            N_eff_array = self._N_pop_array * stoichiometry_binwidth_array * 2**(3/2) # Gamma correction
         else:
-            N_eff_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * stoichiometry_binwidth_array# * 2**(-3/2) # Gamma correction
+            N_eff_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * stoichiometry_binwidth_array * 2**(3/2) # Gamma correction
 
         if time_resolved_PCH:
             # Bin time correction
@@ -2214,7 +2231,7 @@ class FCS_spectrum():
         
         stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) #* 2**(-3/2) # Gamma correction
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * 2**(3/2) # Gamma correction
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         if time_resolved_PCH:
@@ -2569,10 +2586,6 @@ class FCS_spectrum():
                            value = self.labelling_efficiency if labelling_correction else 1.,
                            vary = False)
 
-        initial_params.add('N_pop_total', 
-                           value = 1., 
-                           min = 0., 
-                           vary = True)
 
         # Species-wise parameters
         for i_spec, tau_diff_i in enumerate(tau_diff_array):
@@ -2709,10 +2722,6 @@ class FCS_spectrum():
                            value = self.labelling_efficiency if labelling_correction else 1.,
                            vary = False)
 
-        initial_params.add('N_pop_total', 
-                           value = 1., 
-                           min = 0., 
-                           vary = True)
 
         # Species-wise parameters
         
