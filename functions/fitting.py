@@ -446,6 +446,9 @@ class FCS_spectrum():
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         
+        # Do we need to optimize other parameters besides those tuned through MEM algorithm?
+        has_other_params = np.any(np.array([params[key].vary for key in params.keys()]))
+        
         # Initialize amplitudes and construct  N_population array for model functions as attribute 
         if not utils.isiterable(N_pop_array):
             if N_pop_array == None:
@@ -646,26 +649,34 @@ class FCS_spectrum():
                 
                 
                 ### Step 3: MLE iteration of other parameters 
-                # Also to get neg log likelihood NLL
-                minimization_result = fitter.minimize(method = 'nelder',
-                                                      params = params,
-                                                      max_nfev = 1)
+                if has_other_params:
+                    # Also to get neg log likelihood NLL
+                    minimization_result = fitter.minimize(method = 'nelder',
+                                                          params = params,
+                                                          max_nfev = 1)
 
-                params = minimization_result.params
-                NLL = minimization_result.residual
-                NLL_array_inner[iterator_inner] = NLL
-                
-                if incomplete_sampling_correction:
-                    # If and only if we have incomplete labelling correction, we have to recalculate the spectrum here
-                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-                    if spectrum_parameter  == 'Amplitude':
-                        temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
-                    elif spectrum_parameter == 'N_monomers':
-                        temp_n_array = amp_array / stoichiometry_binwidth_array / stoichiometry_array
-                    else: # spectrum_parameter == 'N_oligomers'
-                        temp_n_array = amp_array / stoichiometry_binwidth_array
-                    self._N_pop_array = temp_n_array / temp_n_array.sum() * N_pop_tot_del
+
+                    params = minimization_result.params
+                    NLL = minimization_result.residual
+                    NLL_array_inner[iterator_inner] = NLL
                     
+                    if incomplete_sampling_correction:
+                        # If and only if we have incomplete labelling correction, we have to recalculate the spectrum here
+                        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                        if spectrum_parameter  == 'Amplitude':
+                            temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
+                        elif spectrum_parameter == 'N_monomers':
+                            temp_n_array = amp_array / stoichiometry_binwidth_array / stoichiometry_array
+                        else: # spectrum_parameter == 'N_oligomers'
+                            temp_n_array = amp_array / stoichiometry_binwidth_array
+                        self._N_pop_array = temp_n_array / temp_n_array.sum() * N_pop_tot_del
+
+                    
+                else: # not has_other_params
+                    # we use chi-square as NLL
+                    NLL_array_inner[iterator_inner] = np.mean(weighted_residual**2)
+
+        
                     
                 # Once in a while, check for convergence 
                 if (iterator_inner + 1) % 500 == 0 and iterator_inner > 1:
@@ -2580,7 +2591,7 @@ class FCS_spectrum():
         if use_FCS:
             initial_params.add('acf_offset', 
                                 value = 0., 
-                                vary=True)
+                                vary = False)
 
         if use_PCH:
             initial_params.add('F', 
@@ -2714,9 +2725,12 @@ class FCS_spectrum():
         
         # More technical parameters
         if use_FCS:
+            # initial_params.add('acf_offset', 
+            #                     value = gauss_fit_params['acf_offset'].value, 
+            #                     vary=True)
             initial_params.add('acf_offset', 
-                                value = gauss_fit_params['acf_offset'].value, 
-                                vary=True)
+                                value = 0., 
+                                vary = False)
 
         if use_PCH:
             initial_params.add('F', 
