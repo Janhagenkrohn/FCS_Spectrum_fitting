@@ -338,11 +338,14 @@ def fitting_parfunc(job_prefix,
                                                                    use_blinking = use_blinking, # bool
                                                                    use_parallel = False # Bool
                                                                    )
+            
         
         if not fit_result == None:
-                
-            
             fit_params = fit_result.params
+            
+            # Recalculate number of species, it is possible we lose some in between
+            n_species = fitter.get_n_species(fit_params)
+            
             out_name = os.path.join(save_path,
                                     time_tag.strftime("%Y%m%d-%H%M%S") + f'{in_file_name_FCS if use_FCS else in_file_name_PCH}_fit_{spectrum_type}_{n_species}spec')
             

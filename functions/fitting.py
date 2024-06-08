@@ -333,12 +333,11 @@ class FCS_spectrum():
         else:
             raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
 
-        if self.PCH_possible:
-            if type(PCH_fitting_accurate) == bool:
-                self.PCH_fitting_accurate = PCH_fitting_accurate
-            else:
-                raise ValueError(f'[{self.job_prefix}] PCH_fitting_accurate must be bool (ignored if no PCH is loaded).')
-
+        if type(PCH_fitting_accurate) == bool:
+            self.PCH_fitting_accurate = PCH_fitting_accurate
+        else:
+            raise ValueError(f'[{self.job_prefix}] PCH_fitting_accurate must be bool (ignored if no PCH is loaded).')
+        
         if utils.isfloat(labelling_efficiency) and labelling_efficiency > 0. and labelling_efficiency <= 1.:
             self.labelling_efficiency = labelling_efficiency
         else:
