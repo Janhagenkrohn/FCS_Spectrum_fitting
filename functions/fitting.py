@@ -25,6 +25,10 @@ from matplotlib import pyplot as plt
 import multiprocessing
 import traceback
 
+# To suppress unnecessary command line warnings
+import warnings
+
+
 # Custom module
 # For localizing module
 repo_dir = os.path.abspath('..')
@@ -315,10 +319,13 @@ class FCS_spectrum():
                 # Also get uncertainty estimate for least-squares fitting - not used in high-accuracy MLE fitting mode
                 data_PCH_sigma = np.zeros_like(data_PCH_hist)
                 data_PCH_norm = data_PCH_hist / data_PCH_hist.sum(axis=0)
+                data_PCH_max_counts = data_PCH_hist.max(axis=0)
                 for i_bin_time in range(data_PCH_bin_times.shape[0]):
-                    data_PCH_sigma[:,i_bin_time] = np.where(data_PCH_hist[:,i_bin_time] > 0,
-                                                            np.sqrt(data_PCH_hist[:,i_bin_time] * (1 - data_PCH_norm[:,i_bin_time])),
-                                                            self.PCH_n_photons_max[i_bin_time])
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        data_PCH_sigma[:,i_bin_time] = np.where(data_PCH_hist[:,i_bin_time] > 0,
+                                                                np.sqrt(data_PCH_hist[:,i_bin_time] * (1 - data_PCH_norm[:,i_bin_time])),
+                                                                data_PCH_max_counts[i_bin_time])
                 self.data_PCH_sigma = data_PCH_sigma
                 
             else:
@@ -1196,9 +1203,9 @@ class FCS_spectrum():
                 pch_data = pch_data[:n_model_points]
                 pch_sigma = self.data_PCH_sigma[:n_model_points,i_bin_time]
             
-            negloglik = self.PCH_chisq(pch_data,
-                                       pch_model * np.sum(pch_data),
-                                       pch_sigma)
+            negloglik = 0.5 * self.PCH_chisq(pch_data,
+                                             pch_model * np.sum(pch_data),
+                                             pch_sigma)
         
         # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
         negloglik /= np.min([n_data_points, n_model_points])
@@ -1243,9 +1250,9 @@ class FCS_spectrum():
                 pch_data = pch_data[:n_model_points]
                 pch_sigma = self.data_PCH_sigma[:n_model_points,i_bin_time]
             
-            negloglik = self.PCH_chisq(pch_data,
-                                       pch_model * np.sum(pch_data),
-                                       pch_sigma)
+            negloglik = 0.5 * self.PCH_chisq(pch_data,
+                                             pch_model * np.sum(pch_data),
+                                             pch_sigma)
         
         # Normalize by number of "meaningful" data points to avoid effects from dataset length alone
         negloglik /= np.min([n_data_points, n_model_points])
