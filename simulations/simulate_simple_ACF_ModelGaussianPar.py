@@ -19,13 +19,17 @@ simulation of a distribution of particle sizes
 '''
 
 
-oligomer_types = ['spherical_shell', 'spherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
-# oligomer_types = ['spherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+# oligomer_types = ['spherical_shell', 'spherical_dense', 'single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+oligomer_types = ['spherical_shell'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 
-label_efficiencies = [1E-4, 1e-2, 1e-1, 1e-0]
+# label_efficiencies = [1E-4, 1E-3, 1e-2, 1e-1, 1e-0]
+label_efficiencies = [1E-3]
 save_names = []
-[save_names.append(f'3peaks_mu5-20-50_sigma2-30-10_label1e-{log_le}') for log_le in [4, 2, 1, 0]]
+# [save_names.append(f'3peaks_mu5-10-15_sigma2-3-5_label1e-{log_le}') for log_le in [4, 3, 2, 1, 0]]
+# [save_names.append(f'1peaks_mu10_sigma5_label1e-{log_le}') for log_le in [4, 3, 2, 1, 0]]
+# [save_names.append(f'3peaks_equal_mu5-10-15_sigma2-3-5_label1e-{log_le}') for log_le in [4, 3, 2, 1, 0]]
+[save_names.append(f'3peaks_mu5-20-50_sigma2-30-10_label1e-{log_le}') for log_le in [3]]
 
 # Total number of particles to consider
 N_total = 10
@@ -34,14 +38,25 @@ N_total = 10
 # Relative species abundances - will be renormalized and scaled with N_total
 # Many species are needed as this is actually not Gaussian but lognormal 
 n_species = 100
+
 gauss_params = np.array([
     [1, 5, 2],
     [1E-1, 10, 3],
-    [1e-3, 20, 5]]) # relative AUC, mean, sigma for each population
+    [1e-3, 15, 5]]) # relative AUC, mean, sigma for each population
 
 # gauss_params = np.array([
 #     [1E-3, 10, 5]
 #     ]) # relative AUC, mean, sigma for each population
+
+# gauss_params = np.array([
+#     [1, 5, 2],
+#     [1, 10, 3],
+#     [1, 15, 5]]) # relative AUC, mean, sigma for each population
+
+# gauss_params = np.array([
+#     [1, 5, 2],
+#     [1, 10, 3],
+#     [1, 15, 5]]) # relative AUC, mean, sigma for each population
 
 
 monomer_brightness = 10000
@@ -57,11 +72,11 @@ psf_aspect_ratio= 5
 add_noise = False
 noise_scaling_factor = 1e-4
 
-save_folder_glob = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f'
+# save_folder_glob = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f'
+save_folder_glob = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/ACF_simulations_direct/3f/'
 
 
 #%% Processing
-
 n_sims = len(label_efficiencies) * len(oligomer_types)
 
 
@@ -75,7 +90,7 @@ def run_single_sim(i_simulation,
                    monomer_brightness,
                    label_efficiency,
                    save_path):
-    print(f'Starting simulation number {i_simulation} with lablling efficiency {label_efficiency}...')
+    print(f'Starting simulation number {i_simulation} -- labelling efficiency {label_efficiency}')
 
     acf_num = np.zeros_like(tau)
     acf_den = np.zeros_like(tau)
@@ -83,6 +98,7 @@ def run_single_sim(i_simulation,
     acf_noise_var_den = np.zeros_like(tau)
     
     stoichiometry_array = np.round(stoichiometry_array)
+    n_stoichiometries = stoichiometry_array.shape[0]
     tau_diff_array = np.zeros_like(stoichiometry_array)
     species_weights = np.zeros_like(stoichiometry_array)
     species_signal = np.zeros_like(stoichiometry_array)
@@ -96,6 +112,7 @@ def run_single_sim(i_simulation,
     pointer = 0
     
     for i_stoichiometry, stoichiometry in enumerate(stoichiometry_array):
+        print(f'Simulation {i_simulation} -- stoichiometry {stoichiometry} ({i_stoichiometry} / {n_stoichiometries})')
 
         # Parameterize Binomial dist object
         binomial_dist = sstats.binom(stoichiometry, 
@@ -120,8 +137,6 @@ def run_single_sim(i_simulation,
         g_norm_spec = 1 / (1 + tau/tau_diff_array[i_stoichiometry]) / np.sqrt(1 + tau / (np.square(psf_aspect_ratio) * tau_diff_array[i_stoichiometry]))
 
         for i_labelling in range(int(stoichiometry)):
-            if i_labelling % 100000 == 0 and i_labelling > 1:
-                print(f'Label efficiency {i_labelling} ({np.round(i_labelling / stoichiometry * 100, 3)} %)...')
                 
             # Get species parameters
             effective_species_tau_diff[pointer] = tau_diff_array[i_stoichiometry]
@@ -160,7 +175,8 @@ def run_single_sim(i_simulation,
         acf_num += g_norm_spec * species_weights[i_stoichiometry]
         acf_den += species_signal[i_stoichiometry]
 
-    
+    print(f'Simulation {i_simulation} -- Wrapping up and saving spreadsheets')
+
     # Get total ACF            
     acf = acf_num / acf_den**2
     
@@ -174,7 +190,6 @@ def run_single_sim(i_simulation,
         acf_noise = acf
     
     ################### Write parameters        
-    
     # Effective species (resolved by labelling statistics)
     effective_species_weights = effective_species_cpms**2 * effective_species_N 
     effective_species_weights /= effective_species_weights.sum()
@@ -204,6 +219,21 @@ def run_single_sim(i_simulation,
                      header = True)
 
 
+    ######## Export Kristine csv
+    acr_col = np.zeros_like(tau)
+    average_count_rate = np.sum(effective_species_cpms * effective_species_N)
+    acr_col[:3] = np.array([average_count_rate, average_count_rate, 1E3])
+    out_table = pd.DataFrame(data = {'Lagtime[s]':tau, 
+                                     'Correlation': acf_noise,
+                                     'ACR[Hz]': acr_col,
+                                     'Uncertainty_SD': sd_acf})
+    out_table.to_csv(save_path + '_ACF_ch0.csv',
+                     index = False, 
+                     header = False)
+    
+    
+    
+    print(f'Simulation {i_simulation} -- Saving figures')
     ############# FCS Figure
     fig, ax = plt.subplots(nrows=1, ncols=1)
     
@@ -231,17 +261,7 @@ def run_single_sim(i_simulation,
     # plt.show()
     
     
-    ######## Export Kristine csv
-    acr_col = np.zeros_like(tau)
-    average_count_rate = np.sum(effective_species_cpms * effective_species_N)
-    acr_col[:3] = np.array([average_count_rate, average_count_rate, 1E3])
-    out_table = pd.DataFrame(data = {'Lagtime[s]':tau, 
-                                     'Correlation': acf_noise,
-                                     'ACR[Hz]': acr_col,
-                                     'Uncertainty_SD': sd_acf})
-    out_table.to_csv(save_path + '_ACF_ch0.csv',
-                     index = False, 
-                     header = False)
+
     
     
 
@@ -264,6 +284,7 @@ list_of_param_tuples = []
 
 
 pointer = 0
+
 for oligomer_type in oligomer_types:
     save_folder = os.path.join(save_folder_glob, oligomer_type)
     
@@ -273,8 +294,8 @@ for oligomer_type in oligomer_types:
     for i_simulation, label_efficiency in enumerate(label_efficiencies):
 
         save_name = save_names[i_simulation]
-    
-
+        
+        save_path = os.path.join(save_folder, save_name)
         
         stoichiometry_array = np.logspace(start = 0, 
                                           stop = np.log10(gauss_params[-1, 1] * (gauss_params[-1, 2]**8 if gauss_params[-1, 2]**8 > 2. else 2.)), 
@@ -306,14 +327,14 @@ for oligomer_type in oligomer_types:
                                      monomer_tau_diff,
                                      monomer_brightness,
                                      label_efficiency,
-                                     os.path.join(save_folder, save_name)))
+                                     save_path))
         
         pointer += 1
         
         
 #%% Run parallel
 try:
-    mp_pool = multiprocessing.Pool(processes = (os.cpu_count() - 1 if os.cpu_count() - 1 < pointer else pointer))
+    mp_pool = multiprocessing.Pool(processes = (os.cpu_count() - 1 if os.cpu_count() - 1 < len(list_of_param_tuples) else len(list_of_param_tuples)))
     
     _ = [mp_pool.starmap(run_single_sim, list_of_param_tuples)]
 except:
@@ -321,6 +342,7 @@ except:
 finally:
     mp_pool.close()
     
+print('Job done.')
     
 """
 run_single_sim(i_simulation,
