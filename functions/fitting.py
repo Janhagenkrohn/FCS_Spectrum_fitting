@@ -1580,13 +1580,13 @@ class FCS_spectrum():
         poisson_dist = sstats.poisson(N_avg_box)
         
         # x axis array
-        N_box_array = np.arange(0, np.min([np.ceil(N_avg_box * 1E3), 3])) # At least inspect 3 elements
+        N_box_array = np.arange(0, np.max([np.ceil(N_avg_box * 1E3), 3])) # At least inspect 3 elements
         # Clip N_box to useful significant values within precision (on righthand side)
         poisson_sf = poisson_dist.sf(N_box_array)
         
         significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
         # It can happen that none fulfil criterion, than we need more precise calculation...
-        if significant_bins.shape[0] == 0:
+        while significant_bins.shape[0] == 0:
             numeric_precision /= 10.
             significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
 
@@ -1686,7 +1686,7 @@ class FCS_spectrum():
                                 mode='full')
             pch_full[0:pch_N.shape[0]] += pN * pch_N
         
-        return pch_full[pch_full>0]
+        return pch_full
         
     
     def get_pch(self,
@@ -1886,10 +1886,20 @@ class FCS_spectrum():
         poisson_dist = sstats.poisson(N_avg_box)
         
         # x axis array
-        N_box_array = np.arange(0, np.min([np.ceil(N_avg_box * 1E3), 3])) # At least inspect 3 elements
+        N_box_array = np.arange(0, np.max([np.ceil(N_avg_box * 1E3), 3])) # At least inspect 3 elements
         # Clip N_box to useful significant values within precision (on righthand side)
         poisson_sf = poisson_dist.sf(N_box_array)
-        N_box_array_clip = N_box_array[:np.nonzero(poisson_sf > numeric_precision)[0][-1] + 1]
+        
+        significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
+        # It can happen that none fulfil criterion, than we need more precise calculation...
+        while significant_bins.shape[0] == 0:
+            numeric_precision /= 10.
+            significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
+
+        N_box_array_clip = N_box_array[:significant_bins[-1] + 1]
+        
+        # Get probability mass function
+        p_of_N = poisson_dist.pmf(N_box_array_clip)
         
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
