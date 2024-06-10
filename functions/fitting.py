@@ -1021,7 +1021,22 @@ class FCS_spectrum():
         "scale" is a handle for additional weighting/scaling factors, global or element-wise
         '''
         
-        negloglik = np.sum(observations * np.log(rates) - rates - np.log(sspecial.factorial(observations)) * scale)
+        # Error handling for zeros in observations
+        mask = observations == 0
+        if np.any(mask):            
+            observations = np.where(np.logical_not(mask),
+                                    observations,
+                                    np.min(observations[np.logical_not(mask)]) * 1E-3)
+
+        # Error handling for zeros in rates
+        mask = rates == 0
+        if np.any(mask):            
+            rates = np.where(np.logical_not(mask),
+                             rates,
+                             np.min(rates[np.logical_not(mask)]) * 1E-3)
+
+
+        negloglik = np.sum(observations * np.log(rates) - rates - sspecial.gammaln(observations) * scale)
         
         return negloglik
 
@@ -1035,7 +1050,20 @@ class FCS_spectrum():
         "scale" is a handle for additional weighting/scaling factors, global or element-wise
 
         '''
-        
+        # Error handling for zeros in observations
+        mask = observations == 0
+        if np.any(mask):            
+            observations = np.where(np.logical_not(mask),
+                                    observations,
+                                    np.min(observations[np.logical_not(mask)]) * 1E-3)
+
+        # Error handling for zeros in rates
+        mask = rates == 0
+        if np.any(mask):            
+            rates = np.where(np.logical_not(mask),
+                             rates,
+                             np.min(rates[np.logical_not(mask)]) * 1E-3)
+
         negloglik = np.sum((observations * np.log(rates) - rates) * scale)
         
         return negloglik 
@@ -1055,9 +1083,16 @@ class FCS_spectrum():
         "scale" is a handle for additional weighting/scaling factors, global or element-wise
 
         '''
+        # Error handling for zeros in probabilities
+        mask = probabilities == 0
+        if np.any(mask):            
+            probabilities = np.where(np.logical_not(mask),
+                                    probabilities,
+                                    np.min(probabilities[np.logical_not(mask)]) * 1E-3)
+        
         # Renormalize for possible truncation artifacts
         probabilities /= probabilities.sum()
-        
+
         successes_term = -k_successes * np.log(probabilities)
         failures_term = -(n_trials - k_successes) * np.log(1 - probabilities)
         
@@ -1079,6 +1114,14 @@ class FCS_spectrum():
         "scale" is a handle for additional weighting/scaling factors, global or element-wise
 
         '''
+        
+        # Error handling for zeros in probabilities
+        mask = probabilities == 0
+        if np.any(mask):            
+            probabilities = np.where(np.logical_not(mask),
+                                    probabilities,
+                                    np.min(probabilities[np.logical_not(mask)]) * 1E-3)
+        
         # Renormalize for possible truncation artifacts
         probabilities /= probabilities.sum()
 
@@ -2909,18 +2952,24 @@ class FCS_spectrum():
         # parameters, stoichiometry can cover many orders of magnitude, and
         # the median of the value range is likely to bring us sort of into the 
         # right order of magnitude to start
+        # N_dist_amp = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1e-3
+        N_dist_amp = 1.
         initial_params.add('N_dist_amp', 
-                           value = (median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1e-3), 
+                           value = N_dist_amp, 
                            min = 0., 
                            vary=True)
 
+        # N_dist_a = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 10.
+        N_dist_a = 1.
         initial_params.add('N_dist_a', 
-                           value = (median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 10.), 
+                           value = N_dist_a, 
                            min = 0., 
                            vary=True)
 
+        # N_dist_b = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1.
+        N_dist_b = 1.
         initial_params.add('N_dist_b', 
-                           value = (median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1.), 
+                           value = N_dist_b, 
                            min = 0.,
                            vary=True)
         
@@ -2941,20 +2990,19 @@ class FCS_spectrum():
                                vary = False)
 
             # Weighting function that essentially decides which number the parameterization acts on
+            
             if spectrum_parameter == 'Amplitude':
-                initial_params.add(f'spectrum_weight_{i_spec}', 
-                                   value = stoichiometry[i_spec]**(-2), 
-                                   vary = False)
+                spectrum_weight = stoichiometry[i_spec]**(-2)
+
             elif spectrum_parameter == 'N_monomers':
-                initial_params.add(f'spectrum_weight_{i_spec}', 
-                                   value = stoichiometry[i_spec]**(-1), 
-                                   vary = False)
+                spectrum_weight = stoichiometry[i_spec]**(-1)
             elif spectrum_parameter == 'N_oligomers':
-                initial_params.add(f'spectrum_weight_{i_spec}', 
-                                   value = 1., 
-                                   vary = False)
+                spectrum_weight = 1.
             else:
                 raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+            initial_params.add(f'spectrum_weight_{i_spec}', 
+                               value = spectrum_weight, 
+                               vary = False)
             
             
             # Define particle numbers via parameterized distributions
@@ -2963,33 +3011,54 @@ class FCS_spectrum():
                                    expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
                                    vary = False)
                 
+                if incomplete_sampling_correction:
+                    # Allow fluctuations of observed apparent particle count
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2),
+                                       min = 0., 
+                                       vary = True)
+                    
             if spectrum_type == 'par_LogNorm':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
                                    expr = f'log(N_dist_amp) * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
                                    vary = False)
                 
+                if incomplete_sampling_correction:
+                    # Allow fluctuations of observed apparent particle count
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2),
+                                       min = 0., 
+                                       vary = True)
             if spectrum_type == 'par_Gamma':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
                                    expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
                                    vary = False)
                 
+                if incomplete_sampling_correction:
+                    # Allow fluctuations of observed apparent particle count
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]),
+                                       min = 0., 
+                                       vary = True)
+
             if spectrum_type == 'par_StrExp':
                 initial_params.add(f'N_avg_pop_{i_spec}', 
                                    expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
                                    vary = False)
 
-            if incomplete_sampling_correction:
-                # Allow fluctuations of observed apparent particle count
-                initial_params.add(f'N_avg_obs_{i_spec}', 
-                                   value = 1., 
-                                   min = 0., 
-                                   vary = True)
-                
-            else:
-                # Dummy
+                if incomplete_sampling_correction:
+                    # Allow fluctuations of observed apparent particle count
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b),
+                                       min = 0., 
+                                       vary = True)
+                    
+            if not incomplete_sampling_correction:
+                # Dummy expression does not depend on model
                 initial_params.add(f'N_avg_obs_{i_spec}', 
                                    expr = f'N_avg_pop_{i_spec}', 
                                    vary = False)
+
 
             # An additional factor for translating between "sample-level" and
             # "population-level" observed label efficiency if and only if we 
