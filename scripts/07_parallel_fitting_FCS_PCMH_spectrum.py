@@ -35,17 +35,17 @@ from functions import fitting
 in_dir_names= []
 alpha_label = []
 # glob_dir = '/fs/pool/pool-schwille-spt/Experiment_analysis/20231117_JHK_NKaletta_ParM_oligomerization'
-glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/'
+glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data'
 
 
 
 ''' Labelled protein fraction'''
-in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3a/Exports')])
-alpha_label.append(1.) 
-in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3b/Exports')])
-alpha_label.append(1.) 
-in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3c/Exports')])
-alpha_label.append(1.) 
+# in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3a/Exports')])
+# alpha_label.append(1.) 
+# in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3b/Exports')])
+# alpha_label.append(1.) 
+# in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3c/Exports')])
+# alpha_label.append(1.) 
 in_dir_names.extend([os.path.join(glob_in_dir, 'simFCS2_simulations/3d/Exports')])
 alpha_label.append(1.) 
 
@@ -65,16 +65,16 @@ glob_out_dir ='/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240609
 labelling_correction_list = [False]
 incomplete_sampling_correction_list = [False]
 
-n_species_list = [1, 2]
-spectrum_type_list = ['discrete'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+n_species_list = [80]
+spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
+oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking_list = [True, False]
 
 
 ### FCS settings
-use_FCS_list = [True, False]
+use_FCS_list = [True]
 
 # Shortest and longest diffusion time to fit (parameter bounds)
 tau_diff_min_list = [1E-5]
@@ -87,8 +87,8 @@ FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv
 
 ### PCH settings
 use_PCH_list = [True]
-time_resolved_PCH_list = [True, False]
-PCH_fitting_accurate_list = [True, False] # Accurate MLE or least-squares approximation?
+time_resolved_PCH_list = [True]
+PCH_fitting_accurate_list = [False] # Accurate MLE or least-squares approximation?
 
 # Shortest and longest bin times to consider
 PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
@@ -278,11 +278,10 @@ def fitting_parfunc(job_prefix,
     print('\n' + time_tag.strftime("%Y-%m-%d %H:%M:%S") + '\n' + message)
     
     try:
-        if use_FCS:
-            data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
-                                                                                                                     in_file_name_FCS,
-                                                                                                                     FCS_min_lag_time,
-                                                                                                                     FCS_max_lag_time)
+        data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
+                                                                                                                 in_file_name_FCS,
+                                                                                                                 FCS_min_lag_time,
+                                                                                                                 FCS_max_lag_time)
         if use_PCH:
             data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
                                                                 in_file_name_PCH,

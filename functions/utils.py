@@ -128,13 +128,15 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                            in_dir_names_PCH,
                            in_file_names_PCH,
                            other_info_PCH):
-    if len(in_dir_names_PCH) == len(in_dir_names_FCS):
-        # One PCH file per FCS file
+    
+    if len(in_dir_names_PCH) <= len(in_dir_names_FCS):
+        # One PCH file per FCS file or more FCS files than PCH files
         
         # We use FCS as reference to sort PCH
+        in_file_names_FCS_argsort = []
         in_file_names_PCH_argsort = []
         
-        for in_dir_name_FCS in in_dir_names_FCS:
+        for i_fcs, in_dir_name_FCS in enumerate(in_dir_names_FCS):
         # Find the index of the corresponding PCH file
             
             found = False
@@ -142,6 +144,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                 
                 if in_dir_name_PCH == in_dir_name_FCS and not found:
                     # This looks like the right one - Store index for sorting PCH information
+                    in_file_names_FCS_argsort.append(i_fcs)
                     in_file_names_PCH_argsort.append(i_pch)
                     found = True
                     
@@ -149,45 +152,47 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                     # We already found the correct PCH, but now we find another? That does not work!
                     raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined logic may be needed.')
             
-        in_dir_names = in_dir_names_FCS
-        # in_file_names_FCS unchanged
+        in_dir_names = [in_dir_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
+        in_file_names_FCS = [in_file_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
         in_file_names_PCH = [in_file_names_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
-        other_info = other_info_FCS
+        other_info = [other_info_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
         
         
-    elif len(in_dir_names_PCH) < len(in_dir_names_FCS):
-        # We have more FCS files than PCH files
+    # elif len(in_dir_names_PCH) < len(in_dir_names_FCS):
             
-        # We use FCS as reference to sort PCH
-        in_file_names_PCH_argsort = []
+    #     # We use FCS as reference to sort PCH
+    #     in_file_names_FCS_argsort = []
+    #     in_file_names_PCH_argsort = []
         
-        for in_dir_name_FCS in in_dir_names_FCS:
-        # Find the index of the corresponding PCH file
+    #     for i_fcs, in_dir_name_FCS in enumerate(in_dir_names_FCS):
+    #     # Find the index of the corresponding PCH file
             
-            found = False
-            for i_pch, in_dir_name_PCH in enumerate(in_dir_names_PCH):
+    #         found = False
+    #         for i_pch, in_dir_name_PCH in enumerate(in_dir_names_PCH):
                 
-                if in_dir_name_PCH == in_dir_name_FCS and not found:
-                    # This looks like the right one - Store index for sorting PCH information
-                    in_file_names_PCH_argsort.append(i_pch)
-                    found = True
+    #             if in_dir_name_PCH == in_dir_name_FCS and not found:
+    #                 # This looks like the right one - Store index for sorting PCH information
+    #                 in_file_names_FCS_argsort.append(i_fcs)
+    #                 in_file_names_PCH_argsort.append(i_pch)
+    #                 found = True
                     
-                elif in_dir_name_PCH == in_dir_name_FCS and found:
-                    # We already found the correct PCH, but now we find another? That does not work!
-                    raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined assignment code may be needed.')
+    #             elif in_dir_name_PCH == in_dir_name_FCS and found:
+    #                 # We already found the correct PCH, but now we find another? That does not work!
+    #                 raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined assignment code may be needed.')
                     
-        in_dir_names = in_dir_names_FCS
-        # in_file_names_FCS unchanged
-        in_file_names_PCH = [in_file_names_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
-        other_info = other_info_FCS
+    #     in_dir_names = [in_dir_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
+    #     in_file_names_FCS = [in_file_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
+    #     in_file_names_PCH = [in_file_names_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
+    #     other_info = other_info_FCS
 
 
     else: # len(in_dir_names_PCH) > len(in_dir_names_FCS)
         # We have more PCH files than FCS files - use PCH as reference
         
         in_file_names_FCS_argsort = []
-        
-        for in_dir_name_PCH in in_dir_names_PCH:
+        in_file_names_PCH_argsort = []
+
+        for i_pch, in_dir_name_PCH in enumerate(in_dir_names_PCH):
         # Find the index of the corresponding PCH file
             
             found = False
@@ -196,16 +201,18 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                 if in_dir_name_PCH == in_dir_name_FCS and not found:
                     # This looks like the right one - Store index for sorting PCH information
                     in_file_names_FCS_argsort.append(i_fcs)
+                    in_file_names_PCH_argsort.append(i_pch)
                     found = True
 
                 elif in_dir_name_PCH == in_dir_name_FCS and found:
                     # We already found the correct FCS dataset, but now we find another? That does not work!
                     raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined assignment code may be needed.')
             
-        in_dir_names = in_dir_names_PCH
+        in_dir_names = [in_dir_names_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
         in_file_names_FCS = [in_file_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
-        # in_file_names_PCH unchanged
-        other_info = other_info_PCH
+        in_file_names_PCH = [in_file_names_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
+        other_info = [other_info_PCH[i_pch] for i_pch in in_file_names_PCH_argsort]
+
         
     return in_dir_names, in_file_names_FCS, in_file_names_PCH, other_info
 

@@ -1026,14 +1026,14 @@ class FCS_spectrum():
         if np.any(mask):            
             observations = np.where(np.logical_not(mask),
                                     observations,
-                                    np.min(observations[np.logical_not(mask)]) * 1E-3)
+                                    np.min(observations[np.logical_not(mask)]) * 1E-6)
 
         # Error handling for zeros in rates
         mask = rates == 0
         if np.any(mask):            
             rates = np.where(np.logical_not(mask),
                              rates,
-                             np.min(rates[np.logical_not(mask)]) * 1E-3)
+                             np.min(rates[np.logical_not(mask)]) * 1E-6)
 
 
         negloglik = np.sum(observations * np.log(rates) - rates - sspecial.gammaln(observations) * scale)
@@ -1055,14 +1055,14 @@ class FCS_spectrum():
         if np.any(mask):            
             observations = np.where(np.logical_not(mask),
                                     observations,
-                                    np.min(observations[np.logical_not(mask)]) * 1E-3)
+                                    np.min(observations[np.logical_not(mask)]) * 1E-6)
 
         # Error handling for zeros in rates
         mask = rates == 0
         if np.any(mask):            
             rates = np.where(np.logical_not(mask),
                              rates,
-                             np.min(rates[np.logical_not(mask)]) * 1E-3)
+                             np.min(rates[np.logical_not(mask)]) * 1E-6)
 
         negloglik = np.sum((observations * np.log(rates) - rates) * scale)
         
@@ -1629,12 +1629,18 @@ class FCS_spectrum():
         
         significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
         # It can happen that none fulfil criterion, than we need more precise calculation...
-        while significant_bins.shape[0] == 0:
+        i_iter = 0
+        while significant_bins.shape[0] == 0 and i_iter < 10:
             numeric_precision /= 10.
             significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
-
-        N_box_array_clip = N_box_array[:significant_bins[-1] + 1]
+            i_iter += 1
         
+        if significant_bins.shape[0] > 0: 
+            N_box_array_clip = N_box_array[:significant_bins[-1] + 1]
+        else:
+            # increasing precision did not help - use 3 or all, whichever is smaller
+            N_box_array_clip = N_box_array[:np.min([3, N_box_array.shape[0]])]
+            
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
         
@@ -1935,11 +1941,18 @@ class FCS_spectrum():
         
         significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
         # It can happen that none fulfil criterion, than we need more precise calculation...
-        while significant_bins.shape[0] == 0:
+        i_iter = 0
+        while significant_bins.shape[0] == 0 and i_iter < 10:
             numeric_precision /= 10.
             significant_bins = np.nonzero(poisson_sf > numeric_precision)[0]
+            i_iter += 1
+            
+        if significant_bins.shape[0] > 0: 
+            N_box_array_clip = N_box_array[:significant_bins[-1] + 1]
+        else:
+            # increasing precision did not help - use 3 or all, whichever is smaller
+            N_box_array_clip = N_box_array[:np.min([3, N_box_array.shape[0]])]
 
-        N_box_array_clip = N_box_array[:significant_bins[-1] + 1]
         
         # Get probability mass function
         p_of_N = poisson_dist.pmf(N_box_array_clip)
@@ -2261,10 +2274,9 @@ class FCS_spectrum():
                                ):
         
         n_species = self.get_n_species(params)
-        
             
         # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)]) 
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
@@ -2283,7 +2295,6 @@ class FCS_spectrum():
                                                                    beta_blink = params['beta_blink'].value, 
                                                                    F_blink = params['F_blink'].value)
         
-        
         pch = self.multi_species_pch_handler(F = params['F'].value,
                                              t_bin = t_bin,
                                              cpms_array = cpms_array,
@@ -2292,6 +2303,7 @@ class FCS_spectrum():
                                              numeric_precision = numeric_precision,
                                              mp_pool = mp_pool
                                              )
+        
         if crop_output:
             PCH_n_photons_max = self.PCH_n_photons_max[self.data_PCH_bin_times == t_bin][0]
             pch = pch[:PCH_n_photons_max + 1]
@@ -2564,14 +2576,14 @@ class FCS_spectrum():
             if use_FCS or (use_PCH and time_resolved_PCH):
                 # Diffusion time only for FCS and PCMH
                 initial_params.add(f'tau_diff_{i_spec}', 
-                                   value = np.sqrt(tau_diff_min * tau_diff_max), # Initialize at geo mean of bounds
+                                   value = np.sqrt(tau_diff_min * tau_diff_max) *10**(i_spec + 0.5 - n_species / 2), # Initialize around geo mean of bounds
                                    min = tau_diff_min,
                                    max = tau_diff_max,
                                    vary = True)
             
             if use_PCH:
                 initial_params.add(f'cpms_{i_spec}', 
-                                   value = 1E3, 
+                                   value = 1E3 * 10*(i_spec + 0.5 - n_species / 2), # Initialize around 1000 
                                    min = 0., 
                                    vary = True)
             else:
@@ -2926,7 +2938,7 @@ class FCS_spectrum():
         # Can be fewer here than originally intended, depending on settings
         n_species = stoichiometry.shape[0]
         
-        median_stoichiometry = stoichiometry[int(n_species // 2) + 1]
+        # median_stoichiometry = stoichiometry[int(n_species // 2) + 1]
             
         initial_params = lmfit.Parameters()
 
@@ -2967,7 +2979,7 @@ class FCS_spectrum():
                            vary=True)
 
         # N_dist_b = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1.
-        N_dist_b = 1.
+        N_dist_b = 0.5
         initial_params.add('N_dist_b', 
                            value = N_dist_b, 
                            min = 0.,
@@ -3013,8 +3025,9 @@ class FCS_spectrum():
                 
                 if incomplete_sampling_correction:
                     # Allow fluctuations of observed apparent particle count
+                    # We increment the value a bit to avoid starting too close to 0
                     initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2),
+                                       value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2) + 0.1,
                                        min = 0., 
                                        vary = True)
                     
@@ -3024,9 +3037,8 @@ class FCS_spectrum():
                                    vary = False)
                 
                 if incomplete_sampling_correction:
-                    # Allow fluctuations of observed apparent particle count
                     initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2),
+                                       value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
                                        min = 0., 
                                        vary = True)
             if spectrum_type == 'par_Gamma':
@@ -3035,9 +3047,8 @@ class FCS_spectrum():
                                    vary = False)
                 
                 if incomplete_sampling_correction:
-                    # Allow fluctuations of observed apparent particle count
                     initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]),
+                                       value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]) + 0.1,
                                        min = 0., 
                                        vary = True)
 
@@ -3047,9 +3058,8 @@ class FCS_spectrum():
                                    vary = False)
 
                 if incomplete_sampling_correction:
-                    # Allow fluctuations of observed apparent particle count
                     initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b),
+                                       value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
                                        min = 0., 
                                        vary = True)
                     

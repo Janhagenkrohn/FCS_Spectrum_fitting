@@ -9,16 +9,16 @@ cwd = os.getcwd()
 
 def make_sh_text1(seed):
 
-    time_tag = datetime.datetime.now().strftime("%m%d%H%M")
+    time_tag = datetime.datetime.now().strftime("%m%d")
 
     return f'''#!/bin/bash -l
 #SBATCH -o ./job{time_tag}.out.%j.txt
 #SBATCH -e ./job{time_tag}.err.%j.txt
 #SBATCH -D ./
-#SBATCH -J {time_tag}_FCS_sim
+#SBATCH -J PCH_{time_tag}
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=24
 #SBATCH --time=168:00:00
 #SBATCH --mail-user krohn@biochem.mpg.de     
 #SBATCH --mail-type ALL
@@ -26,7 +26,7 @@ def make_sh_text1(seed):
 module purge
 conda activate tttr
 
-srun python /fs/pool/pool-schwille-spt/_Software/FCS_Spectrum_fitting/FCS_Spectrum_fitting/simulations/simulate_simple_ACF_ModelGaussianPar.py'''
+srun python /fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240609_Fits_for_figures/scripts_as_used/FCS_Spectrum_fitting/scripts/04_parallel_fitting_PCH_param_screen.py'''
 
 def make_sh_text2(jobscript_name):
     return f'''#!/bin/bash
