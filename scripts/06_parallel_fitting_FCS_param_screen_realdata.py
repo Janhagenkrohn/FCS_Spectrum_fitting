@@ -43,47 +43,49 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 #%% 20240423 dataset - AF488-EGFP mixtures 
 # Good for PCH proof of concept stuff
-''' Labelled protein fraction'''
-_in_dir_names = []
-_alpha_label = []
+# ''' Labelled protein fraction'''
+# _in_dir_names = []
+# _alpha_label = []
 
-local_dir = os.path.join(glob_in_dir, r'20240423_Test_data\Test_data.sptw')
+# local_dir = os.path.join(glob_in_dir, r'20240423_Test_data\Test_data.sptw')
 
 
-[_in_dir_names.extend([os.path.join(local_dir, f'AF488_1nM_power{x}')]) for x in [4000]]
-[_alpha_label.append(1.) for x in [4000]]
+# [_in_dir_names.extend([os.path.join(local_dir, f'AF488_1nM_power{x}')]) for x in [4000]]
+# [_alpha_label.append(1.) for x in [4000]]
 # [_in_dir_names.extend([os.path.join(local_dir, f'AF488_1nM_power{x}')]) for x in [50, 150, 450, 1350, 4000]]
 # [_alpha_label.append(1.) for x in [50, 150, 450, 1350, 4000]]
 # [_in_dir_names.extend([os.path.join(local_dir, f'EGFP_3nM_power{x}')]) for x in [50, 150, 450, 1350, 4000]]
 # [_alpha_label.append(1.) for x in [50, 150, 450, 1350, 4000]]
+# _in_dir_names.extend([os.path.join(local_dir, r'EGFP_AF488_Mix_Dil3\EGFP_AF488_Mix_Dil3_1_T0s_1_20240610_1336')])
+# _alpha_label.append(1.)
 
-# Naming pattern for detecting correct files within subdirs of each in_dir
-file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
-file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
+# # Naming pattern for detecting correct files within subdirs of each in_dir
+# file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
+# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
 
-# Detect PCH files
-in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-                                                                          file_name_pattern_PCH, 
-                                                                          _alpha_label, 
-                                                                          '')
+# # Detect PCH files
+# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
+#                                                                           file_name_pattern_PCH, 
+#                                                                           _alpha_label, 
+#                                                                           '')
 
-# Repeat for FCS
-in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-                                                                          file_name_pattern_FCS, 
-                                                                          _alpha_label,
-                                                                          '')
+# # Repeat for FCS
+# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
+#                                                                           file_name_pattern_FCS, 
+#                                                                           _alpha_label,
+#                                                                           '')
 
-_in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-                                                                                                   in_file_names_FCS,
-                                                                                                   alpha_label_FCS,
-                                                                                                   in_dir_names_PCH,
-                                                                                                   in_file_names_PCH,
-                                                                                                   alpha_label_PCH)
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
+#                                                                                                    in_file_names_FCS,
+#                                                                                                    alpha_label_FCS,
+#                                                                                                    in_dir_names_PCH,
+#                                                                                                    in_file_names_PCH,
+#                                                                                                    alpha_label_PCH)
 
-[in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
-[in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
+# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
 
@@ -253,6 +255,42 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 # [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
+#%% 20240604 dataset 1 - A488-labelled DNA
+# SHould be good for incomplete-sampling stuff
+''' Labelled protein fraction'''
+_in_dir_names = []
+_alpha_label = []
+
+local_dir = os.path.join(glob_in_dir, r'20240604_Test_data\20240604_data.sptw\Sample11_DNAs1234567_1\Sample11_DNAs1234567_1_T0s_1_20240612_1358')
+_in_dir_names.extend([os.path.join(local_dir)])
+_alpha_label.append(1.) 
+
+# Naming pattern for detecting correct files within subdirs of each in_dir
+file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
+file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
+
+
+# Detect PCH files
+in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
+                                                                          file_name_pattern_PCH, 
+                                                                          _alpha_label, 
+                                                                          '')
+
+# Repeat for FCS
+in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
+                                                                          file_name_pattern_FCS, 
+                                                                          _alpha_label,
+                                                                          '')
+_in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
+                                                                                                in_file_names_FCS,
+                                                                                                alpha_label_FCS,
+                                                                                                in_dir_names_PCH,
+                                                                                                in_file_names_PCH,
+                                                                                                alpha_label_PCH)
+[in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+[in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+[alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
 
@@ -261,27 +299,27 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 
 #%% Fit settings
 # Output dir for result file writing
-glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits'
+glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\DNA_fitting'
 
 ### General model settings
 
 labelling_correction_list = [False]
-incomplete_sampling_correction_list = [False]
+incomplete_sampling_correction_list = [True]
 
-n_species_list = [1]
-spectrum_type_list = ['discrete'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+n_species_list = [50]
+spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
+oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking_list = [False]
 
 
 ### FCS settings
-use_FCS_list = [False]
+use_FCS_list = [True]
 
 # Shortest and longest diffusion time to fit (parameter bounds)
-tau_diff_min_list = [1E-5]
-tau_diff_max_list = [1E-0]
+tau_diff_min_list = [1E-4]
+tau_diff_max_list = [1E-1]
 
 # Shortest and longest lag time to consider in fit (time axis clipping)
 FCS_min_lag_time_list = [0.] # Use 0. to use full range of data in .csv file
@@ -289,9 +327,9 @@ FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv
 
 
 ### PCH settings
-use_PCH_list = [True]
-time_resolved_PCH_list = [True, False]
-PCH_fitting_accurate_list = [True, False] # Accurate MLE or least-squares approximation?
+use_PCH_list = [False]
+time_resolved_PCH_list = [False]
+PCH_fitting_accurate_list = [False] # Accurate MLE or least-squares approximation?
 
 # Shortest and longest bin times to consider
 PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
@@ -302,7 +340,7 @@ numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical
 
 
 #%% Metadata/calibration data/settings that are global for all measurements
-verbosity = 2 # How much do you want the software to talk?
+verbosity = 3 # How much do you want the software to talk?
 FCS_psf_width_nm = 350. # Roughly
 FCS_psf_aspect_ratio = 5. # Roughly
 
@@ -477,7 +515,7 @@ def fitting_parfunc(job_prefix,
         fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
                                       FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
                                       PCH_Q = PCH_Q,
-                                      acquisition_time_s = acquisition_time_s if acquisition_time_s > 0 else 90., # Dummy for debugging with old-format data
+                                      acquisition_time_s = 90., # Dummy for debugging with old-format data
                                       data_FCS_tau_s = data_FCS_tau_s if use_FCS else None,
                                       data_FCS_G = data_FCS_G if use_FCS else None,
                                       data_FCS_sigma = data_FCS_sigma if use_FCS else None,
@@ -503,6 +541,7 @@ def fitting_parfunc(job_prefix,
                                         tau_diff_min = tau_diff_min, # float
                                         tau_diff_max = tau_diff_max, # float
                                         use_blinking = use_blinking, # bool
+                                        two_step_fit = True, # bool
                                         use_parallel = False # Bool
                                         )
             
@@ -542,12 +581,20 @@ def fitting_parfunc(job_prefix,
             fit_result_dict = {}            
             fit_result_dict['file'] = in_file_name_FCS if use_FCS else in_file_name_PCH 
             
+            covar = fit_result.covar
+            has_covar = not covar == None
+            if has_covar:
+                uncertainty_array = np.sqrt(np.diag(covar))
+                covar_pointer = 0
+            
             for key in fit_params.keys():
                 # Fit parameters
                 fit_result_dict[key + '_val'] = fit_params[key].value
                 fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
                 if not fit_params[key].stderr == None:
                     fit_result_dict[key + '_err'] = fit_params[key].stderr
+                elif has_covar and fit_params[key].vary:
+                    fit_result_dict[key + '_err'] = uncertainty_array[covar_pointer]
                     
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 # Special stuff for regularized fitting
@@ -676,7 +723,7 @@ def fitting_parfunc(job_prefix,
                 plt.savefig(os.path.join(save_path, 
                                           out_name + '_FCS.png'), 
                             dpi=300)
-                plt.close()
+                plt.show()
                 
                 
                 # Write spreadsheet
@@ -782,7 +829,7 @@ def fitting_parfunc(job_prefix,
                 plt.savefig(os.path.join(save_path, 
                                           out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.png'), 
                             dpi=300)
-                plt.close()
+                plt.show()
     
                 # Write spreadsheet
                 out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 

@@ -404,6 +404,7 @@ class FCS_spectrum():
         
         n_total = N_avg * self.acquisition_time_s / tau_diff
         
+        
         return n_total
         
     
@@ -777,6 +778,7 @@ class FCS_spectrum():
         tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             N_avg_pop_array = self._N_pop_array
         else:
@@ -785,10 +787,10 @@ class FCS_spectrum():
         # Likelihood function for particle numbers
         n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
                                         tau_diff_array)
-        
+
         n_obs = self.n_total_from_N_avg(N_avg_obs_array, 
                                         tau_diff_array)
-        
+
         negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                 observations = n_obs,
                                                 scale = stoichiometry_binwidth_array)
@@ -1022,19 +1024,16 @@ class FCS_spectrum():
         '''
         
         # Error handling for zeros in observations
-        mask = observations == 0
-        if np.any(mask):            
-            observations = np.where(np.logical_not(mask),
+        if np.any(observations == 0):            
+            observations = np.where(observations > 0,
                                     observations,
-                                    np.min(observations[np.logical_not(mask)]) * 1E-6)
+                                    np.min(observations[observations > 0]))
 
         # Error handling for zeros in rates
-        mask = rates == 0
-        if np.any(mask):            
-            rates = np.where(np.logical_not(mask),
+        if np.any(rates == 0):            
+            rates = np.where(rates > 0,
                              rates,
-                             np.min(rates[np.logical_not(mask)]) * 1E-6)
-
+                             np.min(rates[rates > 0]))
 
         negloglik = np.sum(observations * np.log(rates) - rates - sspecial.gammaln(observations) * scale)
         
@@ -1051,18 +1050,16 @@ class FCS_spectrum():
 
         '''
         # Error handling for zeros in observations
-        mask = observations == 0
-        if np.any(mask):            
-            observations = np.where(np.logical_not(mask),
+        if np.any(observations == 0):            
+            observations = np.where(observations > 0,
                                     observations,
-                                    np.min(observations[np.logical_not(mask)]) * 1E-6)
+                                    np.min(observations[observations > 0]))
 
         # Error handling for zeros in rates
-        mask = rates == 0
-        if np.any(mask):            
-            rates = np.where(np.logical_not(mask),
+        if np.any(rates == 0):            
+            rates = np.where(rates > 0,
                              rates,
-                             np.min(rates[np.logical_not(mask)]) * 1E-6)
+                             np.min(rates[rates > 0]))
 
         negloglik = np.sum((observations * np.log(rates) - rates) * scale)
         
@@ -1084,11 +1081,10 @@ class FCS_spectrum():
 
         '''
         # Error handling for zeros in probabilities
-        mask = probabilities == 0
-        if np.any(mask):            
-            probabilities = np.where(np.logical_not(mask),
-                                    probabilities,
-                                    np.min(probabilities[np.logical_not(mask)]) * 1E-3)
+        if np.any(probabilities == 0):            
+            probabilities = np.where(probabilities > 0,
+                                     probabilities,
+                                     np.min(probabilities[probabilities > 0]))
         
         # Renormalize for possible truncation artifacts
         probabilities /= probabilities.sum()
@@ -2906,7 +2902,8 @@ class FCS_spectrum():
                           n_species,
                           tau_diff_min,
                           tau_diff_max,
-                          use_blinking
+                          use_blinking,
+                          previous_params = None
                           ):
     
         if use_FCS and not self.FCS_possible:
@@ -2926,197 +2923,361 @@ class FCS_spectrum():
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
-            
-        tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
-                                                 tau_diff_max, 
-                                                 n_species)
         
-        stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
-                                                                                                       oligomer_type)
-        stoichiometry = stoichiometry.astype(np.float64)
+        if type(previous_params) == lmfit.Parameters:
+            from_scratch = False
+        else:
+            from_scratch = True
         
-        # Can be fewer here than originally intended, depending on settings
-        n_species = stoichiometry.shape[0]
-        
-        # median_stoichiometry = stoichiometry[int(n_species // 2) + 1]
-            
         initial_params = lmfit.Parameters()
 
-        # More technical parameters
-        if use_FCS:
-            initial_params.add('acf_offset', 
-                                value = 0., 
-                                vary=True)
-
-        if use_PCH:
-            initial_params.add('F', 
-                               value = 0.4, 
-                               min = 0, 
-                               max = 1.,
+        if from_scratch:
+            tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
+                                                     tau_diff_max, 
+                                                     n_species)        
+            stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
+                                                                                                       oligomer_type)
+            stoichiometry = stoichiometry.astype(np.float64)
+            
+            # Can be fewer here than originally intended, depending on settings
+            n_species = stoichiometry.shape[0]
+            
+        
+            
+    
+            # More technical parameters
+            if use_FCS:
+                initial_params.add('acf_offset', 
+                                    value = 0., 
+                                    vary=False)
+    
+            if use_PCH:
+                initial_params.add('F', 
+                                   value = 0.4, 
+                                   min = 0, 
+                                   max = 1.,
+                                   vary=True)
+                
+            initial_params.add('Label_efficiency', 
+                               value = self.labelling_efficiency if labelling_correction else 1.,
+                               vary = False)
+            
+            # N distribution parameters
+            # We initialize all at median_stoichiometry, as depending on 
+            # parameters, stoichiometry can cover many orders of magnitude, and
+            # the median of the value range is likely to bring us sort of into the 
+            # right order of magnitude to start
+            # N_dist_amp = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1e-3
+            N_dist_amp = 1.
+            initial_params.add('N_dist_amp', 
+                               value = N_dist_amp, 
+                               min = 0., 
+                               vary=True)
+    
+            # N_dist_a = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 10.
+            N_dist_a = 1.
+            initial_params.add('N_dist_a', 
+                               value = N_dist_a, 
+                               min = 0., 
+                               vary=True)
+    
+            # N_dist_b = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1.
+            N_dist_b = 0.5
+            initial_params.add('N_dist_b', 
+                               value = N_dist_b, 
+                               min = 0.01,
                                vary=True)
             
-        initial_params.add('Label_efficiency', 
-                           value = self.labelling_efficiency if labelling_correction else 1.,
-                           vary = False)
-        
-        # N distribution parameters
-        # We initialize all at median_stoichiometry, as depending on 
-        # parameters, stoichiometry can cover many orders of magnitude, and
-        # the median of the value range is likely to bring us sort of into the 
-        # right order of magnitude to start
-        # N_dist_amp = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1e-3
-        N_dist_amp = 1.
-        initial_params.add('N_dist_amp', 
-                           value = N_dist_amp, 
-                           min = 0., 
-                           vary=True)
-
-        # N_dist_a = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 10.
-        N_dist_a = 1.
-        initial_params.add('N_dist_a', 
-                           value = N_dist_a, 
-                           min = 0., 
-                           vary=True)
-
-        # N_dist_b = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 1.
-        N_dist_b = 0.5
-        initial_params.add('N_dist_b', 
-                           value = N_dist_b, 
-                           min = 0.,
-                           vary=True)
-        
-        for i_spec, tau_diff_i in enumerate(tau_diff_array):
-            
-            if use_FCS or (use_PCH and time_resolved_PCH):
-                # Diffusion time only for FCS and PCMH
-                initial_params.add(f'tau_diff_{i_spec}', 
-                                   value = tau_diff_array[i_spec], 
-                                   vary = False)
-            
-            initial_params.add(f'stoichiometry_{i_spec}', 
-                               value = stoichiometry[i_spec], 
-                               vary = False)
-            
-            initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
-                               value = stoichiometry_binwidth[i_spec], 
-                               vary = False)
-
-            # Weighting function that essentially decides which number the parameterization acts on
-            
-            if spectrum_parameter == 'Amplitude':
-                spectrum_weight = stoichiometry[i_spec]**(-2)
-
-            elif spectrum_parameter == 'N_monomers':
-                spectrum_weight = stoichiometry[i_spec]**(-1)
-            elif spectrum_parameter == 'N_oligomers':
-                spectrum_weight = 1.
-            else:
-                raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
-            initial_params.add(f'spectrum_weight_{i_spec}', 
-                               value = spectrum_weight, 
-                               vary = False)
-            
-            
-            # Define particle numbers via parameterized distributions
-            if spectrum_type == 'par_Gauss':
-                initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
+            for i_spec, tau_diff_i in enumerate(tau_diff_array):
+                
+                if use_FCS or (use_PCH and time_resolved_PCH):
+                    # Diffusion time only for FCS and PCMH
+                    initial_params.add(f'tau_diff_{i_spec}', 
+                                       value = tau_diff_array[i_spec], 
+                                       vary = False)
+                
+                initial_params.add(f'stoichiometry_{i_spec}', 
+                                   value = stoichiometry[i_spec], 
                                    vary = False)
                 
-                if incomplete_sampling_correction:
-                    # Allow fluctuations of observed apparent particle count
-                    # We increment the value a bit to avoid starting too close to 0
-                    initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2) + 0.1,
-                                       min = 0., 
-                                       vary = True)
-                    
-            if spectrum_type == 'par_LogNorm':
-                initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'log(N_dist_amp) * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
+                initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
+                                   value = stoichiometry_binwidth[i_spec], 
                                    vary = False)
+    
+                # Weighting function that essentially decides which number the parameterization acts on
                 
-                if incomplete_sampling_correction:
-                    initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
-                                       min = 0., 
-                                       vary = True)
-            if spectrum_type == 'par_Gamma':
-                initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
-                                   vary = False)
-                
-                if incomplete_sampling_correction:
-                    initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]) + 0.1,
-                                       min = 0., 
-                                       vary = True)
-
-            if spectrum_type == 'par_StrExp':
-                initial_params.add(f'N_avg_pop_{i_spec}', 
-                                   expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
-                                   vary = False)
-
-                if incomplete_sampling_correction:
-                    initial_params.add(f'N_avg_obs_{i_spec}', 
-                                       value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
-                                       min = 0., 
-                                       vary = True)
-                    
-            if not incomplete_sampling_correction:
-                # Dummy expression does not depend on model
-                initial_params.add(f'N_avg_obs_{i_spec}', 
-                                   expr = f'N_avg_pop_{i_spec}', 
-                                   vary = False)
-
-
-            # An additional factor for translating between "sample-level" and
-            # "population-level" observed label efficiency if and only if we 
-            # use both incomplete_sampling_correction and labelling_correction
-            initial_params.add(f'Label_obs_factor_{i_spec}', 
-                               value = 1.,
-                               vary = True if (incomplete_sampling_correction and labelling_correction) else False)
-
-            initial_params.add(f'Label_efficiency_obs_{i_spec}', 
-                               expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
-                               vary = False)
-                
-            if i_spec == 0:
-                
-                # Monomer brightness
-                if use_PCH:
-                    initial_params.add('cpms_0', 
-                                       value = 1E3, 
-                                       min = 0, 
-                                       vary = True)
+                if spectrum_parameter == 'Amplitude':
+                    spectrum_weight = stoichiometry[i_spec]**(-2)
+    
+                elif spectrum_parameter == 'N_monomers':
+                    spectrum_weight = stoichiometry[i_spec]**(-1)
+                elif spectrum_parameter == 'N_oligomers':
+                    spectrum_weight = 1.
                 else:
-                    # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
-                    initial_params.add('cpms_0', 
-                                       value = 1., 
-                                       min = 0, 
+                    raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+                initial_params.add(f'spectrum_weight_{i_spec}', 
+                                   value = spectrum_weight, 
+                                   vary = False)
+                
+                
+                # Define particle numbers via parameterized distributions
+                if spectrum_type == 'par_Gauss':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
                                        vary = False)
                     
-            else: # i_spec >= 1
-                # Oligomer cpms is defined by monomer and stoichiometry factor
-                initial_params.add(f'cpms_{i_spec}', 
-                                   expr = f'cpms_0 * stoichiometry_{i_spec}', 
+                    if incomplete_sampling_correction:
+                        # Allow fluctuations of observed apparent particle count
+                        # We increment the value a bit to avoid starting too close to 0
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                        
+                if spectrum_type == 'par_LogNorm':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'log(N_dist_amp) * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
+                                       vary = False)
+                    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                if spectrum_type == 'par_Gamma':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
+                                       vary = False)
+                    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+    
+                if spectrum_type == 'par_StrExp':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
+                                       vary = False)
+    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                        
+                if not incomplete_sampling_correction:
+                    # Dummy expression does not depend on model
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       expr = f'N_avg_pop_{i_spec}', 
+                                       vary = False)
+    
+                # An additional factor for translating between "sample-level" and
+                # "population-level" observed label efficiency if and only if we 
+                # use both incomplete_sampling_correction and labelling_correction
+                initial_params.add(f'Label_obs_factor_{i_spec}', 
+                                   value = 1.,
+                                   vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+    
+                initial_params.add(f'Label_efficiency_obs_{i_spec}', 
+                                   expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
                                    vary = False)
+                    
+                if i_spec == 0:
+                    
+                    # Monomer brightness
+                    if use_PCH:
+                        initial_params.add('cpms_0', 
+                                           value = 1E3, 
+                                           min = 0, 
+                                           vary = True)
+                    else:
+                        # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
+                        initial_params.add('cpms_0', 
+                                           value = 1., 
+                                           min = 0, 
+                                           vary = False)
+                        
+                else: # i_spec >= 1
+                    # Oligomer cpms is defined by monomer and stoichiometry factor
+                    initial_params.add(f'cpms_{i_spec}', 
+                                       expr = f'cpms_0 * stoichiometry_{i_spec}', 
+                                       vary = False)
+                
+            # Add blinking parameters for FCS and PCMH - real or dummy
+            if use_FCS or (use_PCH and time_resolved_PCH):
+                initial_params = self.set_blinking_initial_params(initial_params,
+                                                                          use_blinking,
+                                                                          tau_diff_min)
             
-        # Add blinking parameters for FCS and PCMH - real or dummy
-        if use_FCS or (use_PCH and time_resolved_PCH):
-            initial_params = self.set_blinking_initial_params(initial_params,
-                                                                      use_blinking,
-                                                                      tau_diff_min)
-        
-        # Pre-calculate Normalized species correlation functions that we would 
-        # otherwise spend a significant amount of time on during fitting
-        if use_FCS:
-            n_lag_times = self.data_FCS_G.shape[0]
-            tau_diff__tau_array = np.zeros((n_species, n_lag_times))
+            # Pre-calculate Normalized species correlation functions that we would 
+            # otherwise spend a significant amount of time on during fitting
+            if use_FCS:
+                n_lag_times = self.data_FCS_G.shape[0]
+                tau_diff__tau_array = np.zeros((n_species, n_lag_times))
+                for i_spec in range(n_species):
+                    tau_diff__tau_array[i_spec,:] = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
+                self.tau__tau_diff_array = np.transpose(tau_diff__tau_array)
+            
+            
+            
+        else: # not from_scratch - use previous            
+            n_species = self.get_n_species(previous_params)
+            
+            if use_FCS:
+                initial_params.add('acf_offset', 
+                                    value = previous_params['acf_offset'].value,
+                                    vary=True)
+    
+            if use_PCH:
+                initial_params.add('F', 
+                                   value = previous_params['F'].value if 'F' in previous_params.keys() else 0.4,
+                                   min = 0, 
+                                   max = 1.,
+                                   vary=True)
+                
+            initial_params.add('Label_efficiency', 
+                               value = self.labelling_efficiency if labelling_correction else 1.,
+                               vary = False)
+            
+            N_dist_amp = previous_params['N_dist_amp'].value if 'N_dist_amp' in previous_params.keys() else 1.
+            initial_params.add('N_dist_amp', 
+                               value = N_dist_amp, 
+                               min = 0., 
+                               vary=True)
+    
+            N_dist_a = previous_params['N_dist_a'].value if 'N_dist_a' in previous_params.keys() else 1.
+            initial_params.add('N_dist_a', 
+                               value = N_dist_a, 
+                               min = 0., 
+                               vary=True)
+    
+            N_dist_b = previous_params['N_dist_b'].value if 'N_dist_b' in previous_params.keys() else 1.
+            initial_params.add('N_dist_b', 
+                               value = N_dist_b, 
+                               min = 0.01,
+                               vary=True)
+
             for i_spec in range(n_species):
-                tau_diff__tau_array[i_spec,:] = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
-            self.tau__tau_diff_array = np.transpose(tau_diff__tau_array)
+                
+                if use_FCS or (use_PCH and time_resolved_PCH):
+                    # Diffusion time only for FCS and PCMH
+                    initial_params.add(f'tau_diff_{i_spec}', 
+                                       value = previous_params[f'tau_diff_{i_spec}'].value, 
+                                       vary = False)
+                
+                initial_params.add(f'stoichiometry_{i_spec}', 
+                                   value = previous_params[f'stoichiometry_{i_spec}'].value, 
+                                   vary = False)
+                
+                initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
+                                   value = previous_params[f'stoichiometry_binwidth_{i_spec}'].value, 
+                                   vary = False)
+                    
+                if spectrum_parameter == 'Amplitude':
+                    spectrum_weight = previous_params[f'stoichiometry_{i_spec}'].value**(-2)
+    
+                elif spectrum_parameter == 'N_monomers':
+                    spectrum_weight = previous_params[f'stoichiometry_{i_spec}'].value**(-1)
+                elif spectrum_parameter == 'N_oligomers':
+                    spectrum_weight = 1.
+                else:
+                    raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+                initial_params.add(f'spectrum_weight_{i_spec}', 
+                                   value = spectrum_weight, 
+                                   vary = False)
+                
+                if spectrum_type == 'par_Gauss':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(-0.5 * ((stoichiometry_{i_spec} - N_dist_a) / N_dist_b) ** 2)', 
+                                       vary = False)
+                    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = previous_params[f'N_avg_pop_{i_spec}'].value if f'N_avg_pop_{i_spec}' in previous_params.keys() else N_dist_amp * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                        
+                if spectrum_type == 'par_LogNorm':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'log(N_dist_amp) * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
+                                       vary = False)
+                    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = previous_params[f'N_avg_pop_{i_spec}'].value if f'N_avg_pop_{i_spec}' in previous_params.keys() else np.log(N_dist_amp) * spectrum_weight / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                if spectrum_type == 'par_Gamma':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
+                                       vary = False)
+                    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = previous_params[f'N_avg_pop_{i_spec}'].value if f'N_avg_pop_{i_spec}' in previous_params.keys() else N_dist_amp * spectrum_weight * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+    
+                if spectrum_type == 'par_StrExp':
+                    initial_params.add(f'N_avg_pop_{i_spec}', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * exp(1 / N_dist_b - (stoichiometry_{i_spec} * N_dist_a) ** N_dist_b)', 
+                                       vary = False)
+    
+                    if incomplete_sampling_correction:
+                        initial_params.add(f'N_avg_obs_{i_spec}', 
+                                           value = previous_params[f'N_avg_pop_{i_spec}'].value if f'N_avg_pop_{i_spec}' in previous_params.keys() else N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 0.1,
+                                           min = 0., 
+                                           vary = True)
+                        
+                if not incomplete_sampling_correction:
+                    initial_params.add(f'N_avg_obs_{i_spec}', 
+                                       expr = f'N_avg_pop_{i_spec}', 
+                                       vary = False)
+    
+    
+                initial_params.add(f'Label_obs_factor_{i_spec}', 
+                                   value = 1.,
+                                   vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+    
+                initial_params.add(f'Label_efficiency_obs_{i_spec}', 
+                                   expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
+                                   vary = False)
+                    
+                if i_spec == 0:
+                    
+                    if use_PCH:
+                        initial_params.add('cpms_0', 
+                                           value = previous_params['cpms_0'].value if previous_params['cpms_0'].vary else 1E3, 
+                                           min = 0, 
+                                           vary = True)
+                    else:
+                        initial_params.add('cpms_0', 
+                                           value = previous_params['cpms_0'].value if previous_params['cpms_0'].vary else 1E3, 
+                                           min = 0, 
+                                           vary = False)
+                        
+                else: # i_spec >= 1
+                    initial_params.add(f'cpms_{i_spec}', 
+                                       expr = f'cpms_0 * stoichiometry_{i_spec}', 
+                                       vary = False)
+                
+            if use_FCS or (use_PCH and time_resolved_PCH):
+                # We re-init those, whatever
+                initial_params = self.set_blinking_initial_params(initial_params,
+                                                                    use_blinking,
+                                                                    tau_diff_min)
             
+            # Pre-calculate Normalized species correlation functions that we would 
+            # otherwise spend a significant amount of time on during fitting
+            if use_FCS:
+                n_lag_times = self.data_FCS_G.shape[0]
+                tau_diff__tau_array = np.zeros((n_species, n_lag_times))
+                for i_spec in range(n_species):
+                    tau_diff__tau_array[i_spec,:] = self.fcs_3d_diff_single_species(initial_params[f'tau_diff_{i_spec}'].value)
+                self.tau__tau_diff_array = np.transpose(tau_diff__tau_array)
+
+
         return initial_params
 
 
@@ -3137,7 +3298,7 @@ class FCS_spectrum():
                 tau_diff_min, # float
                 tau_diff_max, # float
                 use_blinking, # bool
-                gauss_before_reg = True,
+                two_step_fit = True,
                 i_bin_time = 0, # int
                 use_parallel = False # Bool
                 ):
@@ -3188,9 +3349,9 @@ class FCS_spectrum():
         if not (utils.isint(i_bin_time) and i_bin_time >= 0):
             raise Exception(f"[{self.job_prefix}] Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
 
-        if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            if type(gauss_before_reg) != bool:
-                raise Exception(f"[{self.job_prefix}] Invalid input for gauss_before_reg - must be bool if spectrum_type is 'reg_MEM' or 'reg_CONTIN'. Got {gauss_before_reg}")
+        if not spectrum_type == 'discrete':
+            if type(two_step_fit) != bool:
+                raise Exception(f"[{self.job_prefix}] Invalid input for two_step_fit - must be bool if spectrum_type is not 'discrete'. Got {two_step_fit}")
 
 
 
@@ -3207,21 +3368,21 @@ class FCS_spectrum():
                                                          )
             
         elif (spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'] or
-              (spectrum_type in ['reg_MEM', 'reg_CONTIN'] and gauss_before_reg)):
+              (spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit)):
             initial_params = self.set_up_params_par(use_FCS, 
                                                     use_PCH, 
                                                     time_resolved_PCH,
                                                     ('par_Gauss' if spectrum_type in ['reg_MEM', 'reg_CONTIN'] else spectrum_type),
                                                     spectrum_parameter, 
                                                     oligomer_type, 
-                                                    incomplete_sampling_correction, 
+                                                    incomplete_sampling_correction and not two_step_fit, # we never do incomplete_sampling_correction in step 1 of a two-step fit
                                                     labelling_correction, 
                                                     n_species, 
                                                     tau_diff_min, 
                                                     tau_diff_max, 
                                                     use_blinking
                                                     )    
-        else: # spectrum_type in ['reg_MEM', 'reg_CONTIN'] and not gauss_before_reg:
+        else: # spectrum_type in ['reg_MEM', 'reg_CONTIN'] and not two_step_fit:
             initial_params = self.set_up_params_reg(use_FCS,
                                                     use_PCH,
                                                     time_resolved_PCH,
@@ -3235,10 +3396,9 @@ class FCS_spectrum():
                                                     use_blinking
                                                     )
             
-            
 
         if self.verbosity > 0:
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN'] and gauss_before_reg:
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit:
                 print(f'[{self.job_prefix}]    --- Initial Gauss fit ---')
             print(f'[{self.job_prefix}]    Initial parameters:')
             [print(f'[{self.job_prefix}] {key}: {initial_params[key].value}') for key in initial_params.keys() if initial_params[key].vary]
@@ -3267,14 +3427,52 @@ class FCS_spectrum():
                                                         spectrum_type, 
                                                         spectrum_parameter,
                                                         labelling_correction, 
-                                                        incomplete_sampling_correction
+                                                        incomplete_sampling_correction and not two_step_fit
                                                         ),
                                                 kws = {'i_bin_time': i_bin_time,
                                                        'numeric_precision': self.numeric_precision,
                                                        'mp_pool': mp_pool},
                                                 calc_covar = True)
+                    
+                    if two_step_fit and incomplete_sampling_correction: # Re-fit - currently only does anything if incomplete_sampling_correction == True, that's why we set the cond
+                        # Re-fit with with fuller model
+                        if self.verbosity > 0:
+                            print(f'[{self.job_prefix}]    --- Parameterized-spectrum re-fit---')                        
+
+                        initial_params = self.set_up_params_par(use_FCS, 
+                                                                use_PCH, 
+                                                                time_resolved_PCH,
+                                                                spectrum_type,
+                                                                spectrum_parameter, 
+                                                                oligomer_type, 
+                                                                incomplete_sampling_correction, 
+                                                                labelling_correction, 
+                                                                n_species, 
+                                                                tau_diff_min, 
+                                                                tau_diff_max, 
+                                                                use_blinking,
+                                                                fit_result.params
+                                                                )    
+                        
+                        fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+                                                    params = initial_params, 
+                                                    method = 'nelder',
+                                                    args = (use_FCS, 
+                                                            use_PCH, 
+                                                            time_resolved_PCH,
+                                                            spectrum_type, 
+                                                            spectrum_parameter,
+                                                            labelling_correction, 
+                                                            incomplete_sampling_correction
+                                                            ),
+                                                    kws = {'i_bin_time': i_bin_time,
+                                                           'numeric_precision': self.numeric_precision,
+                                                           'mp_pool': mp_pool},
+                                                    calc_covar = True)
+
+
                 
-                elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and gauss_before_reg:
+                elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit:
                     # Run Gauss fit
                     fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
                                                 params = initial_params, 
@@ -3380,7 +3578,7 @@ class FCS_spectrum():
                                                            'mp_pool': mp_pool},
                                                     calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
                         
-                    elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and gauss_before_reg:
+                    elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit:
                         
                         if i_inc == 0:
                             # Run Gauss fit in first iteration only
