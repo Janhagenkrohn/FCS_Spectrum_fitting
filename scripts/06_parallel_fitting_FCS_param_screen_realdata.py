@@ -255,19 +255,61 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 # [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
-#%% 20240604 dataset 1 - A488-labelled DNA
+# #%% 20240604 - A488-labelled DNA
+# # SHould be good for incomplete-sampling stuff
+# ''' Labelled protein fraction'''
+# _in_dir_names = []
+# _alpha_label = []
+
+# local_dir = os.path.join(glob_in_dir, r'20240604_Test_data\20240604_data.sptw\Sample11_DNAs1234567_1\Sample11_DNAs1234567_1_T0s_1_20240612_1358')
+# _in_dir_names.extend([os.path.join(local_dir)])
+# _alpha_label.append(1.) 
+
+# # Naming pattern for detecting correct files within subdirs of each in_dir
+# file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
+# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
+
+
+# # Detect PCH files
+# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
+#                                                                           file_name_pattern_PCH, 
+#                                                                           _alpha_label, 
+#                                                                           '')
+
+# # Repeat for FCS
+# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
+#                                                                           file_name_pattern_FCS, 
+#                                                                           _alpha_label,
+#                                                                           '')
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
+#                                                                                                 in_file_names_FCS,
+#                                                                                                 alpha_label_FCS,
+#                                                                                                 in_dir_names_PCH,
+#                                                                                                 in_file_names_PCH,
+#                                                                                                 alpha_label_PCH)
+# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
+
+
+
+
+
+#%% 20240604 - A488-labelled ParM
 # SHould be good for incomplete-sampling stuff
 ''' Labelled protein fraction'''
 _in_dir_names = []
 _alpha_label = []
 
-local_dir = os.path.join(glob_in_dir, r'20240604_Test_data\20240604_data.sptw\Sample11_DNAs1234567_1\Sample11_DNAs1234567_1_T0s_1_20240612_1358')
-_in_dir_names.extend([os.path.join(local_dir)])
-_alpha_label.append(1.) 
+local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data\20240416_data.sptw')
+# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
+_in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
+_alpha_label.append(0.025) 
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
-file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
-file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
+file_name_pattern_PCH = '*07_PCMH_ch0*' # Dual-channel PCH
+file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*' # CCF
 
 
 # Detect PCH files
@@ -299,17 +341,17 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 
 #%% Fit settings
 # Output dir for result file writing
-glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\DNA_fitting'
+glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\fil_fitting'
 
 ### General model settings
 
 labelling_correction_list = [False]
-incomplete_sampling_correction_list = [True]
+incomplete_sampling_correction_list = [False]
 
-n_species_list = [50]
-spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+n_species_list = [2]
+spectrum_type_list = ['discrete'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
+oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking_list = [False]
 
@@ -318,18 +360,18 @@ use_blinking_list = [False]
 use_FCS_list = [True]
 
 # Shortest and longest diffusion time to fit (parameter bounds)
-tau_diff_min_list = [1E-4]
-tau_diff_max_list = [1E-1]
+tau_diff_min_list = [11E-5]
+tau_diff_max_list = [1E-0]
 
 # Shortest and longest lag time to consider in fit (time axis clipping)
-FCS_min_lag_time_list = [0.] # Use 0. to use full range of data in .csv file
+FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
 FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
 
 
 ### PCH settings
-use_PCH_list = [False]
-time_resolved_PCH_list = [False]
-PCH_fitting_accurate_list = [False] # Accurate MLE or least-squares approximation?
+use_PCH_list = [True]
+time_resolved_PCH_list = [True]
+PCH_fitting_accurate_list = [True] # Accurate MLE or least-squares approximation?
 
 # Shortest and longest bin times to consider
 PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
@@ -348,12 +390,13 @@ acquisition_time_s = 90.
 
 PCH_Q = 10. # More calculation parameter than metadata, but whatever
 
-# mp_processes = os.cpu_count()-1 # How many parallel processes?
+# How many parallel processes?
+# If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
+# If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
+# mp_processes = os.cpu_count()-1 
 mp_processes = 1 # no multiprocessing
 
 #%% Wrap all permutations for different fit settings and all files...Long list!
-
-
 
 
 # Iterate over all settings and files
@@ -542,7 +585,7 @@ def fitting_parfunc(job_prefix,
                                         tau_diff_max = tau_diff_max, # float
                                         use_blinking = use_blinking, # bool
                                         two_step_fit = True, # bool
-                                        use_parallel = False # Bool
+                                        use_parallel = mp_processes <= 1 # Bool
                                         )
             
         else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
@@ -559,7 +602,7 @@ def fitting_parfunc(job_prefix,
                                                                     tau_diff_min = tau_diff_min, # float
                                                                     tau_diff_max = tau_diff_max, # float
                                                                     use_blinking = use_blinking, # bool
-                                                                    use_parallel = False # Bool
+                                                                    use_parallel = mp_processes <= 1 # Bool
                                                                     )
         
         if not fit_result == None:

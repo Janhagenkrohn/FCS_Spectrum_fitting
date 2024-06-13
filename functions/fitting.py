@@ -777,7 +777,7 @@ class FCS_spectrum():
         
         tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        # stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
         
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             N_avg_pop_array = self._N_pop_array
@@ -793,9 +793,10 @@ class FCS_spectrum():
 
         negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                 observations = n_obs,
-                                                scale = stoichiometry_binwidth_array)
+                                                scale = 1.)
         
         # Normalize to avoid effects from species numbers
+        # negloglik /= np.sum(stoichiometry_binwidth_array)
         negloglik /= n_species
         return negloglik
     
@@ -842,21 +843,21 @@ class FCS_spectrum():
         for i_spec in range(n_species):
             
             # "Histogram" of "observed" labelling with "observed" N spectrum
-            labelling_efficiency_array_spec_obs = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
-                                                                                      labelling_efficiency_obs_array[i_spec],
-                                                                                      numeric_precision = numeric_precision)
+            _, labelling_efficiency_array_spec_obs = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
+                                                                                         labelling_efficiency_obs_array[i_spec],
+                                                                                         numeric_precision = numeric_precision)
             labelling_efficiency_array_spec_obs *= n_obs[i_spec]
             
             # Reference labelling statistics based on labelling efficiency metadata and "population" N spectrum
-            labelling_efficiency_array_spec_pop = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
-                                                                                      labelling_efficiency_pop,
-                                                                                      numeric_precision = numeric_precision)
-            
+            _, labelling_efficiency_array_spec_pop = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
+                                                                                         labelling_efficiency_pop,
+                                                                                         numeric_precision = numeric_precision)
+
             # Likelihood function for current estimate of "observed" labelling statistics given current estimate of "population" frequencies
             negloglik_labelling_spec = self.negloglik_binomial_full(n_trials = n_obs[i_spec],
                                                                     k_successes = labelling_efficiency_array_spec_obs, 
                                                                     probabilities = labelling_efficiency_array_spec_pop,
-                                                                    scale = stoichiometry_binwidth_array)
+                                                                    scale = stoichiometry_binwidth_array[i_spec])
             
             # Normalize by number of "meaningful" labelling data points to avoid effects from array length
             negloglik_labelling_spec /= labelling_efficiency_array_spec_obs.shape[0]
@@ -864,7 +865,7 @@ class FCS_spectrum():
             negloglik_labelling += negloglik_labelling
             
         # Combine neglogliks and normalize to avoid effects from species numbers
-        negloglik = (negloglik_N + negloglik_labelling) / n_species
+        negloglik = (negloglik_N + negloglik_labelling) / np.sum(stoichiometry_binwidth_array)
         
         return negloglik
     
@@ -1024,18 +1025,24 @@ class FCS_spectrum():
         '''
         
         # Error handling for zeros in observations
-        if np.any(observations == 0):            
-            observations = np.where(observations > 0,
-                                    observations,
-                                    np.min(observations[observations > 0]))
+        if np.any(observations == 0): 
+            if np.any(observations > 0):
+                observations = np.where(observations > 0,
+                                        observations,
+                                        np.min(observations[observations > 0]))
+            else:
+                observations[:] = 1E-9
 
         # Error handling for zeros in rates
-        if np.any(rates == 0):            
-            rates = np.where(rates > 0,
-                             rates,
-                             np.min(rates[rates > 0]))
+        if np.any(rates == 0):   
+            if np.any(rates > 0):
+                rates = np.where(rates > 0,
+                                 rates,
+                                 np.min(rates[rates > 0]))
+            else:
+                rates[:] = 1E-9
 
-        negloglik = np.sum(observations * np.log(rates) - rates - sspecial.gammaln(observations) * scale)
+        negloglik = np.sum(observations * np.log(rates) - rates - sspecial.loggamma(observations + 1) * scale)
         
         return negloglik
 
@@ -1125,7 +1132,7 @@ class FCS_spectrum():
                                                      k_successes))
         successes_term = -k_successes * np.log(probabilities)
         failures_term = -(n_trials - k_successes) * np.log(1 - probabilities)
-        
+
         negloglik = np.sum((neglog_binom_coeff + successes_term + failures_term) * scale)
         
         return negloglik
@@ -2453,19 +2460,21 @@ class FCS_spectrum():
                                        args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
         else: # oligomer_type == naive
-            # Simple enumeration where we actually ignore the fold changes
+            # Dummy ones
             stoichiometry = np.arange(1, tau_diff_array.shape[0] + 1)
+            stoichiometry_binwidth = 1. / stoichiometry
         
-        stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                           return_index = True)
-        tau_diff_array_unique = tau_diff_array[indices]
+        if not oligomer_type == 'naive':
+            stoichiometry, indices = np.unique(np.round(stoichiometry),
+                                               return_index = True)
+            tau_diff_array = tau_diff_array[indices]
         
-        # Also get approximate bin widths of log-spaced distribution
-        log_stoichiometry = np.log(stoichiometry)
-        log_binwidth = np.mean(np.diff(log_stoichiometry))
-        stoichiometry_binwidth = (np.exp(log_stoichiometry + log_binwidth/2) - np.exp(log_stoichiometry - log_binwidth/2))
-
-        return stoichiometry, tau_diff_array_unique, stoichiometry_binwidth
+            # Also get approximate bin widths of log-spaced distribution
+            log_stoichiometry = np.log(stoichiometry)
+            log_binwidth = np.mean(np.diff(log_stoichiometry))
+            stoichiometry_binwidth = (np.exp(log_stoichiometry + log_binwidth/2) - np.exp(log_stoichiometry - log_binwidth/2))
+            
+        return stoichiometry, tau_diff_array, stoichiometry_binwidth
     
        
     def set_blinking_initial_params(self,
@@ -2579,7 +2588,7 @@ class FCS_spectrum():
             
             if use_PCH:
                 initial_params.add(f'cpms_{i_spec}', 
-                                   value = 1E3 * 10*(i_spec + 0.5 - n_species / 2), # Initialize around 1000 
+                                   value = 1E3 * 10**(i_spec + 0.5 - n_species / 2), # Initialize around 1000 
                                    min = 0., 
                                    vary = True)
             else:
@@ -2936,7 +2945,7 @@ class FCS_spectrum():
                                                      tau_diff_max, 
                                                      n_species)        
             stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
-                                                                                                       oligomer_type)
+                                                                                                           oligomer_type)
             stoichiometry = stoichiometry.astype(np.float64)
             
             # Can be fewer here than originally intended, depending on settings
@@ -3006,12 +3015,12 @@ class FCS_spectrum():
     
                 # Weighting function that essentially decides which number the parameterization acts on
                 
-                if spectrum_parameter == 'Amplitude':
+                if spectrum_parameter == 'Amplitude' and not oligomer_type == 'naive':
                     spectrum_weight = stoichiometry[i_spec]**(-2)
     
-                elif spectrum_parameter == 'N_monomers':
+                elif spectrum_parameter == 'N_monomers' and not oligomer_type == 'naive':
                     spectrum_weight = stoichiometry[i_spec]**(-1)
-                elif spectrum_parameter == 'N_oligomers':
+                elif spectrum_parameter == 'N_oligomers' or oligomer_type == 'naive':
                     spectrum_weight = 1.
                 else:
                     raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
@@ -3667,8 +3676,8 @@ class FCS_spectrum():
                 if not mp_pool == None:
                     mp_pool.close()
                 if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-
                     return fit_result
+                
                 else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
                     return fit_result, N_pop_array, lagrange_mul
             except:

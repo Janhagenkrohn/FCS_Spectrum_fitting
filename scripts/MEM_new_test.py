@@ -287,21 +287,25 @@ if __name__ == '__main__':
     # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil9\EGFP_AF488_Mix_Dil9_1_T0s_1_20240610_1308'
     # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil27\EGFP_AF488_Mix_Dil27_1_T0s_1_20240610_1211'
     # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil81\EGFP_AF488_Mix_Dil81_1_T0s_1_20240610_1222'
-    dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240521_Test_data\20240521.sptw\SUVs3_2e-5_labelling_long_1_20240610_1342'
-    in_file_names_FCS = '07_ACF_ch0_dt_bg'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240521_Test_data\20240521.sptw\SUVs3_2e-5_labelling_long_1_20240610_1342'
+    dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240416_JHK_NK_New_ParM_data\20240416_data.sptw\10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240416_JHK_NK_New_ParM_data\20240416_data.sptw\10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435'
+    
+
+    in_file_names_FCS = '06_ACF_ch0_dt_bg'
     
     data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
                                                                                                              in_file_names_FCS,
                                                                                                              1e-6,
                                                                                                              1.)
     # We cheat a little to get better weighting
-    data_FCS_sigma_fit = data_FCS_sigma *data_FCS_tau_s**(2/3)
+    # data_FCS_sigma_fit = data_FCS_sigma *data_FCS_tau_s**(2/3)
     
     G_fit, amp_array, tau_D_array = g3Ddiff_MEMFCS_fit(data_FCS_tau_s, 
                                                        data_FCS_G, 
-                                                       data_FCS_sigma_fit, 
+                                                       data_FCS_sigma, 
                                                        PSF_aspect_ratio = 5, 
-                                                       tau_D_min = 1e-6, 
+                                                       tau_D_min = 2.1e-4, 
                                                        tau_D_max = 1e0, 
                                                        n_tau_D = 100,
                                                        tau_D_array = np.array([]),
@@ -309,7 +313,7 @@ if __name__ == '__main__':
                                                        convergence_criterion_inner = 'parallel_gradients', # 'parallel_gradients', 
                                                        max_iter_inner = 2.5E4,
                                                        max_iter_outer = 50,
-                                                       reg_method = 'CONTIN',# 'MEM', 'CONTIN'
+                                                       reg_method = 'MEM',# 'MEM', 'CONTIN'
                                                        max_lagrange_mul = 1e4
                                                        )
 
