@@ -20,7 +20,9 @@ import matplotlib.pyplot as plt
 import datetime
 from itertools import cycle # used only in plotting
 import traceback # Crash handling
-import multiprocessing
+import multiprocessing 
+import lmfit # only used for type recognition
+
 
 # Custom module
 repo_dir = os.path.abspath('..')
@@ -256,12 +258,13 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 # #%% 20240604 - A488-labelled DNA
-# # SHould be good for incomplete-sampling stuff
+# #SHould be good for incomplete-sampling stuff
 # ''' Labelled protein fraction'''
 # _in_dir_names = []
 # _alpha_label = []
 
-# local_dir = os.path.join(glob_in_dir, r'20240604_Test_data\20240604_data.sptw\Sample11_DNAs1234567_1\Sample11_DNAs1234567_1_T0s_1_20240612_1358')
+# local_dir = os.path.join(glob_in_dir, r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240604_Test_data\20240604_data.sptw\Sample9_DNAs17_1')
+# # local_dir = os.path.join(glob_in_dir, r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240604_Test_data\20240604_data.sptw\Sample9_DNAs157_1')
 # _in_dir_names.extend([os.path.join(local_dir)])
 # _alpha_label.append(1.) 
 
@@ -296,7 +299,7 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 
-#%% 20240604 - A488-labelled ParM
+# #%% 20240604 - A488-labelled ParM
 # SHould be good for incomplete-sampling stuff
 ''' Labelled protein fraction'''
 _in_dir_names = []
@@ -304,6 +307,9 @@ _alpha_label = []
 
 local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data\20240416_data.sptw')
 # _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
+# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
+# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
+# _alpha_label.append(0.001) 
 _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
 _alpha_label.append(0.025) 
 
@@ -323,12 +329,14 @@ in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_di
                                                                           file_name_pattern_FCS, 
                                                                           _alpha_label,
                                                                           '')
+
 _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
                                                                                                 in_file_names_FCS,
                                                                                                 alpha_label_FCS,
                                                                                                 in_dir_names_PCH,
                                                                                                 in_file_names_PCH,
                                                                                                 alpha_label_PCH)
+
 [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
@@ -341,17 +349,18 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 
 #%% Fit settings
 # Output dir for result file writing
-glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\fil_fitting'
+glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\Incom_smpl_corr_tests'
+# glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\DNA157_fitting'
 
 ### General model settings
 
-labelling_correction_list = [False]
-incomplete_sampling_correction_list = [False]
+labelling_correction_list = [False, True]
+incomplete_sampling_correction_list = [False, True]
 
-n_species_list = [2]
-spectrum_type_list = ['discrete'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+n_species_list = [80]
+spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
+oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking_list = [False]
 
@@ -360,31 +369,31 @@ use_blinking_list = [False]
 use_FCS_list = [True]
 
 # Shortest and longest diffusion time to fit (parameter bounds)
-tau_diff_min_list = [11E-5]
-tau_diff_max_list = [1E-0]
+tau_diff_min_list = [2.1E-4]
+tau_diff_max_list = [1E0]
 
 # Shortest and longest lag time to consider in fit (time axis clipping)
-FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
+FCS_min_lag_time_list = [1E-5] # Use 0. to use full range of data in .csv file
 FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
 
 
 ### PCH settings
-use_PCH_list = [True]
-time_resolved_PCH_list = [True]
-PCH_fitting_accurate_list = [True] # Accurate MLE or least-squares approximation?
+use_PCH_list = [False]
+time_resolved_PCH_list = [False]
 
 # Shortest and longest bin times to consider
 PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
 PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
+NLL_funcs_accurate_list = [False, True] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
 numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
 
 
 #%% Metadata/calibration data/settings that are global for all measurements
-verbosity = 3 # How much do you want the software to talk?
-FCS_psf_width_nm = 350. # Roughly
-FCS_psf_aspect_ratio = 5. # Roughly
+verbosity = 1 # How much do you want the software to talk?
+FCS_psf_width_nm = 210. # Roughly
+FCS_psf_aspect_ratio = 6. # Roughly
 
 acquisition_time_s = 90.
 
@@ -409,7 +418,7 @@ for use_FCS in use_FCS_list:
                 for PCH_min_bin_time in PCH_min_bin_time_list:
                     for PCH_max_bin_time in PCH_max_bin_time_list:
                         for time_resolved_PCH in time_resolved_PCH_list:
-                            for PCH_fitting_accurate in PCH_fitting_accurate_list:
+                            for NLL_funcs_accurate in NLL_funcs_accurate_list:
                                 for n_species in n_species_list:
                                     for tau_diff_min in tau_diff_min_list:
                                         for tau_diff_max in tau_diff_max_list:
@@ -429,7 +438,7 @@ for use_FCS in use_FCS_list:
                                                                             PCH_min_bin_time >= 0 and
                                                                             PCH_max_bin_time >= PCH_min_bin_time and
                                                                             type(time_resolved_PCH) == bool and
-                                                                            type(PCH_fitting_accurate) == bool and
+                                                                            type(NLL_funcs_accurate) == bool and
                                                                             utils.isint(n_species) and n_species > 0 and
                                                                             tau_diff_min > 0 and
                                                                             tau_diff_max >= tau_diff_min and
@@ -457,7 +466,7 @@ for use_FCS in use_FCS_list:
                                                                             fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
                                                                             fit_settings_str += '_FCS' if use_FCS else ''
                                                                             fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
-                                                                            fit_settings_str += ('_MLE' if PCH_fitting_accurate else '_WLSQ') if use_PCH else ''
+                                                                            fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
                                                                             
                                                                             for i_file, dir_name in enumerate(in_dir_names):
                                                                                 job_prefix = in_file_names_FCS[i_file] + '_' + fit_settings_str
@@ -482,7 +491,7 @@ for use_FCS in use_FCS_list:
                                                                                                     PCH_min_bin_time,
                                                                                                     PCH_max_bin_time,
                                                                                                     PCH_Q,
-                                                                                                    PCH_fitting_accurate,
+                                                                                                    NLL_funcs_accurate,
                                                                                                     time_resolved_PCH,
                                                                                                     n_species,
                                                                                                     tau_diff_min,
@@ -566,7 +575,7 @@ def fitting_parfunc(job_prefix,
                                       data_PCH_hist = data_PCH_hist if use_PCH else None,
                                       labelling_efficiency = labelling_efficiency,
                                       numeric_precision = numeric_precision,
-                                      PCH_fitting_accurate = PCH_fitting_accurate,
+                                      NLL_funcs_accurate = NLL_funcs_accurate,
                                       verbosity = verbosity,
                                       job_prefix = job_prefix
                                       )
@@ -585,7 +594,8 @@ def fitting_parfunc(job_prefix,
                                         tau_diff_max = tau_diff_max, # float
                                         use_blinking = use_blinking, # bool
                                         two_step_fit = True, # bool
-                                        use_parallel = mp_processes <= 1 # Bool
+                                        # use_parallel = mp_processes <= 1 # Bool
+                                        use_parallel = False # Bool
                                         )
             
         else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
@@ -602,16 +612,29 @@ def fitting_parfunc(job_prefix,
                                                                     tau_diff_min = tau_diff_min, # float
                                                                     tau_diff_max = tau_diff_max, # float
                                                                     use_blinking = use_blinking, # bool
-                                                                    use_parallel = mp_processes <= 1 # Bool
+                                                                    # use_parallel = mp_processes <= 1 # Bool
+                                                                    use_parallel = False # Bool
                                                                     )
         
         if not fit_result == None:
+            if hasattr(fit_result, 'params') and hasattr(fit_result, 'covar'): 
+                # dirty workaround for essentially testing "if type(fit_result) == lmfit.MinimizerResult", as MinimizerResult class cannot be explicitly referenced
+                # Unpack fit result
+                fit_params = fit_result.params
+                covar = fit_result.covar
+                # Recalculate number of species, it is possible we lose some in between
+                n_species = fitter.get_n_species(fit_params)
                 
-            
-            fit_params = fit_result.params
-            
-            # Recalculate number of species, it is possible we lose some in between
-            n_species = fitter.get_n_species(fit_params)
+            elif type(fit_result) == lmfit.Parameters:
+                # Different output that can come from regularized fitting
+                # Unpack fit result
+                fit_params = fit_result
+                covar = None
+                
+                n_species = N_pop_array.shape[0]
+                
+            else:
+                raise Exception(f'Got a fit_result output, but with unsupported type. Expected lmfit.MinimizerResult or lmfit.Parameters, got {type(fit_result)}')
 
             out_name = os.path.join(save_path,
                                     time_tag.strftime("%Y%m%d-%H%M%S") + f'{in_file_name_FCS if use_FCS else in_file_name_PCH}_fit_{spectrum_type}_{n_species}spec')
@@ -624,7 +647,6 @@ def fitting_parfunc(job_prefix,
             fit_result_dict = {}            
             fit_result_dict['file'] = in_file_name_FCS if use_FCS else in_file_name_PCH 
             
-            covar = fit_result.covar
             has_covar = not covar == None
             if has_covar:
                 uncertainty_array = np.sqrt(np.diag(covar))
@@ -751,6 +773,31 @@ def fitting_parfunc(job_prefix,
                             linestyle = '-', 
                             color = 'tab:gray')
                 
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+                    stoichiometry_array = np.array([fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
+                    stoichiometry_binwidth_array = np.array([fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+                    label_efficiency_array = np.array([fit_params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+
+                    scaled_N_pop_array = N_pop_array / N_pop_array.max() * model_FCS.max()
+                    
+                    ax.semilogx(tau_diff_array,
+                                scaled_N_pop_array, 
+                                linestyle = '',
+                                marker = 'x',
+                                color = 'b')
+                    
+                    scaled_amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 
+                    if labelling_correction:
+                        scaled_amp_array  *= (1 + (1-label_efficiency_array) / label_efficiency_array / stoichiometry_array)
+                    scaled_amp_array = scaled_amp_array / scaled_amp_array.max() * model_FCS.max()
+                    ax.semilogx(tau_diff_array,
+                                scaled_amp_array, 
+                                linestyle = '',
+                                marker = 'x',
+                                color = 'r')
+
+                
                 try:
                     fig.supxlabel('Correlation time [s]')
                     fig.supylabel('G(\u03C4)')
@@ -759,7 +806,7 @@ def fitting_parfunc(job_prefix,
                     pass
                 ax.set_xlim(data_FCS_tau_s[0], data_FCS_tau_s[-1])
                 plot_y_min_max = (np.percentile(data_FCS_G, 3), np.percentile(data_FCS_G, 97))
-                ax.set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
+                ax.set_ylim(0. if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
                             plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
         
                 # Save and show figure
@@ -884,7 +931,9 @@ def fitting_parfunc(job_prefix,
                 out_table.to_csv(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'),
                                   index = False, 
                                   header = True)
-        else:
+                
+                
+        else: # No valid fit result
             # Command line message
             message = f'[{job_prefix}] Failed to fit '
             message += in_file_name_FCS if use_FCS else ''
