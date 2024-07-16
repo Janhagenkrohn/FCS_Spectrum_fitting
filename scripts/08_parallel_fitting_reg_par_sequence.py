@@ -308,10 +308,10 @@ _alpha_label = []
 local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data\20240416_data.sptw')
 # _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
 # _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
-# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
-# _alpha_label.append(0.001) 
-_in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
-_alpha_label.append(0.025) 
+_in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
+_alpha_label.append(0.001) 
+# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
+# _alpha_label.append(0.025) 
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 file_name_pattern_PCH = '*07_PCMH_ch0*' # Dual-channel PCH

@@ -39,8 +39,8 @@ in_file_names_FCS = []
 in_file_names_PCH = []
 alpha_label = []
 
-glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora'
-# glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/'
+# glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora'
+glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/D044_MT200_Naora/'
 
 
 #%% 20240423 dataset - AF488-EGFP mixtures 
@@ -66,23 +66,23 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
 
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
 
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                    in_file_names_FCS,
-#                                                                                                    alpha_label_FCS,
-#                                                                                                    in_dir_names_PCH,
-#                                                                                                    in_file_names_PCH,
-#                                                                                                    alpha_label_PCH)
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                    in_file_names_FCS_tmp,
+#                                                                                                    alpha_label_FCS_tmp,
+#                                                                                                    in_dir_names_PCH_tmp,
+#                                                                                                    in_file_names_PCH_tmp,
+#                                                                                                    alpha_label_PCH_tmp)
 
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
@@ -115,21 +115,23 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
+
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                in_file_names_FCS,
-#                                                                                                alpha_label_FCS,
-#                                                                                                in_dir_names_PCH,
-#                                                                                                in_file_names_PCH,
-#                                                                                                alpha_label_PCH)
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                    in_file_names_FCS_tmp,
+#                                                                                                    alpha_label_FCS_tmp,
+#                                                                                                    in_dir_names_PCH_tmp,
+#                                                                                                    in_file_names_PCH_tmp,
+#                                                                                                    alpha_label_PCH_tmp)
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
@@ -157,22 +159,23 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
 
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                in_file_names_FCS,
-#                                                                                                alpha_label_FCS,
-#                                                                                                in_dir_names_PCH,
-#                                                                                                in_file_names_PCH,
-#                                                                                                alpha_label_PCH)
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                    in_file_names_FCS_tmp,
+#                                                                                                    alpha_label_FCS_tmp,
+#                                                                                                    in_dir_names_PCH_tmp,
+#                                                                                                    in_file_names_PCH_tmp,
+#                                                                                                    alpha_label_PCH_tmp)
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
@@ -198,22 +201,23 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
 
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                in_file_names_FCS,
-#                                                                                                alpha_label_FCS,
-#                                                                                                in_dir_names_PCH,
-#                                                                                                in_file_names_PCH,
-#                                                                                                alpha_label_PCH)
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                    in_file_names_FCS_tmp,
+#                                                                                                    alpha_label_FCS_tmp,
+#                                                                                                    in_dir_names_PCH_tmp,
+#                                                                                                    in_file_names_PCH_tmp,
+#                                                                                                    alpha_label_PCH_tmp)
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
@@ -235,67 +239,168 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
 
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                in_file_names_FCS,
-#                                                                                                alpha_label_FCS,
-#                                                                                                in_dir_names_PCH,
-#                                                                                                in_file_names_PCH,
-#                                                                                                alpha_label_PCH)
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                    in_file_names_FCS_tmp,
+#                                                                                                    alpha_label_FCS_tmp,
+#                                                                                                    in_dir_names_PCH_tmp,
+#                                                                                                    in_file_names_PCH_tmp,
+#                                                                                                    alpha_label_PCH_tmp)
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
 # [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
-# #%% 20240604 - A488-labelled DNA
+# #%% 20240604 - A488-labelled dsDNA
 # #SHould be good for incomplete-sampling stuff
 # ''' Labelled protein fraction'''
 # _in_dir_names = []
 # _alpha_label = []
 
-# local_dir = os.path.join(glob_in_dir, r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240604_Test_data\20240604_data.sptw\Sample9_DNAs17_1')
+# local_dir = os.path.join(glob_in_dir, r'20240604_Test_data/20240604_data.sptw/')
 # # local_dir = os.path.join(glob_in_dir, r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240604_Test_data\20240604_data.sptw\Sample9_DNAs157_1')
-# _in_dir_names.extend([os.path.join(local_dir)])
-# _alpha_label.append(1.) 
+# [_in_dir_names.extend([os.path.join(local_dir, f'Sample{x+1}_DNA{x}_only_1')]) for x in range(1, 8)]
+# [_alpha_label.append(0.1) for x in range(1, 8)]
+# _in_dir_names.extend([os.path.join(local_dir, 'Sample9_DNAs17_1')])
+# _alpha_label.append(0.1)
+# _in_dir_names.extend([os.path.join(local_dir, 'Sample10_DNAs157_1')])
+# _alpha_label.append(0.1)
+# _in_dir_names.extend([os.path.join(local_dir, 'Sample11_DNAs1234567_1')])
+# _alpha_label.append(0.1)
 
 # # Naming pattern for detecting correct files within subdirs of each in_dir
-# file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
-# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
-
+# # Wohland SD
+# # file_name_pattern_PCH = '*08_PCMH_ch0*' 
+# # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' 
+# # Bootstrap SD
+# file_name_pattern_PCH = '*07_PCMH_ch0*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*' 
 
 # # Detect PCH files
-# in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-#                                                                           file_name_pattern_PCH, 
-#                                                                           _alpha_label, 
-#                                                                           '')
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
 
 # # Repeat for FCS
-# in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-#                                                                           file_name_pattern_FCS, 
-#                                                                           _alpha_label,
-#                                                                           '')
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-#                                                                                                 in_file_names_FCS,
-#                                                                                                 alpha_label_FCS,
-#                                                                                                 in_dir_names_PCH,
-#                                                                                                 in_file_names_PCH,
-#                                                                                                 alpha_label_PCH)
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                     in_file_names_FCS_tmp,
+#                                                                                                     alpha_label_FCS_tmp,
+#                                                                                                     in_dir_names_PCH_tmp,
+#                                                                                                     in_file_names_PCH_tmp,
+#                                                                                                     alpha_label_PCH_tmp)
+
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
 # [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
+
+# #%% 20240604 - A488-labelled ssDNA
+# #SHould be good for incomplete-sampling stuff
+# ''' Labelled protein fraction'''
+# _in_dir_names = []
+# _alpha_label = []
+
+# local_dir = os.path.join(glob_in_dir, '20240627_ssDNA_ssRNA_samples/TestData.sptw')
+# [_in_dir_names.extend([os.path.join(local_dir, f'ssDNA{x}_1in50_1')]) for x in range(1, 8)]
+# [_alpha_label.append(0.1) for x in range(1, 8)]
+# [_in_dir_names.extend([os.path.join(local_dir, f'ssDNAmix_125_{4//x}-4-{4*x}_1')]) for x in [1, 2, 4]]
+# [_alpha_label.append(0.1) for x in [1, 2, 4]]
+
+# # Naming pattern for detecting correct files within subdirs of each in_dir
+# # Wohland SD
+# # file_name_pattern_PCH = '*08_PCMH_ch0*' 
+# # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' 
+# # Bootstrap SD
+# file_name_pattern_PCH = '*07_PCMH_ch0*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*' 
+
+
+# # Detect PCH files
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
+
+# # Repeat for FCS
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                     in_file_names_FCS_tmp,
+#                                                                                                     alpha_label_FCS_tmp,
+#                                                                                                     in_dir_names_PCH_tmp,
+#                                                                                                     in_file_names_PCH_tmp,
+#                                                                                                     alpha_label_PCH_tmp)
+
+# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
+
+
+# #%% 20240604 - A488-labelled ssRNA
+# #SHould be good for incomplete-sampling stuff, but not that great
+# ''' Labelled protein fraction'''
+# _in_dir_names = []
+# _alpha_label = []
+
+# local_dir = os.path.join(glob_in_dir, '20240627_ssDNA_ssRNA_samples/TestData.sptw')
+# [_in_dir_names.extend([os.path.join(local_dir, f'0628_ssRNA{x}_1in50_1')]) for x in range(1, 9)]
+# [_alpha_label.append(0.1) for x in range(1, 9)]
+
+# # Naming pattern for detecting correct files within subdirs of each in_dir
+# # Wohland SD
+# # file_name_pattern_PCH = '*08_PCMH_ch0*' 
+# # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' 
+# # Bootstrap SD
+# file_name_pattern_PCH = '*07_PCMH_ch0*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*' 
+
+
+# # Detect PCH files
+# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+#                                                                                       file_name_pattern_PCH, 
+#                                                                                       _alpha_label, 
+#                                                                                       '')
+
+# # Repeat for FCS
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+#                                                                                                     in_file_names_FCS_tmp,
+#                                                                                                     alpha_label_FCS_tmp,
+#                                                                                                     in_dir_names_PCH_tmp,
+#                                                                                                     in_file_names_PCH_tmp,
+#                                                                                                     alpha_label_PCH_tmp)
+
+# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
 
 
 
@@ -305,38 +410,44 @@ glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FC
 _in_dir_names = []
 _alpha_label = []
 
-local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data\20240416_data.sptw')
-# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
-# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
-# _in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016')])
-# _alpha_label.append(0.001) 
-_in_dir_names.extend([os.path.join(local_dir, r'10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435')])
-_alpha_label.append(0.025) 
+local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data/20240416_data.sptw')
+_in_dir_names.extend([os.path.join(local_dir, '10uM_ParM_noATP_1')])
+_alpha_label.append(0.005) 
+# [ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
+# [_alpha_label.append(x) for x in [5E-3, 1E-3, 2.5E-2, 5E-3]]
+# [ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3]]
+# [_alpha_label.append(x) for x in [1E-2, 1E-2, 1E-2]]
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
-file_name_pattern_PCH = '*07_PCMH_ch0*' # Dual-channel PCH
-file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*' # CCF
+# Wohland SD, no burst removal
+# file_name_pattern_PCH = '*08_PCMH_ch0*' 
+# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*'
+# # Bootstrap SD, no burst removal
+file_name_pattern_PCH = '*07_PCMH_ch0*' 
+file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
+# # Bootstrap SD, with burst removal
+# file_name_pattern_PCH = '*09_PCMH_ch0_br*' 
+# file_name_pattern_FCS = '*08_ACF_ch0_br_dt_bg*'
 
 
 # Detect PCH files
-in_dir_names_PCH, in_file_names_PCH, alpha_label_PCH = utils.detect_files(_in_dir_names,
-                                                                          file_name_pattern_PCH, 
-                                                                          _alpha_label, 
-                                                                          '')
+in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+                                                                                      file_name_pattern_PCH, 
+                                                                                      _alpha_label, 
+                                                                                      '')
 
 # Repeat for FCS
-in_dir_names_FCS, in_file_names_FCS, alpha_label_FCS = utils.detect_files(_in_dir_names, 
-                                                                          file_name_pattern_FCS, 
-                                                                          _alpha_label,
-                                                                          '')
+in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+                                                                                      file_name_pattern_FCS, 
+                                                                                      _alpha_label,
+                                                                                      '')
 
-_in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS,
-                                                                                                in_file_names_FCS,
-                                                                                                alpha_label_FCS,
-                                                                                                in_dir_names_PCH,
-                                                                                                in_file_names_PCH,
-                                                                                                alpha_label_PCH)
-
+_in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+                                                                                                    in_file_names_FCS_tmp,
+                                                                                                    alpha_label_FCS_tmp,
+                                                                                                    in_dir_names_PCH_tmp,
+                                                                                                    in_file_names_PCH_tmp,
+                                                                                                    alpha_label_PCH_tmp)
 [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
 [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
@@ -348,32 +459,35 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 
 
 #%% Fit settings
+
+############ Config for fitting protein filaments
 # Output dir for result file writing
-glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\Incom_smpl_corr_tests'
-# glob_out_dir = r'C:\Users\Krohn\Desktop\20240611_tempfits\DNA157_fitting'
+glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits'
 
 ### General model settings
 
-labelling_correction_list = [False, True]
+labelling_correction_list = [True]
 incomplete_sampling_correction_list = [False, True]
+labelling_efficiency_incomp_sampling_list = [False] 
 
-n_species_list = [80]
+
+n_species_list = [50]
 spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
 
 use_blinking_list = [False]
 
-
-### FCS settings
-use_FCS_list = [True]
-
 # Shortest and longest diffusion time to fit (parameter bounds)
 tau_diff_min_list = [2.1E-4]
 tau_diff_max_list = [1E0]
 
+
+### FCS settings
+use_FCS_list = [True]
+
 # Shortest and longest lag time to consider in fit (time axis clipping)
-FCS_min_lag_time_list = [1E-5] # Use 0. to use full range of data in .csv file
+FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
 FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
 
 
@@ -386,8 +500,52 @@ PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
 PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
-NLL_funcs_accurate_list = [False, True] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
+NLL_funcs_accurate_list = [False] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
 numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
+
+
+
+# ############ Config for fitting XNA mixtures
+# # Output dir for result file writing
+# glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits'
+
+# ### General model settings
+
+# labelling_correction_list = [False]
+# incomplete_sampling_correction_list = [False]
+# labelling_efficiency_incomp_sampling_list = [False] 
+
+# n_species_list = [80]
+# # spectrum_type_list = ['par_Gamma'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+# spectrum_type_list = ['par_LogNorm'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+# spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
+# oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+
+# use_blinking_list = [False]
+
+# # Shortest and longest diffusion time to fit (parameter bounds)
+# tau_diff_min_list = [3E-5]
+# tau_diff_max_list = [1E0]
+
+# ### FCS settings
+# use_FCS_list = [True]
+
+# # Shortest and longest lag time to consider in fit (time axis clipping)
+# FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
+# FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
+
+
+# ### PCH settings
+# use_PCH_list = [False]
+# time_resolved_PCH_list = [False]
+
+# # Shortest and longest bin times to consider
+# PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
+# PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
+
+# # Calculation settings
+# NLL_funcs_accurate_list = [False] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
+# numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
 
 
 #%% Metadata/calibration data/settings that are global for all measurements
@@ -402,15 +560,15 @@ PCH_Q = 10. # More calculation parameter than metadata, but whatever
 # How many parallel processes?
 # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
 # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
-# mp_processes = os.cpu_count()-1 
-mp_processes = 1 # no multiprocessing
+# mp_processes = os.cpu_count() // 2
+mp_processes = 1  # no multiprocessing
 
 #%% Wrap all permutations for different fit settings and all files...Long list!
 
 
 # Iterate over all settings and files
 list_of_parameter_tuples = []
-
+print(f'Sanity check all: Found {len(in_file_names_FCS)} FCS files, {len(in_file_names_PCH)} PCH files, {len(in_dir_names)} dir names.')
 for use_FCS in use_FCS_list:
     for FCS_min_lag_time in FCS_min_lag_time_list:
         for FCS_max_lag_time in FCS_max_lag_time_list:
@@ -428,84 +586,88 @@ for use_FCS in use_FCS_list:
                                                         for oligomer_type in oligomer_type_list:
                                                             for labelling_correction in labelling_correction_list:
                                                                 for incomplete_sampling_correction in incomplete_sampling_correction_list:
-                                                                    for numeric_precision in numeric_precision_list:
-                                                                        
-                                                                        # a number of sanity-checks to make sure we do not waste time planning fits that cannot work:
-                                                                        if (type(use_FCS) == bool and
-                                                                            FCS_min_lag_time >= 0 and
-                                                                            FCS_max_lag_time > FCS_min_lag_time and
-                                                                            type(use_PCH) == bool and
-                                                                            PCH_min_bin_time >= 0 and
-                                                                            PCH_max_bin_time >= PCH_min_bin_time and
-                                                                            type(time_resolved_PCH) == bool and
-                                                                            type(NLL_funcs_accurate) == bool and
-                                                                            utils.isint(n_species) and n_species > 0 and
-                                                                            tau_diff_min > 0 and
-                                                                            tau_diff_max >= tau_diff_min and
-                                                                            type(use_blinking) == bool and
-                                                                            (n_species < 5 and spectrum_type == 'discrete' or
-                                                                              n_species > 10 and spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
-                                                                            spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] and
-                                                                            oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] and
-                                                                            type(labelling_correction) == bool and
-                                                                            type(incomplete_sampling_correction) == bool and
-                                                                            (incomplete_sampling_correction == False and spectrum_type == 'discrete' or
-                                                                              spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
-                                                                            ((utils.isfloat(numeric_precision) and 
-                                                                                  numeric_precision < 1. and 
-                                                                                  numeric_precision > 0.) or
-                                                                              (utils.isiterable(numeric_precision) and 
-                                                                                  np.all(numeric_precision < 1.) and 
-                                                                                  np.all(numeric_precision > 0.)))
-                                                                            ):
-                                                                        
-                                                                            fit_settings_str = f'{spectrum_type}_{n_species}spec'
-                                                                            fit_settings_str += f'_{oligomer_type}_{spectrum_parameter}' if spectrum_type != 'discrete' else ''
-                                                                            fit_settings_str += '_blink' if use_blinking else ''
-                                                                            fit_settings_str += '_lblcr' if labelling_correction else ''
-                                                                            fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
-                                                                            fit_settings_str += '_FCS' if use_FCS else ''
-                                                                            fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
-                                                                            fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
+                                                                    for labelling_efficiency_incomp_sampling in labelling_efficiency_incomp_sampling_list:
+                                                                        for numeric_precision in numeric_precision_list:
                                                                             
-                                                                            for i_file, dir_name in enumerate(in_dir_names):
-                                                                                job_prefix = in_file_names_FCS[i_file] + '_' + fit_settings_str
-                                                                                save_path = os.path.join(glob_out_dir, fit_settings_str)
-                                                                                if not os.path.exists(save_path):
-                                                                                    os.makedirs(save_path)
+                                                                            # a number of sanity-checks to make sure we do not waste time planning fits that cannot work:
+                                                                            if (type(use_FCS) == bool and
+                                                                                FCS_min_lag_time >= 0 and
+                                                                                FCS_max_lag_time > FCS_min_lag_time and
+                                                                                type(use_PCH) == bool and
+                                                                                PCH_min_bin_time >= 0 and
+                                                                                PCH_max_bin_time >= PCH_min_bin_time and
+                                                                                type(time_resolved_PCH) == bool and
+                                                                                type(NLL_funcs_accurate) == bool and
+                                                                                utils.isint(n_species) and n_species > 0 and
+                                                                                tau_diff_min > 0 and
+                                                                                tau_diff_max >= tau_diff_min and
+                                                                                type(use_blinking) == bool and
+                                                                                (n_species < 5 and spectrum_type == 'discrete' or
+                                                                                  n_species > 10 and spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
+                                                                                spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] and
+                                                                                oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] and
+                                                                                type(labelling_correction) == bool and
+                                                                                type(incomplete_sampling_correction) == bool and
+                                                                                type(labelling_efficiency_incomp_sampling) == bool and
+                                                                                ((not labelling_efficiency_incomp_sampling) or (labelling_efficiency_incomp_sampling and incomplete_sampling_correction and labelling_correction)) and
+                                                                                (incomplete_sampling_correction == False and spectrum_type == 'discrete' or
+                                                                                  spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
+                                                                                ((utils.isfloat(numeric_precision) and 
+                                                                                      numeric_precision < 1. and 
+                                                                                      numeric_precision > 0.) or
+                                                                                  (utils.isiterable(numeric_precision) and 
+                                                                                      np.all(numeric_precision < 1.) and 
+                                                                                      np.all(numeric_precision > 0.)))
+                                                                                ):
+                                                                            
+                                                                                fit_settings_str = f'{spectrum_type}_{n_species}spec'
+                                                                                fit_settings_str += f'_{oligomer_type}_{spectrum_parameter}' if spectrum_type != 'discrete' else ''
+                                                                                fit_settings_str += '_blink' if use_blinking else ''
+                                                                                fit_settings_str += '_lblcr' if labelling_correction else ''
+                                                                                fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
+                                                                                fit_settings_str += '_FCS' if use_FCS else ''
+                                                                                fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
+                                                                                fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
                                                                                 
-                                                                                fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
-                                                                                
-                                                                                parameter_tuple = (job_prefix,
-                                                                                                    save_path,
-                                                                                                    fit_res_table_path,
-                                                                                                    dir_name,
-                                                                                                    in_file_names_FCS[i_file],
-                                                                                                    in_file_names_PCH[i_file],
-                                                                                                    use_FCS,
-                                                                                                    FCS_min_lag_time,
-                                                                                                    FCS_max_lag_time,
-                                                                                                    FCS_psf_width_nm,
-                                                                                                    FCS_psf_aspect_ratio,
-                                                                                                    use_PCH,
-                                                                                                    PCH_min_bin_time,
-                                                                                                    PCH_max_bin_time,
-                                                                                                    PCH_Q,
-                                                                                                    NLL_funcs_accurate,
-                                                                                                    time_resolved_PCH,
-                                                                                                    n_species,
-                                                                                                    tau_diff_min,
-                                                                                                    tau_diff_max,
-                                                                                                    use_blinking,
-                                                                                                    spectrum_type,
-                                                                                                    spectrum_parameter,
-                                                                                                    oligomer_type,
-                                                                                                    alpha_label[i_file],
-                                                                                                    labelling_correction,
-                                                                                                    incomplete_sampling_correction,
-                                                                                                    numeric_precision,
-                                                                                                    verbosity)
-                                                                                list_of_parameter_tuples.extend((parameter_tuple,))
+                                                                                for i_file, dir_name in enumerate(in_dir_names):
+                                                                                    job_prefix = in_file_names_FCS[i_file] + '_' + fit_settings_str
+                                                                                    save_path = os.path.join(glob_out_dir, fit_settings_str)
+                                                                                    if not os.path.exists(save_path):
+                                                                                        os.makedirs(save_path)
+                                                                                    
+                                                                                    fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
+                                                                                    
+                                                                                    parameter_tuple = (job_prefix,
+                                                                                                        save_path,
+                                                                                                        fit_res_table_path,
+                                                                                                        dir_name,
+                                                                                                        in_file_names_FCS[i_file],
+                                                                                                        in_file_names_PCH[i_file],
+                                                                                                        use_FCS,
+                                                                                                        FCS_min_lag_time,
+                                                                                                        FCS_max_lag_time,
+                                                                                                        FCS_psf_width_nm,
+                                                                                                        FCS_psf_aspect_ratio,
+                                                                                                        use_PCH,
+                                                                                                        PCH_min_bin_time,
+                                                                                                        PCH_max_bin_time,
+                                                                                                        PCH_Q,
+                                                                                                        NLL_funcs_accurate,
+                                                                                                        time_resolved_PCH,
+                                                                                                        n_species,
+                                                                                                        tau_diff_min,
+                                                                                                        tau_diff_max,
+                                                                                                        use_blinking,
+                                                                                                        spectrum_type,
+                                                                                                        spectrum_parameter,
+                                                                                                        oligomer_type,
+                                                                                                        alpha_label[i_file],
+                                                                                                        labelling_correction,
+                                                                                                        incomplete_sampling_correction,
+                                                                                                        labelling_efficiency_incomp_sampling,
+                                                                                                        numeric_precision,
+                                                                                                        verbosity)
+                                                                                    list_of_parameter_tuples.extend((parameter_tuple,))
                                                                             
                                                                             
                                                                             
@@ -539,6 +701,7 @@ def fitting_parfunc(job_prefix,
                     labelling_efficiency,
                     labelling_correction,
                     incomplete_sampling_correction,
+                    labelling_efficiency_incomp_sampling,
                     numeric_precision,
                     verbosity,
                     ):
@@ -577,7 +740,8 @@ def fitting_parfunc(job_prefix,
                                       numeric_precision = numeric_precision,
                                       NLL_funcs_accurate = NLL_funcs_accurate,
                                       verbosity = verbosity,
-                                      job_prefix = job_prefix
+                                      job_prefix = job_prefix,
+                                      labelling_efficiency_incomp_sampling = labelling_efficiency_incomp_sampling
                                       )
         
         if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
@@ -645,7 +809,10 @@ def fitting_parfunc(job_prefix,
             
             # Write fit results
             fit_result_dict = {}            
-            fit_result_dict['file'] = in_file_name_FCS if use_FCS else in_file_name_PCH 
+            fit_result_dict['folder'] = dir_name
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            
             
             has_covar = not covar == None
             if has_covar:

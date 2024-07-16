@@ -64,7 +64,8 @@ class FCS_spectrum():
                  numeric_precision = np.array([1E-3, 1E-4, 1E-5]),
                  NLL_funcs_accurate = False,
                  verbosity = 1,
-                 job_prefix = ''
+                 job_prefix = '',
+                 labelling_efficiency_incomp_sampling = False 
                  ):
         '''
         Class for single or combined fitting of FCS and/or PCH.
@@ -172,13 +173,21 @@ class FCS_spectrum():
             A user-defined string that is printed as a preamble to most command 
             line output from this instance, meant as a means of keeping track 
             for example when you have large batches running in parallel
+        labelling_efficiency_incomp_sampling :
+            OPTIONAL bool with default False. Whether to consider incomplete 
+            sampling-deviation of labelling statistics. Without this, an 
+            incomplete sampling fit with incomplete labelling only allows 
+            deviations in the particle number, but not the label stoichiometry.
+            If True, also the label stoichiometry is varied. CAVE: 
+            Computationally extremely expensive!
+
         '''
         # Acquisition metadata and technical settings
         
         if type(job_prefix) == str:
             self.job_prefix = job_prefix
         else:
-            raise ValueError('job_prefix must be string')
+            raise ValueError('job_prefix must be string. Got {job_prefix}')
         
         # This parameter is actually currently unused...Whatever.
         if utils.isfloat(FCS_psf_width_nm):
@@ -186,12 +195,12 @@ class FCS_spectrum():
                 self.FCS_psf_width_nm = FCS_psf_width_nm
                 self.FCS_possible = True
             else:
-                raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0. Got {FCS_psf_width_nm}')
         elif utils.isempty(FCS_psf_width_nm):
             self.psf_width = None
             self.FCS_possible = False
         else:
-            raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0')
+            raise ValueError(f'[{self.job_prefix}] FCS_psf_width_nm must be float > 0. Got {FCS_psf_width_nm}')
 
 
         if utils.isfloat(FCS_psf_aspect_ratio):
@@ -199,12 +208,12 @@ class FCS_spectrum():
                 self.FCS_psf_aspect_ratio = FCS_psf_aspect_ratio
                 self.FCS_possible = True
             else:
-                raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0. Got {FCS_psf_aspect_ratio}')
         elif utils.isempty(FCS_psf_aspect_ratio):
             self.FCS_psf_aspect_ratio = None
             self.FCS_possible = False
         else:
-            raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
+            raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0. Got {FCS_psf_aspect_ratio}')
 
 
         if utils.isfloat(PCH_Q):
@@ -212,12 +221,12 @@ class FCS_spectrum():
                 self.PCH_Q = PCH_Q
                 self.PCH_possible = True
             else:
-                raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
+                raise ValueError(f'[{self.job_prefix}] PCH_Q must be float > 0. Got {PCH_Q}')
         elif utils.isempty(PCH_Q):
             self.PCH_Q = None
             self.PCH_possible = False
         else:
-            raise ValueError(f'[{self.job_prefix}] FCS_psf_aspect_ratio must be float > 0')
+            raise ValueError(f'[{self.PCH_Q}] FCS_psf_aspect_ratio must be float > 0. Got {PCH_Q}')
 
 
         if utils.isfloat(acquisition_time_s):
@@ -225,14 +234,14 @@ class FCS_spectrum():
                 self.acquisition_time_s = acquisition_time_s
                 self.incomplete_sampling_possible = True
             else: 
-                raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0')
+                raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0. Got {acquisition_time_s}')
                 
         elif utils.isempty(acquisition_time_s):
             self.acquisition_time_s = None
             self.incomplete_sampling_possible = False
             
         else:
-            raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0')
+            raise ValueError(f'[{self.job_prefix}] acquisition_time_s must be empty value or float > 0. Got {acquisition_time_s}')
     
     
         if utils.isfloat(numeric_precision) and numeric_precision > 0. and numeric_precision < 1.:
@@ -246,16 +255,16 @@ class FCS_spectrum():
                 self.numeric_precision = numeric_precision
                 self.precision_incremental = True
             else:
-                raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
+                raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float. Got {numeric_precision}')
         else:
-            raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float')
+            raise ValueError(f'[{self.job_prefix}] numeric_precision must be float with 0 < numeric_precision < 1., or array of such float. Got {numeric_precision}')
 
 
         if utils.isint(verbosity):
             self.verbosity = verbosity
             
         else:
-            raise ValueError(f'[{self.job_prefix}] verbosity must be int')
+            raise ValueError(f'[{self.job_prefix}] verbosity must be int. Got {verbosity}')
             
             
         # FCS input data to be fitted
@@ -266,7 +275,7 @@ class FCS_spectrum():
             self.data_FCS_tau_s = np.array(data_FCS_tau_s)
             self.FCS_possible = True
         else:
-            raise ValueError(f'[{self.job_prefix}] data_FCS_tau_s must be array (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_tau_s must be array (or can be left empty for PCH only). Got {data_FCS_tau_s}')
             
             
         if utils.isempty(data_FCS_G) or not self.FCS_possible:
@@ -277,9 +286,9 @@ class FCS_spectrum():
             if data_FCS_G.shape[0] == data_FCS_tau_s.shape[0]:
                 self.data_FCS_G = data_FCS_G
             else:
-                raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+                raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only). Got {data_FCS_G}')
         else:
-            raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_G must be array of same length as data_FCS_tau_s (or can be left empty for PCH only). Got {data_FCS_G}')
 
 
         if utils.isempty(data_FCS_sigma) or not self.FCS_possible:
@@ -290,9 +299,9 @@ class FCS_spectrum():
             if data_FCS_sigma.shape[0] == data_FCS_tau_s.shape[0]:
                 self.data_FCS_sigma = data_FCS_sigma
             else:
-                raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+                raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only). Got {data_FCS_sigma}')
         else:
-            raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only)')
+            raise ValueError(f'[{self.job_prefix}] data_FCS_sigma must be array of same length as data_FCS_tau_s (or can be left empty for PCH only). Got {data_FCS_sigma}')
 
 
         # PC(M)H input data to be fitted
@@ -303,7 +312,7 @@ class FCS_spectrum():
             self.data_PCH_bin_times = np.array(data_PCH_bin_times)
             self.PCH_possible = True
         else:
-            raise ValueError(f'[{self.job_prefix}] data_PCH_bin_times must be float or array (or can be left empty for FCS only)')
+            raise ValueError(f'[{self.job_prefix}] data_PCH_bin_times must be float or array (or can be left empty for FCS only). Got {data_PCH_bin_times}')
 
 
         if utils.isempty(data_PCH_hist) or not self.PCH_possible:
@@ -331,22 +340,27 @@ class FCS_spectrum():
                 self.data_PCH_sigma = data_PCH_sigma
                 
             else:
-                raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
+                raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only). Got {data_PCH_hist}')
         else:
-            raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only)')
+            raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only). Got {data_PCH_hist}')
 
         if type(NLL_funcs_accurate) == bool:
             self.NLL_funcs_accurate = NLL_funcs_accurate
         else:
-            raise ValueError(f'[{self.job_prefix}] NLL_funcs_accurate must be bool (ignored if no PCH is loaded).')
+            raise ValueError(f'[{self.job_prefix}] NLL_funcs_accurate must be bool (ignored if no PCH is loaded). Got {NLL_funcs_accurate}')
         
         if utils.isfloat(labelling_efficiency) and labelling_efficiency > 0. and labelling_efficiency <= 1.:
             self.labelling_efficiency = labelling_efficiency
         else:
-            raise ValueError(f'[{self.job_prefix}] labelling_efficiency must be float with 0 < labelling_efficiency <= 1.')
+            raise ValueError(f'[{self.job_prefix}] labelling_efficiency must be float with 0 < labelling_efficiency <= 1. Got {labelling_efficiency}')
 
+        if type(labelling_efficiency_incomp_sampling) == bool:
+            self.labelling_efficiency_incomp_sampling = labelling_efficiency_incomp_sampling
+        else:
+            raise ValueError(f'[{self.job_prefix}] labelling_efficiency_incomp_sampling must be bool. Got {labelling_efficiency_incomp_sampling}')
 
-
+            
+            
     #%% Collection of some miscellaneous expressions
     def fcs_3d_diff_single_species(self, 
                                    tau_diff):
@@ -1551,11 +1565,12 @@ class FCS_spectrum():
         if incomplete_sampling_correction:
             # Incomplete sampling correction included in fit
             
-            if labelling_correction:
+            if labelling_correction and self.labelling_efficiency_incomp_sampling:
+                # Allow deviation of labelling efficiency
                 negloglik += self.negloglik_incomplete_sampling_partial_labelling(params,
                                                                                   spectrum_type = spectrum_type,
                                                                                   numeric_precision = numeric_precision)
-            else: # not labelling_correction
+            else: # not labelling_correction, or at least ignore in likelihood function
                 negloglik += self.negloglik_incomplete_sampling_full_labelling(params,
                                                                                spectrum_type = spectrum_type)
             n_negloglik_terms += 1
@@ -2771,7 +2786,7 @@ class FCS_spectrum():
             # use both incomplete_sampling_correction and labelling_correction
             initial_params.add(f'Label_obs_factor_{i_spec}', 
                                value = 1.,
-                               vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+                               vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
 
             initial_params.add(f'Label_efficiency_obs_{i_spec}', 
                                expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
@@ -2916,7 +2931,7 @@ class FCS_spectrum():
             # use both incomplete_sampling_correction and labelling_correction
             initial_params.add(f'Label_obs_factor_{i_spec}', 
                                value = gauss_fit_params[f'Label_obs_factor_{i_spec}'].value,
-                               vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+                               vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
 
             initial_params.add(f'Label_efficiency_obs_{i_spec}', 
                                expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
@@ -3157,7 +3172,7 @@ class FCS_spectrum():
                 # use both incomplete_sampling_correction and labelling_correction
                 initial_params.add(f'Label_obs_factor_{i_spec}', 
                                    value = 1.,
-                                   vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+                                   vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
     
                 initial_params.add(f'Label_efficiency_obs_{i_spec}', 
                                    expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
@@ -3410,7 +3425,7 @@ class FCS_spectrum():
     
                 initial_params.add(f'Label_obs_factor_{i_spec - skip_counter}', 
                                    value = 1.,
-                                   vary = True if (incomplete_sampling_correction and labelling_correction) else False)
+                                   vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
     
                 initial_params.add(f'Label_efficiency_obs_{i_spec - skip_counter}', 
                                    expr = f'Label_efficiency * Label_obs_factor_{i_spec - skip_counter}',
