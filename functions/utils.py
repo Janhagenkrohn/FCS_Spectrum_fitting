@@ -150,7 +150,7 @@ def link_FCS_and_PCH_files(in_dir_names_FCS,
                     
                 elif in_dir_name_PCH == in_dir_name_FCS and found:
                     # We already found the correct PCH, but now we find another? That does not work!
-                    raise Exception('Assignment of FCS data and PCH data is ambiguous! More advanced user-defined logic may be needed.')
+                    raise Exception(f'Assignment of FCS data and PCH data is ambiguous in {in_dir_name_PCH}! More advanced user-defined logic may be needed.')
             
         in_dir_names = [in_dir_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]
         in_file_names_FCS = [in_file_names_FCS[i_fcs] for i_fcs in in_file_names_FCS_argsort]

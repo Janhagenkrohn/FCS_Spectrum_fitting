@@ -2,13 +2,53 @@ clear
 
 
 
-file_names = {
-    'batch3e_1_label5e-1_simData.mat'
+file_paths = {
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
+    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
     };
 
-folders = {
-    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3e'
-    };
 
 lagmin_s = 1e-5;
 lagmax_s = 1;
@@ -16,13 +56,14 @@ Sampling = 6;
 
 sim_time_s = 60;
 
+sd_method = 'Bootstrap'; % 'Wohland', 'Bootstrap'
 
-for i_file = 1:length(file_names)
+for i_file = 1:length(file_paths)
 
 %     try % Try-catch, as correlation algorithm can crash for awkward combinations of dataset and correlation settigs
     
         %%% Load simulation data
-        file_path = fullfile(folders{i_file}, file_names{i_file});
+        file_path = file_paths{i_file};
         disp(['Processing ' file_path '...'])
         load(file_path)
             
@@ -30,12 +71,12 @@ for i_file = 1:length(file_names)
         lagmin_sync = lagmin_s .* Header.Freq;
         lagmax_sync = lagmax_s .* Header.Freq;
     
-        [~, baseFileNameNoExt, ~] = fileparts(file_path);
+        [folder, baseFileNameNoExt, ~] = fileparts(file_path);
 
         
         
         %%% FCS
-        savename = fullfile(folders{i_file}, [baseFileNameNoExt, '_ACF_ch0.csv']);
+        savename = fullfile(folder, [baseFileNameNoExt, '_ACF_ch0.csv']);
         disp(['Correlation function'])
         % Correlation curve (CC) calculation
         [CC_raw, lags] = cross_corr(...
@@ -45,34 +86,58 @@ for i_file = 1:length(file_names)
         lags = lags' ./ Header.Freq;
         CC = CC_raw' - 1;
 
-        nSegments = 10;
 
-        % Calculation of CC standard deviation
-        segment_length = sim_time_s ./ nSegments .* Header.Freq;
-        segmentCCs = zeros(length(CC_raw), nSegments);
-        segmentCC_m = zeros(size(CC_raw));
-        % Minimization target when amplitude-matching the segment CCs to
-        % the full-length curve 
-        fun_inner = @(x, segmentCC_m, CC_raw) sum((x .* segmentCC_m - CC_raw).^2);
-        fun_outer = @(x) fun_inner(x, segmentCC_m, CC_raw);
+        if strcmp(sd_method, 'Wohland')
+            nSegments = 10;
 
-        disp(['Wohland SD'])
+            disp(['Wohland SD: ' num2str(nSegments) ' segments'])
 
-        % Calculate (and scale) segment CCs
-        for m = 1:nSegments
-            disp(['Segment ' num2str(m) ' of 10'])
+        
+            % Calculation of CC standard deviation
+            segment_length = sim_time_s ./ nSegments .* Header.Freq;
+            segmentCCs = zeros(length(CC_raw), nSegments);
+            segmentCC_m = zeros(size(CC_raw));
+            % Minimization target when amplitude-matching the segment CCs to
+            % the full-length curve 
+            fun_inner = @(x, segmentCC_m, CC_raw) sum((x .* segmentCC_m - CC_raw).^2);
+            fun_outer = @(x) fun_inner(x, segmentCC_m, CC_raw);
+        
+        
+            % Calculate (and scale) segment CCs
+        
+            parfor m = 1:nSegments
+        
+                macro_times_segment = macro_times...
+                    (macro_times >= segment_length .* (m-1) &...
+                     macro_times < segment_length .* (m));
+                macro_times_segment = macro_times_segment - segment_length .* (m-1);
+                
+                [segmentCC_m, ~ ] = cross_corr(macro_times_segment,macro_times_segment, lagmin_sync, lagmax_sync, Sampling, 0);
+                
+                segmentCCs(:, m) = segmentCC_m .* fminsearch(fun_outer, 1);
+            end % for iSegment = 1:nSegments
+        
+            SD_CC = std(segmentCCs, 0, 2) ./ sqrt(nSegments);
 
-            macro_times_segment = macro_times...
-                (macro_times >= segment_length .* (m-1) &...
-                 macro_times < segment_length .* (m));
-            macro_times_segment = macro_times_segment - segment_length .* (m-1);
-            
-            [segmentCC_m, ~ ] = cross_corr(macro_times_segment,macro_times_segment, lagmin_sync, lagmax_sync, Sampling, 0);
-            
-            segmentCCs(:, m) = segmentCC_m .* fminsearch(fun_outer, 1);
-        end % for iSegment = 1:nSegments
+        else % implies strcmp(sd_method, 'Bootstrap')
+            n_bs_reps = 10;
+            disp(['Bootstrap SD: ' num2str(n_bs_reps) ' replicates'])
 
-        SD_CC = std(segmentCCs, 0, 2) ./ sqrt(nSegments);
+            bs_rep_CCs = zeros(length(CC_raw), n_bs_reps);
+
+            parfor i_rep = 1:n_bs_reps
+                rand_indices = randi(numel(macro_times), [numel(macro_times), 1]);
+                resampled_macro_times = macro_times(rand_indices);
+                [bs_rep_CC, ~ ] = cross_corr(resampled_macro_times,resampled_macro_times, lagmin_sync, lagmax_sync, Sampling, 0);
+                bs_rep_CCs(:,i_rep) = bs_rep_CC
+
+            end % parfor i_rep = 1:n_bs_reps
+
+
+            SD_CC = std(bs_rep_CCs, 0, 2);
+
+        end % if strcmp(sd_method, 'Wohland')
+
 
         % Finish up
         disp(['Wrap-up and saving'])
@@ -101,7 +166,7 @@ for i_file = 1:length(file_names)
         i_bw = 1;
         while curr_bw <= 1E4 % bin_widths < 10 ms
             bin_widths(i_bw) = curr_bw;
-            bin_widths = bin_widths .* 2;
+            curr_bw = curr_bw .* 2;
             i_bw = i_bw + 1;
         end % while curr_bw <= 1E4
         
@@ -118,19 +183,18 @@ for i_file = 1:length(file_names)
         pcmh(1,end) = bin_widths(end) * 1E-6;
         pcmh(2:end,end) = pch;
 
-        for i_bw = 1:(length(bin_widths)-1)
-            disp(['PCH: bin width' num2str(i_bw) ' of ' num2str(length(bin_widths)-1)])
+        disp(['PCH: Other bin widths (' num2str(length(bin_widths)-1) ' of them)'])
+        parfor i_bw = 1:(length(bin_widths)-1)
 
             [trace, ~] = histcounts(macro_times_us, linspace(0, n_bins .* bin_widths(i_bw), n_bins));
             pch = histcounts(trace, linspace(0, max_photons + 1));
-            pcmh(1,i_bw) = bin_widths(i_bw) * 1E-6;
-            pcmh(2:end,i_bw) = pch;
+            pcmh(:,i_bw) = cat(1, bin_widths(i_bw) * 1E-6, pch');
         end
 
 
         disp(['Wrap-up and saving'])
 
-        savename = fullfile(folders{i_file}, [baseFileNameNoExt, '_PCMH_ch0.csv']);        
+        savename = fullfile(folder, [baseFileNameNoExt, '_PCMH_ch0.csv']);        
         writematrix(pcmh, savename)
 
 %     end % try ...

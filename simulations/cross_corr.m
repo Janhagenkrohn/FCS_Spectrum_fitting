@@ -15,6 +15,7 @@ function [corr_norm, lags] = cross_corr(ch1,ch2, start_time, stop_time, coarsene
 % lags - log spaced lag times
 
 cascade_start = floor(log2(start_time)-2);% if above 0, the algorithm skips the 2^start_cascade correlation times
+cascade_start = max([cascade_start, 1]); % Force positive-nonzero
 [lag_bin_edges, lags, division_factor] = generate_log2_lags(stop_time, coarseness); % generates lags bins with log2 spacing
 
 corr = photons_in_bins(ch1, ch2, lag_bin_edges, ...
@@ -75,7 +76,7 @@ function acf = photons_in_bins(ch1, ch2, lag_bin_edges, ...
            low_inds(1) = 2;
            max_inds = ones(1, n_edges-1);
            acf = zeros(1, n_edges-1);
-           
+
            for phot_ind = 1:num_ch1
                bin_edges = ch1(phot_ind)+lag_bin_edges+offset_lag; %shifts the log bins for each photon
                
@@ -83,11 +84,10 @@ function acf = photons_in_bins(ch1, ch2, lag_bin_edges, ...
                    while low_inds(k) <= numel(ch2) && ch2(low_inds(k)) < bin_edges(k)
                        low_inds(k) = low_inds(k)+1;
                    end
-                   
+
                    while max_inds(k) <= numel(ch2) && ch2(max_inds(k)) <= bin_edges(k+1)
                        max_inds(k) = max_inds(k)+1;
                    end
-                   
                    low_inds(k+1) = max_inds(k);
                    acf(k) = acf(k)+(max_inds(k)-low_inds(k));
                end
