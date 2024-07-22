@@ -43,23 +43,21 @@ alpha_label = []
 glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/D044_MT200_Naora/'
 
 
-#%% 20240423 dataset - AF488-EGFP mixtures 
-# Good for PCH proof of concept stuff
+# #%% 20240423 dataset - AF488-EGFP mixtures 
+# # Good for PCH proof of concept stuff
 # ''' Labelled protein fraction'''
 # _in_dir_names = []
 # _alpha_label = []
 
-# local_dir = os.path.join(glob_in_dir, r'20240423_Test_data\Test_data.sptw')
+# local_dir = os.path.join(glob_in_dir, '20240423_Test_data/Test_data.sptw')
 
 
-# [_in_dir_names.extend([os.path.join(local_dir, f'AF488_1nM_power{x}')]) for x in [4000]]
-# [_alpha_label.append(1.) for x in [4000]]
 # [_in_dir_names.extend([os.path.join(local_dir, f'AF488_1nM_power{x}')]) for x in [50, 150, 450, 1350, 4000]]
 # [_alpha_label.append(1.) for x in [50, 150, 450, 1350, 4000]]
 # [_in_dir_names.extend([os.path.join(local_dir, f'EGFP_3nM_power{x}')]) for x in [50, 150, 450, 1350, 4000]]
 # [_alpha_label.append(1.) for x in [50, 150, 450, 1350, 4000]]
-# _in_dir_names.extend([os.path.join(local_dir, r'EGFP_AF488_Mix_Dil3\EGFP_AF488_Mix_Dil3_1_T0s_1_20240610_1336')])
-# _alpha_label.append(1.)
+# [_in_dir_names.extend([os.path.join(local_dir, f'EGFP_AF488_Mix_Dil{x}')]) for x in [3, 9, 27, 81, 243]]
+# [_alpha_label.append(1.) for x in [3, 9, 27, 81, 243]]
 
 # # Naming pattern for detecting correct files within subdirs of each in_dir
 # file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
@@ -78,11 +76,11 @@ glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/D044_MT200_N
 #                                                                                       '')
 
 # _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                    in_file_names_FCS_tmp,
-#                                                                                                    alpha_label_FCS_tmp,
-#                                                                                                    in_dir_names_PCH_tmp,
-#                                                                                                    in_file_names_PCH_tmp,
-#                                                                                                    alpha_label_PCH_tmp)
+#                                                                                                     in_file_names_FCS_tmp,
+#                                                                                                     alpha_label_FCS_tmp,
+#                                                                                                     in_dir_names_PCH_tmp,
+#                                                                                                     in_file_names_PCH_tmp,
+#                                                                                                     alpha_label_PCH_tmp)
 
 # [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
 # [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
@@ -413,21 +411,80 @@ _alpha_label = []
 local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data/20240416_data.sptw')
 _in_dir_names.extend([os.path.join(local_dir, '10uM_ParM_noATP_1')])
 _alpha_label.append(0.005) 
-# [ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
-# [_alpha_label.append(x) for x in [5E-3, 1E-3, 2.5E-2, 5E-3]]
-# [ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3]]
-# [_alpha_label.append(x) for x in [1E-2, 1E-2, 1E-2]]
+[ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3]]
+[_alpha_label.append(x) for x in [1e-2, 1e-2, 1e-5]]
+[ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
+[_alpha_label.append(x) for x in [5e-3, 1e-3, 2.5e-2, 5e-3, 5e-3]]
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 # Wohland SD, no burst removal
 # file_name_pattern_PCH = '*08_PCMH_ch0*' 
 # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*'
-# # Bootstrap SD, no burst removal
-file_name_pattern_PCH = '*07_PCMH_ch0*' 
-file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
+# # # Bootstrap SD, no burst removal
+# file_name_pattern_PCH = '*07_PCMH_ch0*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
 # # Bootstrap SD, with burst removal
 # file_name_pattern_PCH = '*09_PCMH_ch0_br*' 
 # file_name_pattern_FCS = '*08_ACF_ch0_br_dt_bg*'
+# # Bootstrap SD, no burst removal, long lag times
+file_name_pattern_PCH = '*05_PCMH_ch0*' 
+file_name_pattern_FCS = '*04_ACF_ch0_bg*'
+# # # Bootstrap SD, with burst removal, long lag times
+# file_name_pattern_PCH = '*07_PCMH_ch0_br*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_br_bg*'
+
+
+# Detect PCH files
+in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
+                                                                                      file_name_pattern_PCH, 
+                                                                                      _alpha_label, 
+                                                                                      '')
+
+# Repeat for FCS
+in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+                                                                                      file_name_pattern_FCS, 
+                                                                                      _alpha_label,
+                                                                                      '')
+
+_in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
+                                                                                                    in_file_names_FCS_tmp,
+                                                                                                    alpha_label_FCS_tmp,
+                                                                                                    in_dir_names_PCH_tmp,
+                                                                                                    in_file_names_PCH_tmp,
+                                                                                                    alpha_label_PCH_tmp)
+[in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
+[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
+[in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
+[alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
+
+
+_in_dir_names = []
+_alpha_label = []
+
+local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data/20240416_data.sptw')
+_in_dir_names.extend([os.path.join(local_dir, '10uM_ParM_noATP_1')])
+_alpha_label.append(0.005) 
+[ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3]]
+[_alpha_label.append(x) for x in [1e-2, 1e-2, 1e-5]]
+[ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
+[_alpha_label.append(x) for x in [5e-3, 1e-3, 2.5e-2, 5e-3, 5e-3]]
+
+# Naming pattern for detecting correct files within subdirs of each in_dir
+# Wohland SD, no burst removal
+# file_name_pattern_PCH = '*08_PCMH_ch0*' 
+# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*'
+# # # Bootstrap SD, no burst removal
+# file_name_pattern_PCH = '*07_PCMH_ch0*' 
+# file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
+# # Bootstrap SD, with burst removal
+# file_name_pattern_PCH = '*09_PCMH_ch0_br*' 
+# file_name_pattern_FCS = '*08_ACF_ch0_br_dt_bg*'
+# # # Bootstrap SD, no burst removal, long lag times
+# file_name_pattern_PCH = '*05_PCMH_ch0*' 
+# file_name_pattern_FCS = '*04_ACF_ch0_bg*'
+# # Bootstrap SD, with burst removal, long lag times
+file_name_pattern_PCH = '*07_PCMH_ch0_br*' 
+file_name_pattern_FCS = '*06_ACF_ch0_br_bg*'
 
 
 # Detect PCH files
@@ -457,12 +514,11 @@ _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link
 
 
 
-
-#%% Fit settings
+# #%% Fit settings
 
 ############ Config for fitting protein filaments
 # Output dir for result file writing
-glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits'
+glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits/ParM_strExp_fits'
 
 ### General model settings
 
@@ -471,7 +527,7 @@ incomplete_sampling_correction_list = [False, True]
 labelling_efficiency_incomp_sampling_list = [False] 
 
 
-n_species_list = [50]
+n_species_list = [80]
 spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
 spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
 oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
@@ -480,15 +536,15 @@ use_blinking_list = [False]
 
 # Shortest and longest diffusion time to fit (parameter bounds)
 tau_diff_min_list = [2.1E-4]
-tau_diff_max_list = [1E0]
+tau_diff_max_list = [1E1]
 
 
 ### FCS settings
 use_FCS_list = [True]
 
 # Shortest and longest lag time to consider in fit (time axis clipping)
-FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
-FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
+FCS_min_lag_time_list = [1E-5] # Use 0. to use full range of data in .csv file
+FCS_max_lag_time_list = [3E0]  # Use np.inf to use full range of data in .csv file
 
 
 ### PCH settings
@@ -500,14 +556,14 @@ PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
 PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
 
 # Calculation settings
-NLL_funcs_accurate_list = [False] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
+NLL_funcs_accurate_list = [True] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
 numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
 
 
 
-# ############ Config for fitting XNA mixtures
+# ############ Config for Amplitude fitting
 # # Output dir for result file writing
-# glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits'
+# glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits/A488_EGFP_Amplitude_fits'
 
 # ### General model settings
 
@@ -560,14 +616,15 @@ PCH_Q = 10. # More calculation parameter than metadata, but whatever
 # How many parallel processes?
 # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
 # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
-# mp_processes = os.cpu_count() // 2
-mp_processes = 1  # no multiprocessing
+mp_processes = os.cpu_count()
+# mp_processes = 1  # no multiprocessing
 
 #%% Wrap all permutations for different fit settings and all files...Long list!
 
 
 # Iterate over all settings and files
 list_of_parameter_tuples = []
+fit_counter = 1
 print(f'Sanity check all: Found {len(in_file_names_FCS)} FCS files, {len(in_file_names_PCH)} PCH files, {len(in_dir_names)} dir names.')
 for use_FCS in use_FCS_list:
     for FCS_min_lag_time in FCS_min_lag_time_list:
@@ -625,6 +682,7 @@ for use_FCS in use_FCS_list:
                                                                                 fit_settings_str += '_blink' if use_blinking else ''
                                                                                 fit_settings_str += '_lblcr' if labelling_correction else ''
                                                                                 fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
+                                                                                fit_settings_str += '_lblsmplcr' if labelling_efficiency_incomp_sampling else ''
                                                                                 fit_settings_str += '_FCS' if use_FCS else ''
                                                                                 fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
                                                                                 fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
@@ -637,7 +695,9 @@ for use_FCS in use_FCS_list:
                                                                                     
                                                                                     fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
                                                                                     
-                                                                                    parameter_tuple = (job_prefix,
+                                                                                    parameter_tuple = (fit_counter,
+                                                                                                       i_file,
+                                                                                                       job_prefix,
                                                                                                         save_path,
                                                                                                         fit_res_table_path,
                                                                                                         dir_name,
@@ -668,13 +728,16 @@ for use_FCS in use_FCS_list:
                                                                                                         numeric_precision,
                                                                                                         verbosity)
                                                                                     list_of_parameter_tuples.extend((parameter_tuple,))
+                                                                                    fit_counter += 1
                                                                             
                                                                             
                                                                             
 #%% Parallel processing function definition
 
 
-def fitting_parfunc(job_prefix,
+def fitting_parfunc(fit_number,
+                    i_file,
+                    job_prefix,
                     save_path,
                     fit_res_table_path,
                     dir_name,
@@ -709,7 +772,7 @@ def fitting_parfunc(job_prefix,
     
     # Command line message
     time_tag = datetime.datetime.now()
-    message = f'[{job_prefix}] Fitting '
+    message = f'[{job_prefix}] [{fit_number}] Fitting '
     message += in_file_name_FCS if use_FCS else ''
     message += ' and ' if (use_FCS and use_PCH) else ''
     message += in_file_name_PCH if use_PCH else ''
@@ -758,8 +821,8 @@ def fitting_parfunc(job_prefix,
                                         tau_diff_max = tau_diff_max, # float
                                         use_blinking = use_blinking, # bool
                                         two_step_fit = True, # bool
-                                        # use_parallel = mp_processes <= 1 # Bool
-                                        use_parallel = False # Bool
+                                        use_parallel = mp_processes <= 1 # Bool
+                                        # use_parallel = False # Bool
                                         )
             
         else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
@@ -776,8 +839,8 @@ def fitting_parfunc(job_prefix,
                                                                     tau_diff_min = tau_diff_min, # float
                                                                     tau_diff_max = tau_diff_max, # float
                                                                     use_blinking = use_blinking, # bool
-                                                                    # use_parallel = mp_processes <= 1 # Bool
-                                                                    use_parallel = False # Bool
+                                                                    use_parallel = mp_processes <= 1 # Bool
+                                                                    # use_parallel = False # Bool
                                                                     )
         
         if not fit_result == None:
@@ -801,7 +864,7 @@ def fitting_parfunc(job_prefix,
                 raise Exception(f'Got a fit_result output, but with unsupported type. Expected lmfit.MinimizerResult or lmfit.Parameters, got {type(fit_result)}')
 
             out_name = os.path.join(save_path,
-                                    time_tag.strftime("%Y%m%d-%H%M%S") + f'{in_file_name_FCS if use_FCS else in_file_name_PCH}_fit_{spectrum_type}_{n_species}spec')
+                                    f'{fit_number}_{i_file}_' + time_tag.strftime("%m%d-%H%M%S") + f'_{in_file_name_FCS if use_FCS else in_file_name_PCH}_fit_{spectrum_type}_{n_species}spec')
             
             # Command line preview of fit results
             print(f' [{job_prefix}]   Fitted parameters:')
@@ -809,6 +872,8 @@ def fitting_parfunc(job_prefix,
             
             # Write fit results
             fit_result_dict = {}            
+            fit_result_dict['fit_number'] = fit_number            
+            fit_result_dict['file_number'] = i_file
             fit_result_dict['folder'] = dir_name
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
@@ -852,16 +917,37 @@ def fitting_parfunc(job_prefix,
             # Additional spreadsheets for N and diffusion time spectra
             if n_species > 1:
                 fit_res_N_path = fit_res_table_path + '_N.csv' # N-only spreadsheet for convenience
+                fit_res_stoi_path = fit_res_table_path + '_stoi.csv' # stoichiometry-only spreadsheet for convenience
                 fit_res_tau_diff_path = fit_res_table_path + '_tau_diff.csv' # tau_diff-only spreadsheet for convenience
                 N_result_dict = {}
-                tau_diff_max_result_dict = {}
+                stoi_result_dict = {}
+                tau_diff_result_dict = {}
                 
                 # Metadata
-                N_result_dict['file'] = in_file_name_FCS if use_FCS else in_file_name_PCH 
-                tau_diff_max_result_dict['file'] = in_file_name_FCS if use_FCS else in_file_name_PCH 
+                N_result_dict['fit_number'] = fit_number 
+                stoi_result_dict['fit_number'] = fit_number 
+                tau_diff_result_dict['fit_number'] = fit_number
+                
+                N_result_dict['file_number'] = i_file
+                stoi_result_dict['file_number'] = i_file
+                tau_diff_result_dict['file_number'] = i_file
+
+                N_result_dict['folder'] = dir_name 
+                stoi_result_dict['folder'] = dir_name 
+                tau_diff_result_dict['folder'] = dir_name 
+                
+                N_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                stoi_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                tau_diff_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                
+                N_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                stoi_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                tau_diff_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     N_result_dict['lagrange_mul'] = lagrange_mul
-                    tau_diff_max_result_dict['lagrange_mul'] = lagrange_mul
+                    stoi_result_dict['lagrange_mul'] = lagrange_mul
+                    tau_diff_result_dict['lagrange_mul'] = lagrange_mul
                     
                 # Species parameters
                 for i_spec in range(n_species):
@@ -869,16 +955,26 @@ def fitting_parfunc(job_prefix,
                         N_result_dict[f'N_avg_pop_{i_spec}'] = fit_params[f'N_avg_pop_{i_spec}'].value
                     elif spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                         N_result_dict[f'N_avg_pop_{i_spec}'] = N_pop_array[i_spec]
-                    tau_diff_max_result_dict[f'tau_diff_{i_spec}'] = fit_params[f'tau_diff_{i_spec}'].value
-                    
+                        
                 if incomplete_sampling_correction or spectrum_type == 'discrete':
                     # Additional difference between sample-level and observation-level N
                     # Also, discrete only has N_avg_obs, more for historical reasons. Too lazy to fix...
                     for i_spec in range(n_species):
                         N_result_dict[f'N_avg_obs_{i_spec}'] = fit_params[f'N_avg_obs_{i_spec}'].value
+                        
+                for i_spec in range(n_species):
+                    stoi_result_dict[f'stoichiometry_{i_spec}'] = fit_params[f'stoichiometry_{i_spec}'].value
+
+                for i_spec in range(n_species):
+                    stoi_result_dict[f'stoichiometry_binwidth_{i_spec}'] = fit_params[f'stoichiometry_binwidth_{i_spec}'].value
+                    
+                for i_spec in range(n_species):
+                    tau_diff_result_dict[f'tau_diff_{i_spec}'] = fit_params[f'tau_diff_{i_spec}'].value
+                    
                 
                 fit_result_N_df = pd.DataFrame(N_result_dict, index = [1]) 
-                fit_result_tau_diff_df = pd.DataFrame(tau_diff_max_result_dict, index = [1]) 
+                stoi_result_dict_df = pd.DataFrame(stoi_result_dict, index = [1]) 
+                fit_result_tau_diff_df = pd.DataFrame(tau_diff_result_dict, index = [1]) 
     
     
                 if not os.path.isfile(fit_res_N_path):
@@ -893,6 +989,20 @@ def fitting_parfunc(job_prefix,
                                             header = False, 
                                             index = False)
     
+    
+                if not os.path.isfile(fit_res_stoi_path):
+                    # Does not yet exist - create with header
+                    stoi_result_dict_df.to_csv(fit_res_stoi_path, 
+                                               header = True, 
+                                               index = False)
+                else:
+                    # Exists - append
+                    stoi_result_dict_df.to_csv(fit_res_stoi_path, 
+                                               mode = 'a', 
+                                               header = False, 
+                                               index = False)
+
+
                 if not os.path.isfile(fit_res_tau_diff_path):
                     # Does not yet exist - create with header
                     fit_result_tau_diff_df.to_csv(fit_res_tau_diff_path, 

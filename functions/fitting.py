@@ -3141,12 +3141,12 @@ class FCS_spectrum():
                                            vary = True)
                 if spectrum_type == 'par_Gamma':
                     initial_params.add(f'N_avg_pop_{i_spec}', 
-                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec})', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} * stoichiometry_{i_spec}**(N_dist_a - 1) * exp(- N_dist_b * stoichiometry_{i_spec})', 
                                        vary = False)
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * stoichiometry[i_spec]) + 0.1,
+                                           value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(- N_dist_b * stoichiometry[i_spec]) + 0.1,
                                            min = 0., 
                                            vary = True)
     
@@ -3381,7 +3381,7 @@ class FCS_spectrum():
                                             
                 if spectrum_type == 'par_Gamma':
                     initial_params.add(f'N_avg_pop_{i_spec - skip_counter}', 
-                                       expr = f'N_dist_amp * spectrum_weight_{i_spec - skip_counter} * stoichiometry_{i_spec - skip_counter}**(N_dist_a - 1) * exp(N_dist_a - N_dist_b * stoichiometry_{i_spec - skip_counter})', 
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec - skip_counter} * stoichiometry_{i_spec - skip_counter}**(N_dist_a - 1) * exp(- N_dist_b * stoichiometry_{i_spec - skip_counter})', 
                                        vary = False)
                                                 
                 if spectrum_type == 'par_StrExp':
@@ -3407,7 +3407,7 @@ class FCS_spectrum():
                         elif spectrum_type == 'par_LogNorm':
                             N_avg_obs_spec = np.log(N_dist_amp) * spectrum_weight / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
                         elif spectrum_type == 'par_Gamma':
-                            N_avg_obs_spec = N_dist_amp * spectrum_weight * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(N_dist_a - N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
+                            N_avg_obs_spec = N_dist_amp * spectrum_weight * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
                         else: # spectrum_type == 'par_StrExp'
                             N_avg_obs_spec = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 0.1
                                     
