@@ -2196,7 +2196,6 @@ class FCS_spectrum():
         n_species = self.get_n_species(params)
             
         # Extract parameters
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
         cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
@@ -2207,7 +2206,7 @@ class FCS_spectrum():
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
         
-        acf /= np.sum(N_avg_array * cpms_array * labelling_efficiency_array * stoichiometry_binwidth_array)**2
+        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
@@ -2225,7 +2224,6 @@ class FCS_spectrum():
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
         cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2 * 2**(-3/2)
@@ -2233,7 +2231,7 @@ class FCS_spectrum():
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
         
-        acf /= np.sum(self._N_pop_array * cpms_array * labelling_efficiency_array * stoichiometry_binwidth_array)**2
+        acf /= np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
@@ -2491,57 +2489,105 @@ class FCS_spectrum():
         if not utils.isiterable(tau_diff_array):
             raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_array - must be np.array")
             
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         # The monomer by definition has stoichiometry 1, so we start with the second element
         fold_changes = tau_diff_array[1:] / tau_diff_array[0]
         stoichiometry = np.ones_like(tau_diff_array)
         
-        if oligomer_type in ['sherical_dense']:
+        if oligomer_type == 'sherical_dense':
             # tau_diff proportional hydrodyn. radius
             # Stoichiometry proportional volume
             stoichiometry[1:] = fold_changes ** 3
-        
-        elif oligomer_type == 'spherical_shell':
+            
+            # Round to integer stoichiometries and remove redundant elements
+            stoichiometry, indices = np.unique(np.round(stoichiometry),
+                                               return_index = True)
+            
+            # Recalculate exact diffusion times
+            tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/3)
+            
+            # Get (log-space-centered) bin widths
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            
+            # Make them integer >=1, and insert a one for the monomer species
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
+                    
+        elif oligomer_type in ['spherical_shell', 'Gaussian_chain']:
             # tau_diff proportional hydrodyn. radius
-            # Stoichiometry proportional surface area
+            # Stoichiometry proportional surface area Gaussian chain Kuhn segment number
             stoichiometry[1:] = fold_changes ** 2
+
+            stoichiometry, indices = np.unique(np.round(stoichiometry),
+                                               return_index = True)
+            tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/2)
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
 
         elif oligomer_type == 'single_filament':
             # For the filament models, we have more complicated expressions based
-            # on Seils & Pecora 1995. We numerically solve the expression,
-            # which cannot be decently inverted. 
+            # on Seils & Pecora 1995. We numerically solve the expression.
             
-            for i_spec, tau_diff_fold_change in enumerate(fold_changes):
+            for i_spec, tau_diff_fold_change in enumerate(fold_changes[1:]):
                 res = sminimize_scalar(fun = self.single_filament_tau_diff_fold_change_deviation, 
                                        args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
         
+            stoichiometry, indices = np.unique(np.round(stoichiometry),
+                                               return_index = True)
+            tau_diff_array = np.append(tau_diff_array[0],
+                                       tau_diff_array[0] * self.single_filament_tau_diff_fold_change(stoichiometry[1:]))
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
+
         elif oligomer_type == 'double_filament':
         
             stoichiometry = np.zeros_like(fold_changes)
             
-            for i_spec, tau_diff_fold_change in enumerate(fold_changes):
+            for i_spec, tau_diff_fold_change in enumerate(fold_changes[1:]):
 
                 res = sminimize_scalar(fun = self.double_filament_tau_diff_fold_change_deviation, 
                                        args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
+                
+            stoichiometry, indices = np.unique(np.round(stoichiometry),
+                                               return_index = True)
+            tau_diff_array = np.append(tau_diff_array[0],
+                                       tau_diff_array[0] * self.double_filament_tau_diff_fold_change(stoichiometry[1:]))
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
+
         else: # oligomer_type == naive
             # Dummy ones
             stoichiometry = np.arange(1, tau_diff_array.shape[0] + 1)
             stoichiometry_binwidth = 1. / stoichiometry
-        
-        if not oligomer_type == 'naive':
-            stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                               return_index = True)
-            tau_diff_array = tau_diff_array[indices]
-        
-            # Also get approximate bin widths of log-spaced distribution
-            log_stoichiometry = np.log(stoichiometry)
-            log_binwidth = np.mean(np.diff(log_stoichiometry))
-            stoichiometry_binwidth = (np.exp(log_stoichiometry + log_binwidth/2) - np.exp(log_stoichiometry - log_binwidth/2))
-            
+            # tau_diff_array remains unchanged
+                    
         return stoichiometry, tau_diff_array, stoichiometry_binwidth
     
        
@@ -2719,8 +2765,8 @@ class FCS_spectrum():
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for regularized fitting")
@@ -2860,8 +2906,8 @@ class FCS_spectrum():
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
 
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
             
         # Extract a bunch of arrays from Gauss fit results
         n_species = self.get_n_species(gauss_fit_params)
@@ -2997,8 +3043,8 @@ class FCS_spectrum():
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
 
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
@@ -3102,10 +3148,11 @@ class FCS_spectrum():
                 # Weighting function that essentially decides which number the parameterization acts on
                 
                 if spectrum_parameter == 'Amplitude' and not oligomer_type == 'naive':
-                    spectrum_weight = stoichiometry[i_spec]**(-2)
+                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1) * ((1.+(1-self.labelling_efficiency)/(self.labelling_efficiency*stoichiometry[i_spec]))**(-1) if labelling_correction else 1.)
     
                 elif spectrum_parameter == 'N_monomers' and not oligomer_type == 'naive':
                     spectrum_weight = stoichiometry[i_spec]**(-1)
+                    
                 elif spectrum_parameter == 'N_oligomers' or oligomer_type == 'naive':
                     spectrum_weight = 1.
                 else:
@@ -3131,12 +3178,12 @@ class FCS_spectrum():
                         
                 if spectrum_type == 'par_LogNorm':
                     initial_params.add(f'N_avg_pop_{i_spec}', 
-                                       expr = f'log(N_dist_amp) * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec} / stoichiometry_{i_spec} * exp(-0.5 * ((log(stoichiometry_{i_spec}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
                                        vary = False)
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = np.log(N_dist_amp) * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
+                                           value = N_dist_amp * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
                                            min = 0., 
                                            vary = True)
                 if spectrum_type == 'par_Gamma':
@@ -3267,8 +3314,10 @@ class FCS_spectrum():
                     
                     
                 if spectrum_parameter == 'Amplitude':
-                    spectrum_weight_array = stoichiometry_array**(-2)
-                    
+                    spectrum_weight_array = stoichiometry_array**(-2) * stoichiometry_binwidth_array**(-1)
+                    if labelling_correction:
+                        spectrum_weight_array *= (1. + (1 - self.labelling_efficiency) / (self.labelling_efficiency * stoichiometry_array))**(-1)
+                        
                 elif spectrum_parameter == 'N_monomers':
                     spectrum_weight_array = stoichiometry_array**(-1)
                     
@@ -3293,7 +3342,7 @@ class FCS_spectrum():
                                                     ).x
                         
                 if spectrum_type == 'par_LogNorm':
-                    spectrum_fit_params = sminimize(lambda x: np.sum((np.log(x[0]) * spectrum_weight_array / stoichiometry_array * np.exp(-0.5 * ((np.log(stoichiometry_array) - np.log(x[1])) / np.log(x[2])) ** 2) - previous_N_obs_array_fit)**2 / spectrum_fit_weights),
+                    spectrum_fit_params = sminimize(lambda x: np.sum((x[0] * spectrum_weight_array / stoichiometry_array * np.exp(-0.5 * ((np.log(stoichiometry_array) - np.log(x[1])) / np.log(x[2])) ** 2) - previous_N_obs_array_fit)**2 / spectrum_fit_weights),
                                                     spectrum_fit_init_params,
                                                     ).x
                     
@@ -3352,7 +3401,9 @@ class FCS_spectrum():
                                    vary = False)
                     
                 if spectrum_parameter == 'Amplitude':
-                    spectrum_weight = previous_params[f'stoichiometry_{i_spec}'].value**(-2)
+                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1)
+                    if labelling_correction:
+                        spectrum_weight *= (1. + (1 - self.labelling_efficiency) / (self.labelling_efficiency * stoichiometry[i_spec]))**(-1)
     
                 elif spectrum_parameter == 'N_monomers':
                     spectrum_weight = previous_params[f'stoichiometry_{i_spec}'].value**(-1)
@@ -3376,7 +3427,7 @@ class FCS_spectrum():
                         
                 if spectrum_type == 'par_LogNorm':
                     initial_params.add(f'N_avg_pop_{i_spec - skip_counter}', 
-                                       expr = f'log(N_dist_amp) * spectrum_weight_{i_spec - skip_counter} / stoichiometry_{i_spec - skip_counter} * exp(-0.5 * ((log(stoichiometry_{i_spec - skip_counter}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
+                                       expr = f'N_dist_amp * spectrum_weight_{i_spec - skip_counter} / stoichiometry_{i_spec - skip_counter} * exp(-0.5 * ((log(stoichiometry_{i_spec - skip_counter}) - log(N_dist_a)) / log(N_dist_b)) ** 2)',
                                        vary = False)
                                             
                 if spectrum_type == 'par_Gamma':
@@ -3405,7 +3456,7 @@ class FCS_spectrum():
                         if spectrum_type == 'par_Gauss':
                             N_avg_obs_spec = N_dist_amp * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 0.1
                         elif spectrum_type == 'par_LogNorm':
-                            N_avg_obs_spec = np.log(N_dist_amp) * spectrum_weight / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
+                            N_avg_obs_spec = N_dist_amp * spectrum_weight / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
                         elif spectrum_type == 'par_Gamma':
                             N_avg_obs_spec = N_dist_amp * spectrum_weight * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
                         else: # spectrum_type == 'par_StrExp'
@@ -3512,8 +3563,8 @@ class FCS_spectrum():
         if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {spectrum_parameter}")
     
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] or spectrum_type == 'discrete'):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'. Got {oligomer_type}")
+        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'] or spectrum_type == 'discrete'):
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
         
         if type(labelling_correction) != bool:
             raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
@@ -3896,7 +3947,7 @@ class FCS_spectrum():
                             reg_spectrum_type, # 'reg_MEM', 'reg_CONTIN'
                             par_spectrum_type, # 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
                             par_spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
-                            oligomer_type, # spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'
+                            oligomer_type, # spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'
                             labelling_correction, # bool
                             n_species, # int
                             reg_tau_diff_min, # float
@@ -3926,8 +3977,8 @@ class FCS_spectrum():
         if not par_spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {par_spectrum_parameter}")
     
-        if not oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'. Got {oligomer_type}")
+        if not oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']:
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
         
         if type(labelling_correction) != bool:
             raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
