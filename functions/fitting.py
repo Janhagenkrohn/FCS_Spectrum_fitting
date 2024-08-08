@@ -2162,24 +2162,25 @@ class FCS_spectrum():
     def get_acf_full_labelling(self, 
                                params):
                 
-        acf_num = np.zeros_like(self.data_FCS_G)
-        acf_den = np.zeros_like(self.data_FCS_G)
+        acf = np.zeros_like(self.data_FCS_G)
         
         n_species = self.get_n_species(params)
             
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
         tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
 
         for i_spec in range(n_species):
             g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
-            acf_num += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2
-            acf_den += N_avg_array[i_spec] * cpms_array[i_spec] * stoichiometry_binwidth_array[i_spec]
+            acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2
+            
+        acf *= 2**(-3/2) 
         
-        acf = acf_num / acf_den**2 * 2**(-3/2) 
+        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+
 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
@@ -2198,14 +2199,14 @@ class FCS_spectrum():
         # Extract parameters
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
 
         spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * 2**(-3/2) 
         
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
-        
+            
         acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
         if params['F_blink'].value > 0:
@@ -2223,7 +2224,7 @@ class FCS_spectrum():
             
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
 
         spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2 * 2**(-3/2)
@@ -2245,14 +2246,13 @@ class FCS_spectrum():
     def get_acf_partial_labelling(self, 
                                   params):
                 
-        acf_num = np.zeros_like(self.data_FCS_G)
-        acf_den = np.zeros_like(self.data_FCS_G)
+        acf = np.zeros_like(self.data_FCS_G)
         
         n_species = self.get_n_species(params)
             
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
         tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
@@ -2260,10 +2260,10 @@ class FCS_spectrum():
 
         for i_spec in range(n_species):
             g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
-            acf_num += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / cpms_array[i_spec] / labelling_efficiency_array[i_spec])
-            acf_den += N_avg_array[i_spec] * cpms_array[i_spec] * stoichiometry_binwidth_array[i_spec]
+            acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / cpms_array[i_spec] / labelling_efficiency_array[i_spec])
         
-        acf = acf_num / acf_den**2 * 2**(-3/2) 
+        acf *= 2**(-3/2) 
+        acf /= np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
@@ -2281,7 +2281,7 @@ class FCS_spectrum():
             
         # Extract parameters
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.min() # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
         labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
@@ -3116,7 +3116,7 @@ class FCS_spectrum():
                                vary=True)
     
             # N_dist_a = median_stoichiometry if spectrum_type in ['par_Gauss', 'par_LogNorm'] else 10.
-            N_dist_a = 1.
+            N_dist_a = 10.
             initial_params.add('N_dist_a', 
                                value = N_dist_a, 
                                min = 0., 
@@ -3148,7 +3148,9 @@ class FCS_spectrum():
                 # Weighting function that essentially decides which number the parameterization acts on
                 
                 if spectrum_parameter == 'Amplitude' and not oligomer_type == 'naive':
-                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1) * ((1.+(1-self.labelling_efficiency)/(self.labelling_efficiency*stoichiometry[i_spec]))**(-1) if labelling_correction else 1.)
+                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1)
+                    if labelling_correction:
+                        spectrum_weight /= 1. + (1 - self.labelling_efficiency) / (self.labelling_efficiency * stoichiometry[i_spec])
     
                 elif spectrum_parameter == 'N_monomers' and not oligomer_type == 'naive':
                     spectrum_weight = stoichiometry[i_spec]**(-1)

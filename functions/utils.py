@@ -13,6 +13,9 @@ import glob
 import numpy as np
 import pandas as pd
 
+# misc
+import traceback
+
 
 def detect_files(in_dir_names, 
                  file_name_pattern, 
@@ -45,7 +48,7 @@ def detect_files(in_dir_names,
                 _other_info.append(other_info[i_dir])
                 
     if len(_in_dir_names) == 0:
-        raise Exception(f'Searched {i_dir+1} directories, but could not detect any files.')
+        raise Exception(f'Searched {i_dir+1} directories, but could not detect any files (base dirs: {in_dir_names})')
         
     return _in_dir_names, _in_file_names, _other_info
 
@@ -73,30 +76,31 @@ def read_Kristine_FCS(dir_name,
                       file_name,
                       FCS_min_lag_time = 0.,
                       FCS_max_lag_time = np.inf):
-
-    # Load Kristine format FCS data
-    in_path = os.path.join(dir_name, file_name)
-    data = pd.read_csv(in_path + '.csv', header = None)
+    try:
+        # Load Kristine format FCS data
+        in_path = os.path.join(dir_name, file_name)
+        data = pd.read_csv(in_path + '.csv', header = None)
+            
+        # Col 0: Lag times - Use for cropping, if needed
+        lag_times = data.iloc[:,0].to_numpy()
+        lag_time_mask = np.logical_and(lag_times > FCS_min_lag_time, 
+                                       lag_times < FCS_max_lag_time)
+        data_FCS_tau_s = lag_times[lag_time_mask]
         
-    # Col 0: Lag times - Use for cropping, if needed
-    lag_times = data.iloc[:,0].to_numpy()
-    lag_time_mask = np.logical_and(lag_times > FCS_min_lag_time, 
-                                   lag_times < FCS_max_lag_time)
-    data_FCS_tau_s = lag_times[lag_time_mask]
+        # Col 1: Correlation
+        G = data.iloc[:, 1].to_numpy()
+        data_FCS_G = G[lag_time_mask]
+        
+        # Col 2: Count rate, and in my modification also acquisition time
+        avg_count_rate = data.iloc[0:2,2].mean() 
+            # In case of cross-correlation, we average count rates of both channels for simplicity - not entirely accurate, but good enough I guess
+        acquisition_time_s = data.iloc[2,2] 
     
-    # Col 1: Correlation
-    G = data.iloc[:, 1].to_numpy()
-    data_FCS_G = G[lag_time_mask]
-    
-    # Col 2: Count rate, and in my modification also acquisition time
-    avg_count_rate = data.iloc[0:2,2].mean() 
-        # In case of cross-correlation, we average count rates of both channels for simplicity - not entirely accurate, but good enough I guess
-    acquisition_time_s = data.iloc[2,2] 
-
-    # Col 3: Uncertainty
-    sigma_G = data.iloc[:, 3].to_numpy()
-    data_FCS_sigma = sigma_G[lag_time_mask]
-
+        # Col 3: Uncertainty
+        sigma_G = data.iloc[:, 3].to_numpy()
+        data_FCS_sigma = sigma_G[lag_time_mask]
+    except:
+        raise Exception(f'Error in reading {in_path} \n {traceback.print_exc()}')
     return data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s
 
 

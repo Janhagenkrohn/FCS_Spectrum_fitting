@@ -3,56 +3,18 @@ clear
 
 
 file_paths = {
-    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\1peaks_mu10_sigma5_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\1peaks_mu10_sigma5_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\1peaks_mu10_sigma5_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_dense_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-0_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-1_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-2_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-3_simData'
-    % '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\spherical_shell_run3\3peaks_equal_mu5-10-15_sigma2-3-5_label1e-4_simData'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-0_simData.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-1_simData.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-2_simData.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\1peaks_mu10_sigma5_label1e-0_simData.mat'
     };
 
 
-lagmin_s = 1e-5;
-lagmax_s = 1;
-Sampling = 6;
+lagmin_s = 1e-3;
+lagmax_s = 3;
+Sampling = 12;
 
 sim_time_s = 60;
 
