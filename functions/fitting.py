@@ -2502,9 +2502,10 @@ class FCS_spectrum():
             stoichiometry[1:] = fold_changes ** 3
             
             # Round to integer stoichiometries and remove redundant elements
-            stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                               return_index = True)
-            
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
+            stoichiometry = stoichiometry[stoichiometry > 0]
+
             # Recalculate exact diffusion times
             tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/3)
             
@@ -2525,9 +2526,10 @@ class FCS_spectrum():
             # Stoichiometry proportional surface area Gaussian chain Kuhn segment number
             stoichiometry[1:] = fold_changes ** 2
 
-            stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                               return_index = True)
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
             tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/2)
+            stoichiometry = stoichiometry[stoichiometry > 0]
             log_stoichiometry = np.log(stoichiometry)
             log_spacing = np.diff(log_stoichiometry)
             stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
@@ -2546,8 +2548,9 @@ class FCS_spectrum():
                                        args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
         
-            stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                               return_index = True)
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
+            stoichiometry = stoichiometry[stoichiometry > 0]
             tau_diff_array = np.append(tau_diff_array[0],
                                        tau_diff_array[0] * self.single_filament_tau_diff_fold_change(stoichiometry[1:]))
             log_stoichiometry = np.log(stoichiometry)
@@ -2569,8 +2572,9 @@ class FCS_spectrum():
                                        args = (tau_diff_fold_change,))
                 stoichiometry[i_spec + 1] = np.exp(res.x)
                 
-            stoichiometry, indices = np.unique(np.round(stoichiometry),
-                                               return_index = True)
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
+            stoichiometry = stoichiometry[stoichiometry > 0]
             tau_diff_array = np.append(tau_diff_array[0],
                                        tau_diff_array[0] * self.double_filament_tau_diff_fold_change(stoichiometry[1:]))
             log_stoichiometry = np.log(stoichiometry)
