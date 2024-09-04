@@ -60,6 +60,7 @@ class FCS_spectrum():
                  data_FCS_sigma = None,
                  data_PCH_bin_times = None,
                  data_PCH_hist = None,
+                 data_avg_count_rate = 0.,
                  labelling_efficiency = 1.,
                  numeric_precision = np.array([1E-3, 1E-4, 1E-5]),
                  NLL_funcs_accurate = False,
@@ -107,10 +108,8 @@ class FCS_spectrum():
             for PCH fitting, not for FCS.
         acquisition_time_s : 
             Float > 0. Acquisition time used for correcting short-acquisition 
-            time bias in FCS, and for insufficient sampling correciton in FCS
-            and PC(M)H. Neither of these corrections work without this parameter,
-            but if standard math with assumption of representative sampling of 
-            the ensemble is to be used, this parameter is not required.
+            time bias in FCS, for insufficient sampling correciton in FCS
+            and PC(M)H, and for including average count rate in the fit. 
         data_FCS_tau_s : 
             Array of float. Lag time array to be used as independend variable 
             in FCS fitting. Not required for PC(M)H.
@@ -138,6 +137,10 @@ class FCS_spectrum():
                 - 2D for PCH fitting or PCMH fitting, where iteration over 
                   axis 0 is iteration over photon counts and axis 1 is iteration
                   over bin times
+        data_avg_count_rate :
+            Optional float >=0 with default 0. If specified > 0, it can be used 
+            as an additional constraint parameter in fitting that affects the 
+            fit of molecular brightness.
         labelling_efficiency : 
             OPTIONAL float 0<labelling_efficiency<=1 with default 1. Labelling 
             efficiency expressed as a probability for a randomly chosen monomer 
@@ -344,6 +347,21 @@ class FCS_spectrum():
         else:
             raise ValueError(f'[{self.job_prefix}] data_PCH_hist must be array with axis 1 same length as same length as data_PCH_bin_times (or can be left empty for FCS only). Got {data_PCH_hist}')
 
+        if utils.isfloat(data_avg_count_rate):
+            if data_avg_count_rate > 0:
+                self.data_avg_count_rate = np.array([data_avg_count_rate])
+                self.avg_count_rate_given = True
+                                
+            elif data_avg_count_rate == 0:
+                self.data_avg_count_rate = np.array([0.])
+                self.avg_count_rate_given = False
+                
+            else: # data_average_count_rate < 0
+                raise ValueError(f'[{self.job_prefix}] data_avg_count_rate must be float >= 0. Got {data_avg_count_rate}')
+                
+        else:
+            raise ValueError(f'[{self.job_prefix}] data_avg_count_rate must be float >= 0. Got {data_avg_count_rate}')
+
         if type(NLL_funcs_accurate) == bool:
             self.NLL_funcs_accurate = NLL_funcs_accurate
         else:
@@ -404,10 +422,17 @@ class FCS_spectrum():
         species through the code stack, making things more robust in coding. 
         Or that's the idea at least.
         '''
-        n_species = 0
-        while f'cpms_{n_species}' in params.keys():
-            n_species += 1
-        return n_species
+        
+        n_species_spec = 0
+        n_species_disc = 0
+        
+        while f'cpms_{n_species_spec}' in params.keys():
+            n_species_spec += 1
+            
+        while f'cpms_d_{n_species_disc}' in params.keys():
+            n_species_disc += 1
+            
+        return n_species_spec, n_species_disc
 
 
     def n_total_from_N_avg(self, 
@@ -450,17 +475,18 @@ class FCS_spectrum():
                                      mp_pool = None,
                                      max_iter_inner = 2.5E4,
                                      max_iter_outer = 30,
-                                     max_lagrange_mul = 100
+                                     max_lagrange_mul = 100,
+                                     use_avg_count_rate = False
                                      ):
                     
         verbose = self.verbosity > 1
         
         # Read out iniital parameters and set up fit
-        n_species = self.get_n_species(params)
+        n_species_spec, _ = self.get_n_species(params)
                     
-        stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+        stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)]).astype(np.float64)
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)]).astype(np.float64)
+        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
         
         # Do we need to optimize other parameters besides those tuned through MEM algorithm?
         has_other_params = np.any(np.array([params[key].vary for key in params.keys()]))
@@ -470,12 +496,12 @@ class FCS_spectrum():
             if N_pop_array == None:
                 # Initalize from nothing
                 if incomplete_sampling_correction:
-                    N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+                    N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
                 else:
                     N_avg_obs_array = stoichiometry_array**(-2)
                     
                 if verbose:
-                    print(f'[{self.job_prefix}] Initializing default amp_array for {n_species} species as N_pop_array is empty')
+                    print(f'[{self.job_prefix}] Initializing default amp_array for {n_species_spec} species as N_pop_array is empty')
                 if spectrum_parameter  == 'Amplitude':
                     amp_array = N_avg_obs_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
                 elif spectrum_parameter == 'N_monomers':
@@ -489,7 +515,7 @@ class FCS_spectrum():
             if np.all(N_pop_array >= 0.) and np.sum(N_pop_array) > 0. :
                 # We have an initial array
                 if verbose:
-                    print(f'[{self.job_prefix}] Initializing amp_array with {n_species} species from pre-initialized N_pop_array')
+                    print(f'[{self.job_prefix}] Initializing amp_array with {n_species_spec} species from pre-initialized N_pop_array')
                 if spectrum_parameter  == 'Amplitude':
                     amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
                 elif spectrum_parameter == 'N_monomers':
@@ -557,7 +583,8 @@ class FCS_spectrum():
                                                   ),
                                       fcn_kws = {'i_bin_time': i_bin_time,
                                                 'numeric_precision': numeric_precision,
-                                                'mp_pool': mp_pool},
+                                                'mp_pool': mp_pool,
+                                                'use_avg_count_rate': use_avg_count_rate},
                                       nan_policy = 'propagate',
                                       calc_covar = False)
             
@@ -579,7 +606,7 @@ class FCS_spectrum():
                 
                 if incomplete_sampling_correction:
                     # Recalculate if needed
-                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
                 
                 temp_n_array = self._N_pop_array / np.sum(self._N_pop_array)
                 
@@ -653,7 +680,7 @@ class FCS_spectrum():
                 # amp_array -> temp_n_array -> noramlize -> scale to real N
                 if incomplete_sampling_correction:
                     # Recalculate if needed
-                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                    labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
                     
                 if spectrum_parameter  == 'Amplitude':
                     temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
@@ -691,7 +718,7 @@ class FCS_spectrum():
                     
                     if incomplete_sampling_correction:
                         # If and only if we have incomplete labelling correction, we have to recalculate the spectrum here
-                        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+                        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
                         if spectrum_parameter  == 'Amplitude':
                             temp_n_array = amp_array / (stoichiometry_binwidth_array * stoichiometry_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array))
                         elif spectrum_parameter == 'N_monomers':
@@ -812,16 +839,16 @@ class FCS_spectrum():
         '''
         
         # Unpack parameters
-        n_species = self.get_n_species(params)
+        n_species_spec, _ = self.get_n_species(params)
         
-        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        # stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        # stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
         
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             N_avg_pop_array = self._N_pop_array
         else:
-            N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+            N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
             
         # Likelihood function for particle numbers
         n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
@@ -842,7 +869,7 @@ class FCS_spectrum():
             
         # Normalize to avoid effects from species numbers
         # negloglik /= np.sum(stoichiometry_binwidth_array)
-        negloglik /= n_species
+        negloglik /= n_species_spec
         return negloglik
     
     
@@ -854,19 +881,19 @@ class FCS_spectrum():
         Neg log likelihood function for deviation between population-level
         and observed N and labelling statistics
         '''
-        n_species = self.get_n_species(params)
+        n_species_spec, _ = self.get_n_species(params)
         
-        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        labelling_efficiency_obs_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        labelling_efficiency_obs_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
         labelling_efficiency_pop = params['Label_efficiency'].value
-        stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)]).astype(np.float64)
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)]).astype(np.float64)
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             N_avg_pop_array = self._N_pop_array
         else:
-            N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+            N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
         
         # Likelihood function for particle numbers
         n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
@@ -892,7 +919,7 @@ class FCS_spectrum():
         # Likelihood function for labelling efficiency fluctuations
         # We iterate over species, and for each species calculate a likelihood 
         # for the observed labelling
-        for i_spec in range(n_species):
+        for i_spec in range(n_species_spec):
             
             # "Histogram" of "observed" labelling with "observed" N spectrum
             _, labelling_efficiency_array_spec_obs = self.pch_get_stoichiometry_spectrum(stoichiometry_array[i_spec], 
@@ -1214,67 +1241,67 @@ class FCS_spectrum():
         return np.sum(((pch_data - pch_model) / pch_sigma)**2)
 
 
-    def regularization_MEM(self,
-                           params,
-                           spectrum_parameter):
+    # def regularization_MEM(self,
+    #                        params,
+    #                        spectrum_parameter):
         
-        # LEGACY CODE
+    #     # LEGACY CODE - NO LONGER MAINTAINED
         
-        # Unpack parameters
-        n_species = self.get_n_species(params)
-        if spectrum_parameter == 'Amplitude':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
-        elif spectrum_parameter == 'N_monomers':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        elif spectrum_parameter == 'N_oligomers':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
-        else:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+    #     # Unpack parameters
+    #     n_species = self.get_n_species(params)
+    #     if spectrum_parameter == 'Amplitude':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
+    #     elif spectrum_parameter == 'N_monomers':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
+    #     elif spectrum_parameter == 'N_oligomers':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+    #     else:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
         
-        # Normalize
-        frequency_array = reg_target / reg_target.sum()
+    #     # Normalize
+    #     frequency_array = reg_target / reg_target.sum()
         
-        # Element-wise "entropy" terms circumventing log(0) errors
-        entropy_array = frequency_array[frequency_array > 0.] * np.log(frequency_array[frequency_array > 0.])
+    #     # Element-wise "entropy" terms circumventing log(0) errors
+    #     entropy_array = frequency_array[frequency_array > 0.] * np.log(frequency_array[frequency_array > 0.])
         
-        # neg entropy regularizer
-        regularizer = np.sum(entropy_array)
+    #     # neg entropy regularizer
+    #     regularizer = np.sum(entropy_array)
         
-        # Normalize by n_species to avoid effects from length
-        regularizer /= n_species
+    #     # Normalize by n_species to avoid effects from length
+    #     regularizer /= n_species
                 
-        return regularizer
+    #     return regularizer
 
 
-    def regularization_CONTIN(self,
-                              params,
-                              spectrum_parameter):
+    # def regularization_CONTIN(self,
+    #                           params,
+    #                           spectrum_parameter):
 
-        # LEGACY CODE
+    #     # LEGACY CODE - NO LONGER MAINTAINED
         
-        # Unpack parameters
-        n_species = self.get_n_species(params)
+    #     # Unpack parameters
+    #     n_species = self.get_n_species(params)
         
-        if spectrum_parameter == 'Amplitude':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
-        elif spectrum_parameter == 'N_monomers':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        elif spectrum_parameter == 'N_oligomers':
-            reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
-        else:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
+    #     if spectrum_parameter == 'Amplitude':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'cpms_{i_spec}'].value**2 for i_spec in range(n_species)])
+    #     elif spectrum_parameter == 'N_monomers':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value * params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
+    #     elif spectrum_parameter == 'N_oligomers':
+    #         reg_target = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
+    #     else:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
             
-        # Normalize
-        frequency_array = reg_target / reg_target.sum()
+    #     # Normalize
+    #     frequency_array = reg_target / reg_target.sum()
         
-        # Numerically approximate second derivative of N distribution
-        second_numerical_diff = np.diff(frequency_array, 2)
+    #     # Numerically approximate second derivative of N distribution
+    #     second_numerical_diff = np.diff(frequency_array, 2)
         
-        # Get mean of squared second derivative as single number that reports on non-smoothness of distribution
-        # Mean rather than sum to avoid effects from length
-        regularizer = np.mean(second_numerical_diff**2)
+    #     # Get mean of squared second derivative as single number that reports on non-smoothness of distribution
+    #     # Mean rather than sum to avoid effects from length
+    #     regularizer = np.mean(second_numerical_diff**2)
         
-        return regularizer
+    #     return regularizer
         
         
     def simple_pch_penalty(self,
@@ -1493,6 +1520,50 @@ class FCS_spectrum():
             
         return negloglik
 
+    def negloglik_avg_count_rate(self,
+                                 params,
+                                 labelling_correction,
+                                 incomplete_sampling_correction,
+                                 ):
+        # Poisson likelihood function for considering average count rate in fitting
+        n_species_spec, n_species_disc = self.get_n_species(params)
+        
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array *= 2**(3/2) # Gamma correction
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d *= 2**(3/2) # Gamma correction
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+
+        if labelling_correction:
+            Label_efficiency_obs_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+            Label_efficiency_obs_array_d = np.array([params[f'Label_efficiency_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        else:
+            Label_efficiency_obs_array = np.ones_like(cpms_array)
+            Label_efficiency_obs_array_d = np.ones_like(cpms_array_d)
+            
+        count_rates_spec_model = np.sum(cpms_array * N_avg_array * stoichiometry_binwidth_array * Label_efficiency_obs_array) + \
+                                 np.sum(cpms_array_d * N_avg_array_d * stoichiometry_binwidth_array_d * Label_efficiency_obs_array_d)
+
+        avg_count_rate_model = np.sum(count_rates_spec_model)
+        
+        # Correct dark-state fraction
+        avg_count_rate_model *= 1 - params['F_blink'].value
+        
+        if self.NLL_funcs_accurate and self.incomplete_sampling_possible:
+            negloglik = self.negloglik_poisson_simple(rates = avg_count_rate_model * self.acquisition_time_s, 
+                                                      observations = self.data_avg_count_rate * self.acquisition_time_s)
+            
+        else:
+            # Either the use of least-squares approximation was specified, or we
+            # do not have the acquisition time, in which case we can still work with WLSQ
+            negloglik = 0.5 * ((avg_count_rate_model - self.data_avg_count_rate) / self.data_avg_count_rate)**2
+            
+        return negloglik
+
 
     def negloglik_global_fit(self,
                              params,
@@ -1503,6 +1574,7 @@ class FCS_spectrum():
                              spectrum_parameter,
                              labelling_correction,
                              incomplete_sampling_correction,
+                             use_avg_count_rate = False,
                              i_bin_time = 0,
                              numeric_precision = 1e-4,
                              mp_pool = None
@@ -1575,6 +1647,13 @@ class FCS_spectrum():
                                                                                spectrum_type = spectrum_type)
             n_negloglik_terms += 1
             
+        if use_avg_count_rate:
+            # Include avg count rate in fit
+            negloglik += self.negloglik_avg_count_rate(params, 
+                                                       labelling_correction, 
+                                                       incomplete_sampling_correction)
+            n_negloglik_terms += 1
+
         return negloglik / n_negloglik_terms
 
 
@@ -2163,29 +2242,46 @@ class FCS_spectrum():
                                params):
                 
         acf = np.zeros_like(self.data_FCS_G)
+        acf_den = 0.
         
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
         # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+        # Spectrum species
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+        
+        # Discrete species
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        
+        # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
+        cpms_array /= cpms_norm 
+        cpms_array_d /= cpms_norm
 
-        for i_spec in range(n_species):
+        # Eval spectrum species
+        for i_spec in range(n_species_spec):
             g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
             acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2
-            
-        acf *= 2**(-3/2) 
+        acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
         
-        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        # Eval discrete species
+        for i_spec in range(n_species_disc):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
 
-
+        # Put together and further terms
+        acf *= 2**(-3/2) 
+        acf /= acf_den
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
-                                                                                                              params['beta_blink'].value)
-        
+                                                                                                              params['beta_blink'].value)        
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -2194,25 +2290,43 @@ class FCS_spectrum():
     def get_acf_full_labelling_par(self, 
                                    params):
                 
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
         # Extract parameters
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-
-        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * 2**(-3/2) 
+        # Spectrum species
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
         
+        # Discrete species
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+
+        # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
+        cpms_array /= cpms_norm 
+        cpms_array_d /= cpms_norm
+
+        # Eval spectrum species
+        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
-            
-        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        acf_den = np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
+        # Eval discrete species
+        for i_spec in range(n_species_disc):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+     
+        # Put together and further terms
+        acf *= 2**(-3/2) 
+        acf /= acf_den
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
-        
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -2220,24 +2334,43 @@ class FCS_spectrum():
 
     def get_acf_full_labelling_reg(self, 
                                    params):
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
         # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-
-        spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2 * 2**(-3/2)
         
+        # Spectrum species
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+
+        # Discrete species
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+
+        # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
+        cpms_array /= cpms_norm 
+        cpms_array_d /= cpms_norm
+
+        # Eval spectrum species
+        spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
-        
-        acf /= np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
+        acf_den = np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
 
+        # Eval discrete species
+        for i_spec in range(n_species_disc):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        
+        # Put together and further terms
+        acf /= acf_den
+        acf *= 2**(-3/2) 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
-        
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -2248,27 +2381,45 @@ class FCS_spectrum():
                 
         acf = np.zeros_like(self.data_FCS_G)
         
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
         # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        # Spectrum species
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
 
-        for i_spec in range(n_species):
+        # Discrete species
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        labelling_efficiency_array_d = np.array([params[f'Label_efficiency_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
+        cpms_array /= cpms_norm 
+        cpms_array_d /= cpms_norm
+
+        # Eval spectrum species
+        for i_spec in range(n_species_spec):
             g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
             acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / cpms_array[i_spec] / labelling_efficiency_array[i_spec])
+        acf_den = np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
         
-        acf *= 2**(-3/2) 
-        acf /= np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
+        # Eval discrete species
+        for i_spec in range(n_species_disc):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / cpms_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
+        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
 
+        # Put together and further terms
+        acf /= acf_den
+        acf *= 2**(-3/2) 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
-        
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -2277,26 +2428,44 @@ class FCS_spectrum():
     def get_acf_partial_labelling_par_reg(self, 
                                           params):
                         
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
-        # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)])
-        cpms_array /= cpms_array.mean() # Only relative brightness matters, and normalizing may help avoid overflows etc.
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        # Spectrum species
+        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
 
-        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / cpms_array / labelling_efficiency_array) * 2**(-3/2) 
+        # Discrete species
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        labelling_efficiency_array_d = np.array([params[f'Label_efficiency_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
         
+        # Only relative brightness matters, and normalizing may help avoid overflows etc.
+        cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
+        cpms_array /= cpms_norm 
+        cpms_array_d /= cpms_norm
+
+        # Eval spectrum species
+        spec_weights = N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / cpms_array / labelling_efficiency_array)
         acf = np.dot(self.tau__tau_diff_array, 
                      spec_weights)
-        
-        acf /= np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        acf_den = np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
+        # Eval discrete species
+        for i_spec in range(n_species_disc):
+            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / cpms_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
+        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+
+        # Put together and further terms
+        acf /= acf_den
+        acf *= 2**(-3/2) 
         if params['F_blink'].value > 0:
             acf *= 1 + params['F_blink'].value / (1 - params['F_blink'].value) * self.fcs_blink_stretched_exp(params['tau_blink'].value,
                                                                                                               params['beta_blink'].value)
-            
         acf += params['acf_offset'].value # Offset
 
         return acf
@@ -2342,20 +2511,34 @@ class FCS_spectrum():
                                mp_pool = None
                                ):
         
-        n_species = self.get_n_species(params)
+        n_species_spec, n_species_disc = self.get_n_species(params)
             
-        # Extract parameters
-        cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species)]) * (1 + params['F'].value)**2
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        # Extract parameters for discrete and spectrum species, and concatenate them
+        cpms_array_s = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
+        cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        cpms_array = np.concatenate((cpms_array_s, cpms_array_d), 
+                                    axis = 0) * (1 + params['F'].value)**2 # Correct for non-Gaussian PSF elements
+        
+        stoichiometry_binwidth_array_s = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array = np.concatenate((stoichiometry_binwidth_array_s, stoichiometry_binwidth_array_d), 
+                                                      axis = 0)
 
         if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            N_eff_array = self._N_pop_array * stoichiometry_binwidth_array * 2**(3/2) # Gamma correction
+            N_avg_array_s = self._N_pop_array
         else:
-            N_eff_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * stoichiometry_binwidth_array * 2**(3/2) # Gamma correction
-
+            N_avg_array_s = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_eff_array = np.concatenate((N_avg_array_s, N_avg_array_d), 
+                                     axis = 0) * stoichiometry_binwidth_array * 2**(3/2) # Binwidth and gamma correction
+        
         if time_resolved_PCH:
             # Bin time correction
-            tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+            tau_diff_array_s = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+            tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+            tau_diff_array = np.concatenate((tau_diff_array_s, tau_diff_array_d), 
+                                            axis = 0)
+
             cpms_array, N_eff_array = self.pch_bin_time_correction(t_bin = t_bin, 
                                                                    cpms = cpms_array, 
                                                                    N_avg = N_eff_array,
@@ -2390,22 +2573,42 @@ class FCS_spectrum():
         
         # Unpack parameters
         cpms_0 = params['cpms_0'].value  * (1 + params['F'].value)**2
-        n_species = self.get_n_species(params)
         
-        stoichiometry_array = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-        N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)]) * 2**(3/2) # Gamma correction
-        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
+        n_species_spec, n_species_disc = self.get_n_species(params)
+            
+        # Extract parameters for discrete and spectrum species, and concatenate them
+        stoichiometry_array_s = np.array([params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_array_d = np.array([params[f'stoichiometry_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_array = np.concatenate((stoichiometry_array_s, stoichiometry_array_d), 
+                                             axis = 0).astype(np.float64)
 
+        stoichiometry_binwidth_array_s = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        stoichiometry_binwidth_array = np.concatenate((stoichiometry_binwidth_array_s, stoichiometry_binwidth_array_d), 
+                                                      axis = 0)
+        
+        labelling_efficiency_array_s = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        labelling_efficiency_array_d = np.array([params[f'Label_efficiency_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        labelling_efficiency_array = np.concatenate((labelling_efficiency_array_s, labelling_efficiency_array_d), 
+                                             axis = 0)
+
+        N_avg_array_s = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+        N_eff_array = np.concatenate((N_avg_array_s, N_avg_array_d), 
+                                     axis = 0) * stoichiometry_binwidth_array * 2**(3/2) # Binwidth and gamma correction
+        
         if time_resolved_PCH:
-            tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+            # Bin time correction
+            tau_diff_array_s = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+            tau_diff_array_d = np.array([params[f'tau_diff_d_{i_spec}'].value for i_spec in range(n_species_disc)])
+            tau_diff_array = np.concatenate((tau_diff_array_s, tau_diff_array_d), 
+                                            axis = 0)
             tau_blink = params['tau_blink'].value, 
             beta_blink = params['beta_blink'].value, 
             F_blink = params['F_blink'].value
         
         # Iterate over species in spectrum
-        for i_spec in range(n_species):
-            
+        for i_spec in range(n_species_spec + n_species_disc):
             
             # Get probabilities for different label stoichiometries, 
             # clipping away extremely unlikely ones for computational feasibility
@@ -2415,7 +2618,7 @@ class FCS_spectrum():
             
             # Use parameters to get full array of PCH parameters
             cpms_array_spec = n_labels_array * cpms_0 #  frequency of 0,1,2,3,... labels
-            N_array_spec = N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * p_of_n_labels # N_avg_array[i_spec] as a kind of global amplitude for the frequencies
+            N_array_spec = N_eff_array[i_spec] * p_of_n_labels # N_eff_array[i_spec] as a kind of global amplitude for the frequencies
             
             if time_resolved_PCH:
                 # Bin time correction
@@ -2644,7 +2847,9 @@ class FCS_spectrum():
                                n_species,
                                tau_diff_min,
                                tau_diff_max,
-                               use_blinking
+                               use_blinking,
+                               use_avg_count_rate = False,
+                               fit_label_efficiency = False
                                ):
         
         if use_FCS and not self.FCS_possible:
@@ -2657,24 +2862,34 @@ class FCS_spectrum():
             raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
 
         if not (utils.isint(n_species) and n_species > 0):
-            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 0. Got {n_species}")
         
         if not (utils.isfloat(tau_diff_min) and tau_diff_min > 0):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0. Got {tau_diff_min}")
 
         if not (utils.isfloat(tau_diff_max) and tau_diff_max > 0):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float > 0")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float > 0. Got {tau_diff_max}")
 
         if type(use_blinking) != bool:
-            raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool")
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool. Got {use_blinking}")
 
+        if type(use_avg_count_rate) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
+
+        if use_avg_count_rate and not self.avg_count_rate_given:
+            raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
+            
+        if type(fit_label_efficiency) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for fit_label_efficiency - must be bool. Got {fit_label_efficiency}")
+        elif fit_label_efficiency and not labelling_correction:
+            raise Exception(f"[{self.job_prefix}] Invalid input of labelling_correction==False and fit_label_efficiency==True: The labelling efficiency cannot be fitted without labelling correction!")
 
         initial_params = lmfit.Parameters()
         
         # More technical parameters
         initial_params.add('Label_efficiency', 
                            value = self.labelling_efficiency if labelling_correction else 1.,
-                           vary = False)
+                           vary = fit_label_efficiency)
         
         if use_FCS:
             initial_params.add('acf_offset', 
@@ -2691,27 +2906,27 @@ class FCS_spectrum():
         
         # Actual model parameters 
         for i_spec in range(0, n_species):
-            initial_params.add(f'N_avg_obs_{i_spec}', 
+            initial_params.add(f'N_avg_obs_d_{i_spec}', 
                                value = 1., 
                                min = 0., 
                                vary = True)
 
             if use_FCS or (use_PCH and time_resolved_PCH):
                 # Diffusion time only for FCS and PCMH
-                initial_params.add(f'tau_diff_{i_spec}', 
+                initial_params.add(f'tau_diff_d_{i_spec}', 
                                    value = np.sqrt(tau_diff_min * tau_diff_max) *10**(i_spec + 0.5 - n_species / 2), # Initialize around geo mean of bounds
                                    min = tau_diff_min,
                                    max = tau_diff_max,
                                    vary = True)
             
-            if use_PCH:
-                initial_params.add(f'cpms_{i_spec}', 
+            if use_PCH or use_avg_count_rate:
+                initial_params.add(f'cpms_d_{i_spec}', 
                                    value = 1E4 * 10**(i_spec + 0.5 - n_species / 2), # Initialize around 10000
                                    min = 0., 
                                    vary = True)
             else:
-                # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
-                initial_params.add(f'cpms_{i_spec}', 
+                # If we do not use PCH or the avg count rate, use a dummy, as we won't be able to tell from FCS alone
+                initial_params.add(f'cpms_d_{i_spec}', 
                                    value = 1., 
                                    min = 0., 
                                    vary = False)
@@ -2719,29 +2934,144 @@ class FCS_spectrum():
             # Additional parameters that are included only as dummies for 
             # consistency with spectrum models, to be able to use the same 
             # functions without too much added logic
-            initial_params.add(f'Label_obs_factor_{i_spec}', 
+            initial_params.add(f'Label_obs_factor_d_{i_spec}', 
                                value = 1.,
                                vary = False)
 
-            initial_params.add(f'Label_efficiency_obs_{i_spec}', 
-                               expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
+            initial_params.add(f'Label_efficiency_obs_d_{i_spec}', 
+                               expr = f'Label_efficiency * Label_obs_factor_d_{i_spec}',
                                vary = False)
 
-            initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
+            initial_params.add(f'stoichiometry_binwidth_d_{i_spec}', 
+                               value = 1., 
+                               vary = False)
+
+            initial_params.add(f'stoichiometry_d_{i_spec}', 
                                value = 1., 
                                vary = False)
 
                 
         # Add blinking parameters for FCS and PCMH - real or dummy
-        if use_FCS or (use_PCH and time_resolved_PCH):
-            initial_params = self.set_blinking_initial_params(initial_params,
-                                                              use_blinking,
-                                                              tau_diff_min)
+        initial_params = self.set_blinking_initial_params(initial_params,
+                                                          use_blinking and (use_FCS or (use_PCH and time_resolved_PCH)),
+                                                          tau_diff_min)
 
         return initial_params
 
+    def add_discrete_species(self,
+                             initial_params,
+                             N_avg_obs = 1.,
+                             vary_N_avg_obs = True,                             
+                             tau_diff = 1E-3,
+                             vary_tau_diff = False,
+                             cpms = 1.,
+                             vary_cpms = False,
+                             link_brightness_to_spectrum_monomer = True,
+                             stoichiometry = 1.,
+                             vary_stoichiometry = False,
+                             stoichiometry_binwidth = 1.,
+                             vary_stoichiometry_binwidth = False,
+                             labelling_efficiency = 1.,
+                             vary_labelling_efficiency = False,
+                             ):
+        '''
+        Handle for adding a single species to an existing initial_params object.
+        Here, you have free access to all the parameters!
 
+        Parameters
+        ----------
+        initial_params : 
+            lmfit.Parameters() object to be appended. Should be created with 
+            set_up_params_par() or similar.
+        N_avg_obs, cpms, tau_diff, stoichiometry, stoichiometry_binwidth, labelling_efficiency :
+            OPITONAL floats as initial estimates for the 6 parameters that
+            characterize a species in this software. tau_diff has default 1E-3,
+            the others default to 1.
+        vary_N_avg_obs, vary_cpms, vary_tau_diff, vary_stoichiometry, vary_stoichiometry_binwidth, vary_labelling_efficiency : 
+            OPTIONAL bools to choose whether or not to vary the parameters in 
+            fitting, i.e., this is the handle for deciding what is prior 
+            knowledge and what is fitted. vary_N_avg_obs has default True, the 
+            others have default False.
+        link_brightness_to_spectrum_monomer : 
+            OPTIONAL bool with default True. This is a key parameter that 
+            determines whether or not this species is linked to the monomer of 
+            an oligomer spectrum. This is a bit more complicated:
+            link_brightness_to_spectrum_monomer == False: The brightness of the 
+                new species is handled trivially according to inputs for cpms
+                and vary_cpms, like the other parameters, with no connection 
+                to the spectrum.
+            link_brightness_to_spectrum_monomer == True and vary_cpms == True: 
+                In this case, the input for cpms into this function is ignored!
+                Instead, this species' brightness becomes a dependent parameter
+                tethered to the spectrum monomer brightness cpms_0
+            link_brightness_to_spectrum_monomer == True and vary_cpms == False:
+                In this case, the input for cpms is treated as a known input
+                constant (e.g., from a monomer-only measurement) and both the
+                new species's brightness and the spectrum monomer brightness
+                become fixed at this value.
 
+        Returns
+        -------
+        initial_params : 
+            lmfit.Parameters() with additional species.
+
+        '''
+        
+        # Find out what is the highest index of exisitng discrete species
+        n_species_spec, n_species_disc = self.get_n_species(initial_params)
+        
+        # With the brightness we can do a few interesting things...
+        
+        if link_brightness_to_spectrum_monomer:
+            # We use this species to describe a free-monomer or free-dye species with linked brightness
+            
+            if n_species_spec == 0:
+                raise Exception('No spectrum of species defined, therefore cannot add a discrete species with brightness linked to spectrum monomer brightness!')
+                
+            if vary_cpms:
+                # In this configuration, we vary the spectrum cpms_0 and link this species to it
+                initial_params.add(f'cpms_d_{n_species_disc}',
+                                   expr = 'cpms_0',
+                                   vary = False)
+                
+            else:
+                 # In this configuration, we take the input value specified for this species to express the spectrum cpms_0  
+                 initial_params.add(f'cpms_d_{n_species_disc}',
+                                    value = cpms,
+                                    vary = False)
+                 
+                 initial_params['cpms_0'].vary = False
+                 initial_params['cpms_0'].value = None
+                 initial_params['cpms_0'].expr = f'cpms_d_{n_species_disc}'
+
+        else:
+            # No linking this species to spectrum monomer - then it's trivial
+            initial_params.add(f'cpms_d_{n_species_disc}',
+                               expr = cpms,
+                               vary = vary_cpms)
+            
+        # The other parameter are all straightforward
+        initial_params.add(f'N_avg_obs_d_{n_species_disc}',
+                           value = N_avg_obs,
+                           vary = vary_N_avg_obs)
+
+        initial_params.add(f'tau_diff_d_{n_species_disc}',
+                           value = tau_diff,
+                           vary = vary_tau_diff)
+
+        initial_params.add(f'stoichiometry_d_{n_species_disc}',
+                           value = stoichiometry,
+                           vary = vary_stoichiometry)
+
+        initial_params.add(f'stoichiometry_binwidth_d_{n_species_disc}',
+                           value = stoichiometry_binwidth,
+                           vary = vary_stoichiometry_binwidth)
+
+        initial_params.add(f'labelling_efficiency_d_{n_species_disc}',
+                           value = labelling_efficiency,
+                           vary = vary_labelling_efficiency)
+        
+        return initial_params
 
     def set_up_params_reg(self,
                           use_FCS,
@@ -2754,7 +3084,9 @@ class FCS_spectrum():
                           n_species,
                           tau_diff_min,
                           tau_diff_max,
-                          use_blinking
+                          use_blinking,
+                          use_avg_count_rate = False,
+                          fit_label_efficiency = False
                           ):
     
         if use_FCS and not self.FCS_possible:
@@ -2767,13 +3099,25 @@ class FCS_spectrum():
             raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
             
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'. Got: {spectrum_type}")
 
         if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
             raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         if not (utils.isint(n_species) and n_species >= 10):
-            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for regularized fitting")
+            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for regularized fitting. Got: {n_species}")
+            
+        if type(use_avg_count_rate) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
+
+        if use_avg_count_rate and not self.avg_count_rate_given:
+            raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
+
+        if type(fit_label_efficiency) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for fit_label_efficiency - must be bool. Got {fit_label_efficiency}")
+        elif fit_label_efficiency and not labelling_correction:
+            raise Exception(f"[{self.job_prefix}] Invalid input of labelling_correction==False and fit_label_efficiency==True: The labelling efficiency cannot be fitted without labelling correction!")
+
             
         tau_diff_array = self.get_tau_diff_array(tau_diff_min, 
                                                  tau_diff_max, 
@@ -2801,7 +3145,7 @@ class FCS_spectrum():
 
         initial_params.add('Label_efficiency', 
                            value = self.labelling_efficiency if labelling_correction else 1.,
-                           vary = False)
+                           vary = fit_label_efficiency)
 
 
         # Species-wise parameters
@@ -2836,7 +3180,7 @@ class FCS_spectrum():
             # use both incomplete_sampling_correction and labelling_correction
             initial_params.add(f'Label_obs_factor_{i_spec}', 
                                value = 1.,
-                               vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
+                               vary = incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling)
 
             initial_params.add(f'Label_efficiency_obs_{i_spec}', 
                                expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
@@ -2845,13 +3189,13 @@ class FCS_spectrum():
             if i_spec == 0:
                 
                 # Monomer brightness
-                if use_PCH:
+                if use_PCH or use_avg_count_rate:
                     initial_params.add('cpms_0', 
                                        value = 1E3, 
                                        min = 0, 
                                        vary = True)
                 else:
-                    # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
+                    # If we do not use PCH or avg count rate, use a dummy, as we won't be able to tell from FCS alone
                     initial_params.add('cpms_0', 
                                        value = 1., 
                                        min = 0, 
@@ -2864,10 +3208,9 @@ class FCS_spectrum():
                                    vary = False)
             
         # Add blinking parameters for FCS and PCMH - real or dummy
-        if use_FCS or (use_PCH and time_resolved_PCH):
-            initial_params = self.set_blinking_initial_params(initial_params,
-                                                              use_blinking,
-                                                              tau_diff_min)
+        initial_params = self.set_blinking_initial_params(initial_params,
+                                                          use_blinking and (use_FCS or (use_PCH and time_resolved_PCH)),
+                                                          tau_diff_min)
 
 
         # Pre-calculate Normalized species correlation functions that we would 
@@ -2883,138 +3226,150 @@ class FCS_spectrum():
 
 
 
-    def set_up_params_reg_from_parfit(self,
-                                      gauss_fit_params,
-                                      use_FCS,
-                                      use_PCH,
-                                      time_resolved_PCH,
-                                      spectrum_type,
-                                      oligomer_type,
-                                      incomplete_sampling_correction,
-                                      labelling_correction,
-                                      tau_diff_min,
-                                      tau_diff_max,
-                                      use_blinking
-                                      ):
+    # def set_up_params_reg_from_parfit(self,
+    #                                   gauss_fit_params,
+    #                                   use_FCS,
+    #                                   use_PCH,
+    #                                   time_resolved_PCH,
+    #                                   spectrum_type,
+    #                                   oligomer_type,
+    #                                   incomplete_sampling_correction,
+    #                                   labelling_correction,
+    #                                   tau_diff_min,
+    #                                   tau_diff_max,
+    #                                   use_blinking,
+    #                                   use_avg_count_rate = False,
+    #                                   fit_label_efficiency = False
+    #                                   ):
     
-        # OLD STUFF, NOT FUNCTIONAL ANY MORE
-        if use_FCS and not self.FCS_possible:
-            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
+    #     # OLD STUFF, NOT FUNCTIONAL ANY MORE
+    #     if use_FCS and not self.FCS_possible:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
         
-        if use_PCH and not self.PCH_possible:
-            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
+    #     if use_PCH and not self.PCH_possible:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
                     
-        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
+    #     if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
             
-        if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'")
+    #     if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'. Got: {spectrum_type}")
 
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
+    #     if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
             
-        # Extract a bunch of arrays from Gauss fit results
-        n_species = self.get_n_species(gauss_fit_params)
-        tau_diff_array = np.array([gauss_fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry = np.array([gauss_fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-        stoichiometry_binwidth = np.array([gauss_fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-        N_pop_array = np.array([gauss_fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
+    #     if type(use_avg_count_rate) != bool:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
+
+    #     if use_avg_count_rate and not self.avg_count_rate_given:
+    #         raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
+
+    #     if type(fit_label_efficiency) != bool:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for fit_label_efficiency - must be bool. Got {fit_label_efficiency}")
+    #     elif fit_label_efficiency and not labelling_correction:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input of labelling_correction==False and fit_label_efficiency==True: The labelling efficiency cannot be fitted without labelling correction!")
+
+            
+    #     # Extract a bunch of arrays from Gauss fit results
+    #     n_species_spec, _ = self.get_n_species(gauss_fit_params)
+    #     tau_diff_array = np.array([gauss_fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+    #     stoichiometry = np.array([gauss_fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)])
+    #     stoichiometry_binwidth = np.array([gauss_fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+    #     N_pop_array = np.array([gauss_fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
                     
-        initial_params = lmfit.Parameters()
+    #     initial_params = lmfit.Parameters()
         
-        # More technical parameters
-        if use_FCS:
-            # initial_params.add('acf_offset', 
-            #                     value = gauss_fit_params['acf_offset'].value, 
-            #                     vary=True)
-            initial_params.add('acf_offset', 
-                                value = 0., 
-                                vary = False)
+    #     # More technical parameters
+    #     if use_FCS:
 
-        if use_PCH:
-            initial_params.add('F', 
-                               value = gauss_fit_params['F'].value, 
-                               min = 0, 
-                               max = 1.,
-                               vary=True)
+    #         initial_params.add('acf_offset', 
+    #                             value = 0., 
+    #                             vary = False)
 
-        initial_params.add('Label_efficiency', 
-                           value = self.labelling_efficiency if labelling_correction else 1.,
-                           vary = False)
+    #     if use_PCH:
+    #         initial_params.add('F', 
+    #                            value = gauss_fit_params['F'].value, 
+    #                            min = 0, 
+    #                            max = 1.,
+    #                            vary=True)
+
+    #     initial_params.add('Label_efficiency', 
+    #                        value = self.labelling_efficiency if labelling_correction else 1.,
+    #                        vary = fit_label_efficiency)
 
 
-        # Species-wise parameters
+    #     # Species-wise parameters
         
         
-        # Other parameters tuned in the nested Nelder minimization
-        for i_spec, tau_diff_i in enumerate(tau_diff_array):
+    #     # Other parameters tuned in the nested Nelder minimization
+    #     for i_spec, tau_diff_i in enumerate(tau_diff_array):
             
 
-            if incomplete_sampling_correction:
-                # Allow fluctuations of observed apparent particle count
-                initial_params.add(f'N_avg_obs_{i_spec}', 
-                                   value = gauss_fit_params[f'N_avg_obs_{i_spec}'].value, 
-                                   min = 0., 
-                                   vary = True)
-            else:
-                # Dummy
-                initial_params.add(f'N_avg_obs_{i_spec}', 
-                                   value = 1., 
-                                   vary = False)
+    #         if incomplete_sampling_correction:
+    #             # Allow fluctuations of observed apparent particle count
+    #             initial_params.add(f'N_avg_obs_{i_spec}', 
+    #                                value = gauss_fit_params[f'N_avg_obs_{i_spec}'].value, 
+    #                                min = 0., 
+    #                                vary = True)
+    #         else:
+    #             # Dummy
+    #             initial_params.add(f'N_avg_obs_{i_spec}', 
+    #                                value = 1., 
+    #                                vary = False)
 
-            if use_FCS or (use_PCH and time_resolved_PCH):
-                # Diffusion time only for FCS and PCMH
-                initial_params.add(f'tau_diff_{i_spec}', 
-                                   value = tau_diff_array[i_spec], 
-                                   vary = False)
+    #         if use_FCS or (use_PCH and time_resolved_PCH):
+    #             # Diffusion time only for FCS and PCMH
+    #             initial_params.add(f'tau_diff_{i_spec}', 
+    #                                value = tau_diff_array[i_spec], 
+    #                                vary = False)
             
-            initial_params.add(f'stoichiometry_{i_spec}', 
-                               value = stoichiometry[i_spec], 
-                               vary = False)
+    #         initial_params.add(f'stoichiometry_{i_spec}', 
+    #                            value = stoichiometry[i_spec], 
+    #                            vary = False)
 
-            initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
-                               value = stoichiometry_binwidth[i_spec], 
-                               vary = False)
+    #         initial_params.add(f'stoichiometry_binwidth_{i_spec}', 
+    #                            value = stoichiometry_binwidth[i_spec], 
+    #                            vary = False)
 
-            # An additional factor for translating between "sample-level" and
-            # "population-level" observed label efficiency if and only if we 
-            # use both incomplete_sampling_correction and labelling_correction
-            initial_params.add(f'Label_obs_factor_{i_spec}', 
-                               value = gauss_fit_params[f'Label_obs_factor_{i_spec}'].value,
-                               vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
+    #         # An additional factor for translating between "sample-level" and
+    #         # "population-level" observed label efficiency if and only if we 
+    #         # use both incomplete_sampling_correction and labelling_correction
+    #         initial_params.add(f'Label_obs_factor_{i_spec}', 
+    #                            value = gauss_fit_params[f'Label_obs_factor_{i_spec}'].value,
+    #                            vary = incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling)
 
-            initial_params.add(f'Label_efficiency_obs_{i_spec}', 
-                               expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
-                               vary = False)
+    #         initial_params.add(f'Label_efficiency_obs_{i_spec}', 
+    #                            expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
+    #                            vary = False)
 
-            if i_spec == 0:
+    #         if i_spec == 0:
                 
-                # Monomer brightness
-                if use_PCH:
-                    initial_params.add('cpms_0', 
-                                       value = gauss_fit_params['cpms_0'].value, 
-                                       min = 0, 
-                                       vary = True)
-                else:
-                    # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
-                    initial_params.add('cpms_0', 
-                                       value = 1., 
-                                       min = 0, 
-                                       vary = False)
-            else: # i_spec >= 1
+    #             # Monomer brightness
+    #             if use_PCH or use_avg_count_rate:
+    #                 initial_params.add('cpms_0', 
+    #                                    value = gauss_fit_params['cpms_0'].value, 
+    #                                    min = 0, 
+    #                                    vary = True)
+    #             else:
+    #                 # If we do not use PCH or avg_count_rate, use a dummy, as we won't be able to tell from FCS alone
+    #                 initial_params.add('cpms_0', 
+    #                                    value = 1., 
+    #                                    min = 0, 
+    #                                    vary = False)
+    #         else: # i_spec >= 1
             
-                # Oligomer cpms is defined by monomer and stoichiometry factor
-                initial_params.add(f'cpms_{i_spec}', 
-                                   expr = f'cpms_0 * stoichiometry_{i_spec}', 
-                                   vary = False)
+    #             # Oligomer cpms is defined by monomer and stoichiometry factor
+    #             initial_params.add(f'cpms_{i_spec}', 
+    #                                expr = f'cpms_0 * stoichiometry_{i_spec}', 
+    #                                vary = False)
             
-        # Add blinking parameters for FCS and PCMH - real or dummy
-        if use_FCS or (use_PCH and time_resolved_PCH):
-            initial_params = self.set_blinking_initial_params(initial_params,
-                                                              use_blinking,
-                                                              tau_diff_min)
+    #     # Add blinking parameters for FCS and PCMH - real or dummy
+    #     if use_FCS or (use_PCH and time_resolved_PCH):
+    #         initial_params = self.set_blinking_initial_params(initial_params,
+    #                                                           use_blinking,
+    #                                                           tau_diff_min)
 
-        return initial_params, N_pop_array
+    #     return initial_params, N_pop_array
 
 
     def set_up_params_par(self,
@@ -3032,7 +3387,9 @@ class FCS_spectrum():
                           use_blinking,
                           previous_params = None,
                           previous_N_obs_array = None,
-                          skip_species_mask = None
+                          skip_species_mask = None,
+                          use_avg_count_rate = False,
+                          fit_label_efficiency = False
                           ):
     
         if use_FCS and not self.FCS_possible:
@@ -3052,6 +3409,18 @@ class FCS_spectrum():
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
+        
+        if type(use_avg_count_rate) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
+
+        if use_avg_count_rate and not self.avg_count_rate_given:
+            raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
+
+        if type(fit_label_efficiency) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for fit_label_efficiency - must be bool. Got {fit_label_efficiency}")
+        elif fit_label_efficiency and not labelling_correction:
+            raise Exception(f"[{self.job_prefix}] Invalid input of labelling_correction==False and fit_label_efficiency==True: The labelling efficiency cannot be fitted without labelling correction!")
+
         
         if type(previous_params) == lmfit.Parameters:
             from_scratch = False
@@ -3105,7 +3474,7 @@ class FCS_spectrum():
                 
             initial_params.add('Label_efficiency', 
                                value = self.labelling_efficiency if labelling_correction else 1.,
-                               vary = False)
+                               vary = fit_label_efficiency)
             
             # N distribution parameters
             # We initialize all at median_stoichiometry, as depending on 
@@ -3152,19 +3521,18 @@ class FCS_spectrum():
                 # Weighting function that essentially decides which number the parameterization acts on
                 
                 if spectrum_parameter == 'Amplitude' and not oligomer_type == 'naive':
-                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1)
+                    spectrum_weight_str = f'stoichiometry_{i_spec}**(-2) / stoichiometry_binwidth_{i_spec}'
                     if labelling_correction:
-                        spectrum_weight /= 1. + (1 - self.labelling_efficiency) / (self.labelling_efficiency * stoichiometry[i_spec])
-    
+                        spectrum_weight_str += f' / ( 1. + (1 - Label_efficiency) / (Label_efficiency * stoichiometry_{i_spec}))'
                 elif spectrum_parameter == 'N_monomers' and not oligomer_type == 'naive':
-                    spectrum_weight = stoichiometry[i_spec]**(-1)
+                    spectrum_weight_str = f'stoichiometry_{i_spec}**(-1)'
                     
                 elif spectrum_parameter == 'N_oligomers' or oligomer_type == 'naive':
-                    spectrum_weight = 1.
+                    spectrum_weight_str = '1.'
                 else:
                     raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
                 initial_params.add(f'spectrum_weight_{i_spec}', 
-                                   value = spectrum_weight, 
+                                   expr = spectrum_weight_str, 
                                    vary = False)
                 
                 
@@ -3189,7 +3557,7 @@ class FCS_spectrum():
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * spectrum_weight / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
                                            min = 0., 
                                            vary = True)
                 if spectrum_type == 'par_Gamma':
@@ -3199,7 +3567,7 @@ class FCS_spectrum():
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * spectrum_weight * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(- N_dist_b * stoichiometry[i_spec]) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(- N_dist_b * stoichiometry[i_spec]) + 0.1,
                                            min = 0., 
                                            vary = True)
     
@@ -3210,7 +3578,7 @@ class FCS_spectrum():
     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
                                            min = 0., 
                                            vary = True)
                         
@@ -3225,7 +3593,7 @@ class FCS_spectrum():
                 # use both incomplete_sampling_correction and labelling_correction
                 initial_params.add(f'Label_obs_factor_{i_spec}', 
                                    value = 1.,
-                                   vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
+                                   vary = incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling)
     
                 initial_params.add(f'Label_efficiency_obs_{i_spec}', 
                                    expr = f'Label_efficiency * Label_obs_factor_{i_spec}',
@@ -3234,13 +3602,13 @@ class FCS_spectrum():
                 if i_spec == 0:
                     
                     # Monomer brightness
-                    if use_PCH:
+                    if use_PCH or use_avg_count_rate:
                         initial_params.add('cpms_0', 
                                            value = 1E3, 
                                            min = 0, 
                                            vary = True)
                     else:
-                        # If we do not use PCH, use a dummy, as we won't be able to tell from FCS alone
+                        # If we do not use PCH or avg count rate, use a dummy, as we won't be able to tell from FCS alone
                         initial_params.add('cpms_0', 
                                            value = 1., 
                                            min = 0, 
@@ -3253,10 +3621,9 @@ class FCS_spectrum():
                                        vary = False)
                 
             # Add blinking parameters for FCS and PCMH - real or dummy
-            if use_FCS or (use_PCH and time_resolved_PCH):
-                initial_params = self.set_blinking_initial_params(initial_params,
-                                                                          use_blinking,
-                                                                          tau_diff_min)
+            initial_params = self.set_blinking_initial_params(initial_params,
+                                                              use_blinking and (use_FCS or (use_PCH and time_resolved_PCH)),
+                                                              tau_diff_min)
             
             # Pre-calculate Normalized species correlation functions that we would 
             # otherwise spend a significant amount of time on during fitting
@@ -3270,7 +3637,8 @@ class FCS_spectrum():
             
             
         else: # not from_scratch - use previous            
-            n_species = self.get_n_species(previous_params)
+            # n_species_spec, _ = self.get_n_species(previous_params)
+
             
             if use_FCS:
                 initial_params.add('acf_offset', 
@@ -3286,7 +3654,7 @@ class FCS_spectrum():
                 
             initial_params.add('Label_efficiency', 
                                value = self.labelling_efficiency if labelling_correction else 1.,
-                               vary = False)
+                               vary = fit_label_efficiency)
             
             
             
@@ -3303,12 +3671,8 @@ class FCS_spectrum():
                 # stoichiometry_array = np.array([previous_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
                 
                 if skip_species:
-                    # There are species to discard - in that casre we also need to recalculate stoichiometry parameters!
-                    if 'tau_diff_0' in previous_params.keys():
-                        tau_diff_array = np.array([previous_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-                    else:
-                        # There were no tau_diff values in previous_params - should be in class attribute then
-                        tau_diff_array = self.tau__tau_diff_array[0,:]
+                    # There are species to discard - in that case we also need to recalculate stoichiometry parameters!
+                    tau_diff_array = np.array([previous_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
                     tau_diff_array = tau_diff_array[np.logical_not(skip_species_mask)]
                     stoichiometry_array, tau_diff_array, stoichiometry_binwidth_array = self.stoichiometry_from_tau_diff_array(tau_diff_array,
                                                                                                                                oligomer_type)
@@ -3406,22 +3770,24 @@ class FCS_spectrum():
                                    value = stoichiometry_binwidth_array[i_spec - skip_counter] if use_previous_N_obs_array else previous_params[f'stoichiometry_binwidth_{i_spec}'].value, 
                                    vary = False)
                     
+                
+                # Weighting function that essentially decides which number the parameterization acts on
                 if spectrum_parameter == 'Amplitude':
-                    spectrum_weight = stoichiometry[i_spec]**(-2) * stoichiometry_binwidth[i_spec]**(-1)
+                    spectrum_weight_str = f'stoichiometry_{i_spec - skip_counter}**(-2) / stoichiometry_binwidth_{i_spec - skip_counter} '
                     if labelling_correction:
-                        spectrum_weight *= (1. + (1 - self.labelling_efficiency) / (self.labelling_efficiency * stoichiometry[i_spec]))**(-1)
-    
-                elif spectrum_parameter == 'N_monomers':
-                    spectrum_weight = previous_params[f'stoichiometry_{i_spec}'].value**(-1)
+                        spectrum_weight_str += f' / ( 1. + (1 - Label_efficiency) / (Label_efficiency * stoichiometry_{i_spec - skip_counter})) '
+
+                elif spectrum_parameter == 'N_monomers' and not oligomer_type == 'naive':
+                    spectrum_weight_str = f'stoichiometry_{i_spec - skip_counter}**(-1) '
                     
-                elif spectrum_parameter == 'N_oligomers':
-                    spectrum_weight = 1.
+                elif spectrum_parameter == 'N_oligomers' or oligomer_type == 'naive':
+                    spectrum_weight_str = '1.'
                     
                 else:
                     raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'")
                     
                 initial_params.add(f'spectrum_weight_{i_spec - skip_counter}', 
-                                   value = spectrum_weight, 
+                                   expr = spectrum_weight_str, 
                                    vary = False)
                 
                 
@@ -3460,13 +3826,13 @@ class FCS_spectrum():
                     else:
                         # From model (initial assumption N_obs = N_pop)
                         if spectrum_type == 'par_Gauss':
-                            N_avg_obs_spec = N_dist_amp * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 0.1
                         elif spectrum_type == 'par_LogNorm':
-                            N_avg_obs_spec = N_dist_amp * spectrum_weight / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
                         elif spectrum_type == 'par_Gamma':
-                            N_avg_obs_spec = N_dist_amp * spectrum_weight * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
                         else: # spectrum_type == 'par_StrExp'
-                            N_avg_obs_spec = N_dist_amp * spectrum_weight * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 0.1
                                     
                     initial_params.add(f'N_avg_obs_{i_spec - skip_counter}', 
                                        value = N_avg_obs_spec,
@@ -3482,7 +3848,7 @@ class FCS_spectrum():
     
                 initial_params.add(f'Label_obs_factor_{i_spec - skip_counter}', 
                                    value = 1.,
-                                   vary = True if (incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling) else False)
+                                   vary = incomplete_sampling_correction and labelling_correction and self.labelling_efficiency_incomp_sampling)
     
                 initial_params.add(f'Label_efficiency_obs_{i_spec - skip_counter}', 
                                    expr = f'Label_efficiency * Label_obs_factor_{i_spec - skip_counter}',
@@ -3490,14 +3856,14 @@ class FCS_spectrum():
                     
                 if i_spec == 0:
                     
-                    if use_PCH:
+                    if use_PCH or use_avg_count_rate:
                         initial_params.add('cpms_0', 
                                            value = previous_params['cpms_0'].value if previous_params['cpms_0'].vary else 1E3, 
                                            min = 0, 
                                            vary = True)
                     else:
                         initial_params.add('cpms_0', 
-                                           value = previous_params['cpms_0'].value if previous_params['cpms_0'].vary else 1E3, 
+                                           value = 1., 
                                            min = 0, 
                                            vary = False)
                         
@@ -3506,11 +3872,10 @@ class FCS_spectrum():
                                        expr = f'cpms_0 * stoichiometry_{i_spec - skip_counter}', 
                                        vary = False)
                 
-            if use_FCS or (use_PCH and time_resolved_PCH):
-                # We re-init those, whatever
-                initial_params = self.set_blinking_initial_params(initial_params,
-                                                                    use_blinking,
-                                                                    tau_diff_min)
+            # We re-init those, whatever
+            initial_params = self.set_blinking_initial_params(initial_params,
+                                                              use_blinking and (use_FCS or (use_PCH and time_resolved_PCH)),
+                                                              tau_diff_min)
             
             # Pre-calculate Normalized species correlation functions that we would 
             # otherwise spend a significant amount of time on during fitting
@@ -3548,10 +3913,16 @@ class FCS_spectrum():
                 tau_diff_min, # float
                 tau_diff_max, # float
                 use_blinking, # bool
+                use_avg_count_rate = False, # Bool
+                fit_label_efficiency = False, # bool
                 two_step_fit = True,
                 i_bin_time = 0, # int
                 use_parallel = False # Bool
                 ):
+        
+        
+        # self.avg_count_rate_given
+        
         
         # A bunch of input and compatibility checks
         if use_FCS and not self.FCS_possible:
@@ -3603,6 +3974,16 @@ class FCS_spectrum():
             if type(two_step_fit) != bool:
                 raise Exception(f"[{self.job_prefix}] Invalid input for two_step_fit - must be bool if spectrum_type is not 'discrete'. Got {two_step_fit}")
 
+        if use_avg_count_rate and not self.avg_count_rate_given:
+            raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
+                 
+        if type(fit_label_efficiency) != bool:
+            raise Exception(f"[{self.job_prefix}] Invalid input for fit_label_efficiency - must be bool. Got {fit_label_efficiency}")
+        elif fit_label_efficiency and not labelling_correction:
+            raise Exception(f"[{self.job_prefix}] Invalid input of labelling_correction==False and fit_label_efficiency==True: The labelling efficiency cannot be fitted without labelling correction!")
+
+
+                 
         # Parameter setup
         if spectrum_type == 'discrete':
             initial_params = self.set_up_params_discrete(use_FCS, 
@@ -3612,7 +3993,9 @@ class FCS_spectrum():
                                                          n_species, 
                                                          tau_diff_min, 
                                                          tau_diff_max, 
-                                                         use_blinking
+                                                         use_blinking,
+                                                         use_avg_count_rate = use_avg_count_rate,
+                                                         fit_label_efficiency = fit_label_efficiency
                                                          )
             
         elif (spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'] or
@@ -3628,8 +4011,11 @@ class FCS_spectrum():
                                                     n_species, 
                                                     tau_diff_min, 
                                                     tau_diff_max, 
-                                                    use_blinking
+                                                    use_blinking,
+                                                    use_avg_count_rate = use_avg_count_rate,
+                                                    fit_label_efficiency = fit_label_efficiency and not two_step_fit # Label efficiency is also optimized in second fit round
                                                     )    
+            
         else: # spectrum_type in ['reg_MEM', 'reg_CONTIN'] and not two_step_fit:
             initial_params = self.set_up_params_reg(use_FCS,
                                                     use_PCH,
@@ -3641,7 +4027,9 @@ class FCS_spectrum():
                                                     n_species,
                                                     tau_diff_min,
                                                     tau_diff_max,
-                                                    use_blinking
+                                                    use_blinking,
+                                                    use_avg_count_rate = use_avg_count_rate,
+                                                    fit_label_efficiency = fit_label_efficiency
                                                     )
             
 
@@ -3679,10 +4067,11 @@ class FCS_spectrum():
                                                         ),
                                                 kws = {'i_bin_time': i_bin_time,
                                                        'numeric_precision': self.numeric_precision,
-                                                       'mp_pool': mp_pool},
+                                                       'mp_pool': mp_pool,
+                                                       'use_avg_count_rate': use_avg_count_rate},
                                                 calc_covar = True)
                     
-                    if two_step_fit and incomplete_sampling_correction: # Re-fit - currently only does anything if incomplete_sampling_correction == True, that's why we set the cond
+                    if two_step_fit and (incomplete_sampling_correction or fit_label_efficiency): # Re-fit - currently only does anything if incomplete_sampling_correction or fit_label_efficiency are True, that's why we set the cond
                         # Re-fit with with fuller model
                         if self.verbosity > 0:
                             print(f'[{self.job_prefix}]    --- Parameterized-spectrum re-fit---')                        
@@ -3699,7 +4088,9 @@ class FCS_spectrum():
                                                                 tau_diff_min, 
                                                                 tau_diff_max, 
                                                                 use_blinking,
-                                                                fit_result.params
+                                                                previous_params = fit_result.params,
+                                                                use_avg_count_rate = use_avg_count_rate,
+                                                                fit_label_efficiency = fit_label_efficiency
                                                                 )    
                         
                         fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
@@ -3715,7 +4106,8 @@ class FCS_spectrum():
                                                             ),
                                                     kws = {'i_bin_time': i_bin_time,
                                                            'numeric_precision': self.numeric_precision,
-                                                           'mp_pool': mp_pool},
+                                                           'mp_pool': mp_pool,
+                                                           'use_avg_count_rate': use_avg_count_rate},
                                                     calc_covar = True)
 
 
@@ -3735,7 +4127,8 @@ class FCS_spectrum():
                                                         ),
                                                 kws = {'i_bin_time': i_bin_time,
                                                        'numeric_precision': self.numeric_precision,
-                                                       'mp_pool': mp_pool},
+                                                       'mp_pool': mp_pool,
+                                                       'use_avg_count_rate': use_avg_count_rate},
                                                 calc_covar = False)
                     
                     # Recalculate initial parameters to those for regularized fit
@@ -3749,7 +4142,10 @@ class FCS_spectrum():
                                                                                      labelling_correction,
                                                                                      tau_diff_min,
                                                                                      tau_diff_max, 
-                                                                                     use_blinking)
+                                                                                     use_blinking,
+                                                                                     use_avg_count_rate = use_avg_count_rate,
+                                                                                     fit_label_efficiency = fit_label_efficiency
+                                                                                     )
                     
                     # Re-fit with regularization
                     if self.verbosity > 0:
@@ -3768,8 +4164,10 @@ class FCS_spectrum():
                                                                                               mp_pool = mp_pool,
                                                                                               max_iter_inner = REG_MAX_ITER_INNER,
                                                                                               max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                                              max_lagrange_mul = REG_MAX_LAGRANGE_MUL
+                                                                                              max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+                                                                                              use_avg_count_rate = use_avg_count_rate
                                                                                               )
+                    
         
                 else: # spectrum_type in ['reg_MEM', 'reg_CONTIN'] and not two_step_fit
                     fit_result, N_pop_array, lagrange_mul = self.regularized_minimization_fit(initial_params,
@@ -3786,7 +4184,8 @@ class FCS_spectrum():
                                                                                               mp_pool = mp_pool,
                                                                                               max_iter_inner = REG_MAX_ITER_INNER,
                                                                                               max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                                              max_lagrange_mul = REG_MAX_LAGRANGE_MUL
+                                                                                              max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+                                                                                              use_avg_count_rate = use_avg_count_rate
                                                                                               )
                 
             else:
@@ -3812,7 +4211,7 @@ class FCS_spectrum():
                     if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
 
                         
-                        if (i_inc == self.numeric_precision.shape[0] - 1) and two_step_fit and incomplete_sampling_correction:
+                        if (i_inc == self.numeric_precision.shape[0] - 1) and two_step_fit and (incomplete_sampling_correction or fit_label_efficiency):
                             # Last iteration - switch on incomplete_sampling_correction if needed
                             initial_params = self.set_up_params_par(use_FCS, 
                                                                     use_PCH, 
@@ -3826,7 +4225,9 @@ class FCS_spectrum():
                                                                     tau_diff_min, 
                                                                     tau_diff_max, 
                                                                     use_blinking,
-                                                                    fit_result.params
+                                                                    previous_params = fit_result.params,
+                                                                    use_avg_count_rate = use_avg_count_rate,
+                                                                    fit_label_efficiency = fit_label_efficiency
                                                                     ) 
                             
                             
@@ -3842,7 +4243,8 @@ class FCS_spectrum():
                                                             (incomplete_sampling_correction and (i_inc == self.numeric_precision.shape[0] - 1))),
                                                     kws = {'i_bin_time': i_bin_time,
                                                            'numeric_precision': inc_precision,
-                                                           'mp_pool': mp_pool},
+                                                           'mp_pool': mp_pool,
+                                                           'use_avg_count_rate': use_avg_count_rate},
                                                     calc_covar = i_inc == self.numeric_precision.shape[0] - 1) # Covar only needed at least step
                         
                     elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit:
@@ -3862,7 +4264,8 @@ class FCS_spectrum():
                                                                 ),
                                                         kws = {'i_bin_time': i_bin_time,
                                                                'numeric_precision': inc_precision,
-                                                               'mp_pool': mp_pool},
+                                                               'mp_pool': mp_pool,
+                                                               'use_avg_count_rate': use_avg_count_rate},
                                                         calc_covar = False)
                         
                             # Recalculate initial parameters to those for regularized fit
@@ -3876,7 +4279,10 @@ class FCS_spectrum():
                                                                                              labelling_correction,
                                                                                              tau_diff_min,
                                                                                              tau_diff_max, 
-                                                                                             use_blinking)
+                                                                                             use_blinking,
+                                                                                             use_avg_count_rate = use_avg_count_rate,
+                                                                                             fit_label_efficiency = fit_label_efficiency
+                                                                                             )
                         
                         # Re-fit with regularization
                         if self.verbosity > 0 and i_inc == 0:
@@ -3895,7 +4301,8 @@ class FCS_spectrum():
                                                                                                   mp_pool = mp_pool,
                                                                                                   max_iter_inner = REG_MAX_ITER_INNER,
                                                                                                   max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                                                  max_lagrange_mul = REG_MAX_LAGRANGE_MUL
+                                                                                                  max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+                                                                                                  use_avg_count_rate = use_avg_count_rate
                                                                                                   )
 
                         
@@ -3917,7 +4324,8 @@ class FCS_spectrum():
                                                                                                   mp_pool = mp_pool,
                                                                                                   max_iter_inner = REG_MAX_ITER_INNER,
                                                                                                   max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                                                  max_lagrange_mul = REG_MAX_LAGRANGE_MUL
+                                                                                                  max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+                                                                                                  use_avg_count_rate = use_avg_count_rate
                                                                                                   )
 
                     if i_inc < self.numeric_precision.shape[0] - 1:
@@ -3946,206 +4354,219 @@ class FCS_spectrum():
         
         
         
-    def reg_par_fit_sequence(self,
-                            use_FCS, # bool
-                            use_PCH, # bool
-                            time_resolved_PCH, # bool
-                            reg_spectrum_type, # 'reg_MEM', 'reg_CONTIN'
-                            par_spectrum_type, # 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-                            par_spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
-                            oligomer_type, # spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'
-                            labelling_correction, # bool
-                            n_species, # int
-                            reg_tau_diff_min, # float
-                            par_tau_diff_min,  # float
-                            tau_diff_max, # float
-                            use_blinking, # bool
-                            i_bin_time = 0, # int
-                            use_parallel = False # Bool
-                            ):
+    # def reg_par_fit_sequence(self,
+    #                         use_FCS, # bool
+    #                         use_PCH, # bool
+    #                         time_resolved_PCH, # bool
+    #                         reg_spectrum_type, # 'reg_MEM', 'reg_CONTIN'
+    #                         par_spectrum_type, # 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+    #                         par_spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
+    #                         oligomer_type, # spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'
+    #                         labelling_correction, # bool
+    #                         n_species, # int
+    #                         reg_tau_diff_min, # float
+    #                         par_tau_diff_min,  # float
+    #                         tau_diff_max, # float
+    #                         use_blinking, # bool
+    #                         use_avg_count_rate = False, # Bool
+    #                         i_bin_time = 0, # int
+    #                         use_parallel = False # Bool
+    #                         ):
         
-        # A bunch of input and compatibility checks
-        if use_FCS and not self.FCS_possible:
-            raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
+    #     # Was an idea, but never worked as I had hoped, abandoned this one after some time
         
-        if use_PCH and not self.PCH_possible:
-            raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
+    #     # A bunch of input and compatibility checks
+    #     if use_FCS and not self.FCS_possible:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
+        
+    #     if use_PCH and not self.PCH_possible:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
 
-        if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-            raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
+    #     if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
+    #         raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
 
-        if not reg_spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'reg_MEM' or 'reg_CONTIN'. Got {reg_spectrum_type}")
+    #     if not reg_spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'reg_MEM' or 'reg_CONTIN'. Got {reg_spectrum_type}")
 
-        if not par_spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'. Got {par_spectrum_type}")
+    #     if not par_spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'. Got {par_spectrum_type}")
 
-        if not par_spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {par_spectrum_parameter}")
+    #     if not par_spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers']:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {par_spectrum_parameter}")
     
-        if not oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']:
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
+    #     if not oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
         
-        if type(labelling_correction) != bool:
-            raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
+    #     if type(labelling_correction) != bool:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
 
-        if not (utils.isint(n_species) and n_species > 10):
-            raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 10. Got {n_species}")
+    #     if not (utils.isint(n_species) and n_species > 10):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 10. Got {n_species}")
         
-        if not (utils.isfloat(reg_tau_diff_min) and reg_tau_diff_min > 0):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0. Got {reg_tau_diff_min}")
+    #     if not (utils.isfloat(reg_tau_diff_min) and reg_tau_diff_min > 0):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0. Got {reg_tau_diff_min}")
 
-        if not (utils.isfloat(par_tau_diff_min) and par_tau_diff_min >= reg_tau_diff_min):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float >= reg_tau_diff_min. Got {par_tau_diff_min}")
+    #     if not (utils.isfloat(par_tau_diff_min) and par_tau_diff_min >= reg_tau_diff_min):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float >= reg_tau_diff_min. Got {par_tau_diff_min}")
 
-        if not (utils.isfloat(tau_diff_max) and tau_diff_max >= par_tau_diff_min):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float >= par_tau_diff_min. Got {tau_diff_max}")
+    #     if not (utils.isfloat(tau_diff_max) and tau_diff_max >= par_tau_diff_min):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float >= par_tau_diff_min. Got {tau_diff_max}")
 
-        if type(use_blinking) != bool:
-            raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool. Got {use_blinking}")
+    #     if type(use_blinking) != bool:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool. Got {use_blinking}")
 
-        if not (utils.isint(i_bin_time) and i_bin_time >= 0):
-            raise Exception(f"[{self.job_prefix}] Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
+    #     if not (utils.isint(i_bin_time) and i_bin_time >= 0):
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
+
+    #     if type(use_avg_count_rate) != bool:
+    #         raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
+
+    #     if use_avg_count_rate and not self.avg_count_rate_given:
+    #         raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
 
 
-
-        #### Step 0: Create parpool, if specified
+    #     #### Step 0: Create parpool, if specified
         
-        if use_parallel:
-            mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
-        else:
-            mp_pool = None
+    #     if use_parallel:
+    #         mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
+    #     else:
+    #         mp_pool = None
 
 
 
-        ##### Step 1: Initial parameters for regularized-spectrum fit
+    #     ##### Step 1: Initial parameters for regularized-spectrum fit
         
-        initial_params = self.set_up_params_reg(use_FCS,
-                                                use_PCH,
-                                                time_resolved_PCH,
-                                                reg_spectrum_type,
-                                                oligomer_type,
-                                                False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-                                                labelling_correction,
-                                                n_species,
-                                                reg_tau_diff_min,
-                                                tau_diff_max,
-                                                use_blinking
-                                                )
+    #     initial_params = self.set_up_params_reg(use_FCS,
+    #                                             use_PCH,
+    #                                             time_resolved_PCH,
+    #                                             reg_spectrum_type,
+    #                                             oligomer_type,
+    #                                             False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
+    #                                             labelling_correction,
+    #                                             n_species,
+    #                                             reg_tau_diff_min,
+    #                                             tau_diff_max,
+    #                                             use_blinking,
+    #                                             use_avg_count_rate = use_avg_count_rate
+    #                                             )
         
         
         
         
-        ##### Step 2: Run regularized-spectrum fit
+    #     ##### Step 2: Run regularized-spectrum fit
         
-        if not (self.precision_incremental and use_PCH):
-            # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
-            reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
-                                                                               use_FCS,
-                                                                               use_PCH,
-                                                                               time_resolved_PCH,
-                                                                               reg_spectrum_type,
-                                                                               'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
-                                                                               labelling_correction,
-                                                                               False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-                                                                               i_bin_time = i_bin_time,
-                                                                               N_pop_array = None,
-                                                                               numeric_precision = self.numeric_precision,
-                                                                               mp_pool = mp_pool,
-                                                                               max_iter_inner = REG_MAX_ITER_INNER,
-                                                                               max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                               max_lagrange_mul = REG_MAX_LAGRANGE_MUL
-                                                                               )
+    #     if not (self.precision_incremental and use_PCH):
+    #         # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
+    #         reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
+    #                                                                            use_FCS,
+    #                                                                            use_PCH,
+    #                                                                            time_resolved_PCH,
+    #                                                                            reg_spectrum_type,
+    #                                                                            'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
+    #                                                                            labelling_correction,
+    #                                                                            False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
+    #                                                                            i_bin_time = i_bin_time,
+    #                                                                            N_pop_array = None,
+    #                                                                            numeric_precision = self.numeric_precision,
+    #                                                                            mp_pool = mp_pool,
+    #                                                                            max_iter_inner = REG_MAX_ITER_INNER,
+    #                                                                            max_iter_outer = REG_MAX_ITER_OUTER,
+    #                                                                            max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+    #                                                                            use_avg_count_rate = use_avg_count_rate
+    #                                                                            )
             
-        else:
-            # Multiple numeric precision increments
-            if self.NLL_funcs_accurate:
-                # For early, lower-precision fits we also go to the fast least-squares approximation!
-                NLL_funcs_accurate = True
-                self.NLL_funcs_accurate = False
-            else:
-                # Leave a marker that we stick to least-squares approximation anyway
-                NLL_funcs_accurate = False
+    #     else:
+    #         # Multiple numeric precision increments
+    #         if self.NLL_funcs_accurate:
+    #             # For early, lower-precision fits we also go to the fast least-squares approximation!
+    #             NLL_funcs_accurate = True
+    #             self.NLL_funcs_accurate = False
+    #         else:
+    #             # Leave a marker that we stick to least-squares approximation anyway
+    #             NLL_funcs_accurate = False
                 
 
-            # we use incremental precision fitting
-            for i_inc, inc_precision in enumerate(self.numeric_precision):
+    #         # we use incremental precision fitting
+    #         for i_inc, inc_precision in enumerate(self.numeric_precision):
                 
-                if self.verbosity > 0:
-                    print(f'[{self.job_prefix}] Numeric precision increment {i_inc+1} of {self.numeric_precision.shape[0]}')
+    #             if self.verbosity > 0:
+    #                 print(f'[{self.job_prefix}] Numeric precision increment {i_inc+1} of {self.numeric_precision.shape[0]}')
                     
-                if i_inc == 0:
-                    N_pop_array = None
-                elif i_inc == self.numeric_precision.shape[0] - 1:
-                    # Last iteration: Switch from least-squares to MLE fitting now if needed
-                    self.NLL_funcs_accurate = NLL_funcs_accurate
+    #             if i_inc == 0:
+    #                 N_pop_array = None
+    #             elif i_inc == self.numeric_precision.shape[0] - 1:
+    #                 # Last iteration: Switch from least-squares to MLE fitting now if needed
+    #                 self.NLL_funcs_accurate = NLL_funcs_accurate
 
-                reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
-                                                                                   use_FCS,
-                                                                                   use_PCH,
-                                                                                   time_resolved_PCH,
-                                                                                   reg_spectrum_type,
-                                                                                   'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
-                                                                                   labelling_correction,
-                                                                                   False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-                                                                                   i_bin_time = i_bin_time,
-                                                                                   N_pop_array = N_pop_array,
-                                                                                   numeric_precision = inc_precision,
-                                                                                   mp_pool = mp_pool,
-                                                                                   max_iter_inner = REG_MAX_ITER_INNER,
-                                                                                   max_iter_outer = REG_MAX_ITER_OUTER,
-                                                                                   max_lagrange_mul = REG_MAX_LAGRANGE_MUL
-                                                                                   )
+    #             reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
+    #                                                                                use_FCS,
+    #                                                                                use_PCH,
+    #                                                                                time_resolved_PCH,
+    #                                                                                reg_spectrum_type,
+    #                                                                                'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
+    #                                                                                labelling_correction,
+    #                                                                                False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
+    #                                                                                i_bin_time = i_bin_time,
+    #                                                                                N_pop_array = N_pop_array,
+    #                                                                                numeric_precision = inc_precision,
+    #                                                                                mp_pool = mp_pool,
+    #                                                                                max_iter_inner = REG_MAX_ITER_INNER,
+    #                                                                                max_iter_outer = REG_MAX_ITER_OUTER,
+    #                                                                                max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
+    #                                                                                use_avg_count_rate = use_avg_count_rate
+    #                                                                                )
 
-                if i_inc < self.numeric_precision.shape[0] - 1:
-                    # At least one fit more to run, use output of previous fit as input for next round
-                    initial_params = reg_fit_result.params
+    #             if i_inc < self.numeric_precision.shape[0] - 1:
+    #                 # At least one fit more to run, use output of previous fit as input for next round
+    #                 initial_params = reg_fit_result.params
                     
             
             
-        #### Step 3: Recalculate parameterized spectrum from regularized spectrum fit result
+    #     #### Step 3: Recalculate parameterized spectrum from regularized spectrum fit result
         
-        # Get tau_diff_array and figure out which tau_diff to continue 
-        # using in parameterized-spectrum re-fit
-        # tau_diff_array = np.array([reg_fit_result.params[f'tau_diff_{i_spec}'].value for i_spec in range(N_pop_array.shape[0])]
-        tau_diff_array = self.tau__tau_diff_array[0,:]
-        remove_in_re_fit = tau_diff_array < par_tau_diff_min
+    #     # Get tau_diff_array and figure out which tau_diff to continue 
+    #     # using in parameterized-spectrum re-fit
+    #     # tau_diff_array = np.array([reg_fit_result.params[f'tau_diff_{i_spec}'].value for i_spec in range(N_pop_array.shape[0])]
+    #     tau_diff_array = self.tau__tau_diff_array[0,:]
+    #     remove_in_re_fit = tau_diff_array < par_tau_diff_min
         
-        initial_params = self.set_up_params_par(use_FCS, 
-                                                use_PCH, 
-                                                time_resolved_PCH,
-                                                par_spectrum_type,
-                                                par_spectrum_parameter, 
-                                                oligomer_type, 
-                                                True,  # incomplete_sampling_correction is hard-coded True in the par fitting step
-                                                labelling_correction, 
-                                                n_species,  # Actually gets overwritten here anyway
-                                                par_tau_diff_min, 
-                                                tau_diff_max, 
-                                                use_blinking,
-                                                reg_fit_result.params if (hasattr(reg_fit_result, 'params') and hasattr(reg_fit_result, 'covar')) else reg_fit_result,
-                                                N_pop_array,
-                                                remove_in_re_fit
-                                                ) 
+    #     initial_params = self.set_up_params_par(use_FCS, 
+    #                                             use_PCH, 
+    #                                             time_resolved_PCH,
+    #                                             par_spectrum_type,
+    #                                             par_spectrum_parameter, 
+    #                                             oligomer_type, 
+    #                                             True,  # incomplete_sampling_correction is hard-coded True in the par fitting step
+    #                                             labelling_correction, 
+    #                                             n_species,  # Actually gets overwritten here anyway
+    #                                             par_tau_diff_min, 
+    #                                             tau_diff_max, 
+    #                                             use_blinking,
+    #                                             previous_params = reg_fit_result.params if (hasattr(reg_fit_result, 'params') and hasattr(reg_fit_result, 'covar')) else reg_fit_result,
+    #                                             previous_N_obs_array = N_pop_array,
+    #                                             skip_species_mask = remove_in_re_fit,
+    #                                             use_avg_count_rate = use_avg_count_rate
+    #                                             ) 
         
         
-        #### Step 4: Re-fit parameterized model directly with highest numeric precision
+    #     #### Step 4: Re-fit parameterized model directly with highest numeric precision
         
-        par_fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
-                                        params = initial_params, 
-                                        method = 'nelder',
-                                        args = (use_FCS, 
-                                                use_PCH, 
-                                                time_resolved_PCH,
-                                                par_spectrum_type, 
-                                                par_spectrum_parameter,
-                                                labelling_correction, 
-                                                True # incomplete_sampling_correction is hard-coded True in the par fitting step
-                                                ),
-                                        kws = {'i_bin_time': i_bin_time,
-                                               'numeric_precision': self.numeric_precision[-1] if self.precision_incremental else self.numeric_precision,
-                                               'mp_pool': mp_pool},
-                                        calc_covar = True)
+    #     par_fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
+    #                                     params = initial_params, 
+    #                                     method = 'nelder',
+    #                                     args = (use_FCS, 
+    #                                             use_PCH, 
+    #                                             time_resolved_PCH,
+    #                                             par_spectrum_type, 
+    #                                             par_spectrum_parameter,
+    #                                             labelling_correction, 
+    #                                             True # incomplete_sampling_correction is hard-coded True in the par fitting step
+    #                                             ),
+    #                                     kws = {'i_bin_time': i_bin_time,
+    #                                            'numeric_precision': self.numeric_precision[-1] if self.precision_incremental else self.numeric_precision,
+    #                                            'mp_pool': mp_pool,
+    #                                            'use_avg_count_rate': use_avg_count_rate},
+    #                                     calc_covar = True)
 
-        return reg_fit_result, N_pop_array, par_fit_result
+    #     return reg_fit_result, N_pop_array, par_fit_result
     

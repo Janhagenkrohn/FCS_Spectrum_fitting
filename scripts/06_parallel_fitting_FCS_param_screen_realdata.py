@@ -39,570 +39,192 @@ in_file_names_FCS = []
 in_file_names_PCH = []
 alpha_label = []
 
-# glob_in_dir = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora'
-# glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/D044_MT200_Naora/'
-glob_in_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240731_FCS_Testdata_export'
+glob_in_dir = r'D:\temp\FCS_Spectrum_debug\Data'
 
 
 
+#%% 20240604 - A488-labelled ParM 
 
-
-
-
-
-# #%% 20240425 dataset 2 - QD565
-# # Should be good for incomplete sampling stuff
-# ''' Labelled protein fraction'''
-# _in_dir_names = []
-# _alpha_label = []
-
-# local_dir = os.path.join(glob_in_dir, '20240423_Test_data/Test_data.sptw')
-# _in_dir_names.extend([os.path.join(local_dir, 'QD565_50nM_power50')])
-# _alpha_label.append(1.)
-# _in_dir_names.extend([os.path.join(local_dir, 'QD565_50nM_power150')])
-# _alpha_label.append(1.)
-# _in_dir_names.extend([os.path.join(local_dir, 'QD565_US_50nM_power50')])
-# _alpha_label.append(1.)
-
-
-# # Naming pattern for detecting correct files within subdirs of each in_dir
-# # Change to channel 1!!!
-# file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
-# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
-
-
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# # Repeat for FCS
-# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-#                                                                                       file_name_pattern_FCS, 
-#                                                                                       _alpha_label,
-#                                                                                       '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                    in_file_names_FCS_tmp,
-#                                                                                                    alpha_label_FCS_tmp,
-#                                                                                                    in_dir_names_PCH_tmp,
-#                                                                                                    in_file_names_PCH_tmp,
-#                                                                                                    alpha_label_PCH_tmp)
-# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
-# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
-
-
-
-
-# #%% 20240521 dataset 1 - A488-labelled SUVs
-# _in_dir_names = []
-# _alpha_label = []
-
-# local_dir = os.path.join(glob_in_dir, '20240521_Test_data/20240521.sptw')
-# [_in_dir_names.extend([os.path.join(local_dir, f'SUVs1_{x}_labelling_1')]) for x in ['1e-4', '2e-5', '5e-4']]
-# [_alpha_label.append(x) for x in [1e-4, 2e-5, 5e-4]]
-
-# # Naming pattern for detecting correct files within subdirs of each in_dir
-# file_name_pattern_PCH = '*08_PCMH_ch0*' # Dual-channel PCH
-# file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*' # CCF
-
-
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# # Repeat for FCS
-# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-#                                                                                       file_name_pattern_FCS, 
-#                                                                                       _alpha_label,
-#                                                                                       '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                    in_file_names_FCS_tmp,
-#                                                                                                    alpha_label_FCS_tmp,
-#                                                                                                    in_dir_names_PCH_tmp,
-#                                                                                                    in_file_names_PCH_tmp,
-#                                                                                                    alpha_label_PCH_tmp)
-# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
-# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
-
-
-#%% 20240604 - A488-labelled dsDNA
-_in_dir_names = []
-_alpha_label = []
-
-local_dir = os.path.join(glob_in_dir, r'20240604_Test_data/20240604_data.sptw/')
-[_in_dir_names.extend([os.path.join(local_dir, f'Sample{x+1}_DNA{x}_only_1')]) for x in range(1, 8)]
-[_alpha_label.append(0.025) for x in range(1, 8)]
-_in_dir_names.extend([os.path.join(local_dir, 'Sample9_DNAs17_1')])
-_alpha_label.append(0.025)
-_in_dir_names.extend([os.path.join(local_dir, 'Sample10_DNAs157_1')])
-_alpha_label.append(0.025)
-_in_dir_names.extend([os.path.join(local_dir, 'Sample11_DNAs1234567_1')])
-_alpha_label.append(0.025)
-
-# Naming pattern for detecting correct files within subdirs of each in_dir
-# Wohland SD
-file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-# We do not use PCH right now
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# Repeat for FCS
-in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-                                                                                      file_name_pattern_FCS, 
-                                                                                      _alpha_label,
-                                                                                      '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-
-[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-
-#%% 20240604 - A488-labelled ssDNA
-_in_dir_names = []
-_alpha_label = []
-
-local_dir = os.path.join(glob_in_dir, '20240627_ssDNA_ssRNA_samples/TestData.sptw')
-[_in_dir_names.extend([os.path.join(local_dir, f'ssDNA{x}_1in50_1')]) for x in range(1, 8)]
-[_alpha_label.append(0.025) for x in range(1, 8)]
-[_in_dir_names.extend([os.path.join(local_dir, f'ssDNAmix_125_{4//x}-4-{4*x}_1')]) for x in [1, 2, 4]]
-[_alpha_label.append(0.025) for x in [1, 2, 4]]
-
-# Naming pattern for detecting correct files within subdirs of each in_dir
-# Wohland SD
-file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-
-# We do not use PCH right now
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# Repeat for FCS
-in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-                                                                                      file_name_pattern_FCS, 
-                                                                                      _alpha_label,
-                                                                                      '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-
-[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-#%% 20240604 - A488-labelled ssRNA
-_in_dir_names = []
-_alpha_label = []
-
-local_dir = os.path.join(glob_in_dir, '20240627_ssDNA_ssRNA_samples/TestData.sptw')
-[_in_dir_names.extend([os.path.join(local_dir, f'0628_ssRNA{x}_1in50_1')]) for x in range(1, 9)]
-[_alpha_label.append(0.025) for x in range(1, 9)]
-
-# Naming pattern for detecting correct files within subdirs of each in_dir
-# Wohland SD
-file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-
-# We do not use PCH right now
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# Repeat for FCS
-in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-                                                                                      file_name_pattern_FCS, 
-                                                                                      _alpha_label,
-                                                                                      '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-
-[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-
-#%% 20240730 - A488-labelled ssRNA LADDERS - day 1
-_in_dir_names = []
-_alpha_label = []
-
-local_dir = os.path.join(glob_in_dir, '20240730_JHK_ssRNA_ladder_run1/20240730_data.sptw')
-[_in_dir_names.extend([os.path.join(local_dir, f'ssRNA_ladder_lim_{x}uM_1')]) for x in [20, 50]]
-[_in_dir_names.extend([os.path.join(local_dir, f'ssRNA_ladder_RCT_{x}uM_1')]) for x in [20, 50]]
-[_alpha_label.append(0.025) for x in range(4)]
-
-# Naming pattern for detecting correct files within subdirs of each in_dir
-# Wohland SD
-file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-
-# We do not use PCH right now
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# Repeat for FCS
-in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-                                                                                      file_name_pattern_FCS, 
-                                                                                      _alpha_label,
-                                                                                      '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-
-[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-#%% 20240801 - A488-labelled ssRNA LADDERS - day 2
-_in_dir_names = []
-_alpha_label = []
-
-local_dir = os.path.join(glob_in_dir, '20240801_JHK_ssRNA_ladder_run2/20240801_data.sptw')
-[_in_dir_names.extend([os.path.join(local_dir, f'ssRNA_ladder_lim_{x}uM_1')]) for x in [100, 200]]
-[_alpha_label.append(0.025) for x in [100, 200]]
-
-# Naming pattern for detecting correct files within subdirs of each in_dir
-# Wohland SD
-file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-
-# We do not use PCH right now
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# Repeat for FCS
-in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-                                                                                      file_name_pattern_FCS, 
-                                                                                      _alpha_label,
-                                                                                      '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-
-[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-
-
-# #%% 20240801 - Series of AF488 measurements exported with varying duration
-# _in_dir_names = []
-# _alpha_label = []
-
-# local_dir = os.path.join(glob_in_dir, '20240801_JHK_ssRNA_ladder_run2/20240801_data.sptw')
-# _in_dir_names.extend(os.path.join(local_dir, f'AF488_long_1'))
-# _alpha_label.append(1)
-
-# # Naming pattern for detecting correct files within subdirs of each in_dir
-# # Wohland SD
-# file_name_pattern_FCS = '*_ACF_ch0_bg*' 
-
-
-# # We do not use PCH right now
-# # # Detect PCH files
-# # in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-# #                                                                                       file_name_pattern_PCH, 
-# #                                                                                       _alpha_label, 
-# #                                                                                       '')
-
-# # Repeat for FCS
-# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-#                                                                                       file_name_pattern_FCS, 
-#                                                                                       _alpha_label,
-#                                                                                       '')
-
-# # _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-# #                                                                                                     in_file_names_FCS_tmp,
-# #                                                                                                     alpha_label_FCS_tmp,
-# #                                                                                                     in_dir_names_PCH_tmp,
-# #                                                                                                     in_file_names_PCH_tmp,
-# #                                                                                                     alpha_label_PCH_tmp)
-
-# [in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
-# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
-# # [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-# [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
-
-
-
-
-
-# #%% 20240604 - A488-labelled ParM
+####### NO BURST REMOVAL #########
 # SHould be good for incomplete-sampling stuff
-# ''' Labelled protein fraction'''
-# _in_dir_names = []
-# _alpha_label = []
+''' Labelled protein fraction'''
+_in_dir_names = []
+_alpha_label = []
+local_dir = os.path.join(glob_in_dir, r'ssRNA_ladder_RCT_50uM_1_T0s_1_20240826_1203')
+# local_dir = os.path.join(glob_in_dir, r'_4s_0_AF488_long_1_T0s_120240826_1234')
+_in_dir_names.extend([os.path.join(local_dir)])
+_alpha_label.append(0.025)
+# [ _in_dir_names.extend([os.path.join(local_dir, f'20240808_more_ssRNA/20240808_data.sptw/ssRNA_IVT{x}_1')]) for x in [*range(1,9), 'mix']]
+# [_alpha_label.append(5E-3) for x in [*range(1,9), 'mix']]
 
-# local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data/20240416_data.sptw')
-# _in_dir_names.extend([os.path.join(local_dir, '10uM_ParM_noATP_1')])
-# _alpha_label.append(0.005) 
-# [ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3]]
-# [_alpha_label.append(x) for x in [1e-2, 1e-2, 1e-5]]
-# [ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
-# [_alpha_label.append(x) for x in [5e-3, 1e-3, 2.5e-2, 5e-3, 5e-3]]
-
-# # Naming pattern for detecting correct files within subdirs of each in_dir
-# # Wohland SD, no burst removal
-# # file_name_pattern_PCH = '*08_PCMH_ch0*' 
-# # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*'
-# # # # Bootstrap SD, no burst removal
-# # file_name_pattern_PCH = '*07_PCMH_ch0*' 
-# # file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
-# # # Bootstrap SD, with burst removal
-# # file_name_pattern_PCH = '*09_PCMH_ch0_br*' 
-# # file_name_pattern_FCS = '*08_ACF_ch0_br_dt_bg*'
-# # # Bootstrap SD, no burst removal, long lag times
-# file_name_pattern_PCH = '*05_PCMH_ch0*' 
-# file_name_pattern_FCS = '*04_ACF_ch0_bg*'
-# # # # Bootstrap SD, with burst removal, long lag times
-# # file_name_pattern_PCH = '*07_PCMH_ch0_br*' 
-# # file_name_pattern_FCS = '*06_ACF_ch0_br_bg*'
-
-
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# # Repeat for FCS
-# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-#                                                                                       file_name_pattern_FCS, 
-#                                                                                       _alpha_label,
-#                                                                                       '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
-# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
-
-
-# _in_dir_names = []
-# _alpha_label = []
-
-# local_dir = os.path.join(glob_in_dir, r'20240416_JHK_NK_New_ParM_data/20240416_data.sptw')
-# _in_dir_names.extend([os.path.join(local_dir, '10uM_ParM_noATP_1')])
-# _alpha_label.append(0.005) 
-# [ _in_dir_names.extend([os.path.join(local_dir, f'5uM_ParM_{x}')]) for x in [1, 2, 3]]
-# [_alpha_label.append(x) for x in [1e-2, 1e-2, 1e-5]]
-# [ _in_dir_names.extend([os.path.join(local_dir, f'10uM_ParM_{x}')]) for x in [1, 2, 3, 4, 5]]
-# [_alpha_label.append(x) for x in [5e-3, 1e-3, 2.5e-2, 5e-3, 5e-3]]
-
-# # Naming pattern for detecting correct files within subdirs of each in_dir
-# # Wohland SD, no burst removal
-# # file_name_pattern_PCH = '*08_PCMH_ch0*' 
-# # file_name_pattern_FCS = '*07_ACF_ch0_dt_bg*'
-# # # # Bootstrap SD, no burst removal
-# # file_name_pattern_PCH = '*07_PCMH_ch0*' 
-# # file_name_pattern_FCS = '*06_ACF_ch0_dt_bg*'
-# # # Bootstrap SD, with burst removal
-# # file_name_pattern_PCH = '*09_PCMH_ch0_br*' 
-# # file_name_pattern_FCS = '*08_ACF_ch0_br_dt_bg*'
-# # # # Bootstrap SD, no burst removal, long lag times
-# # file_name_pattern_PCH = '*05_PCMH_ch0*' 
-# # file_name_pattern_FCS = '*04_ACF_ch0_bg*'
-# # # Bootstrap SD, with burst removal, long lag times
-# file_name_pattern_PCH = '*07_PCMH_ch0_br*' 
-# file_name_pattern_FCS = '*06_ACF_ch0_br_bg*'
-
-
-# # Detect PCH files
-# in_dir_names_PCH_tmp, in_file_names_PCH_tmp, alpha_label_PCH_tmp = utils.detect_files(_in_dir_names,
-#                                                                                       file_name_pattern_PCH, 
-#                                                                                       _alpha_label, 
-#                                                                                       '')
-
-# # Repeat for FCS
-# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
-#                                                                                       file_name_pattern_FCS, 
-#                                                                                       _alpha_label,
-#                                                                                       '')
-
-# _in_dir_names, _in_file_names_FCS, _in_file_names_PCH, _alpha_label = utils.link_FCS_and_PCH_files(in_dir_names_FCS_tmp,
-#                                                                                                     in_file_names_FCS_tmp,
-#                                                                                                     alpha_label_FCS_tmp,
-#                                                                                                     in_dir_names_PCH_tmp,
-#                                                                                                     in_file_names_PCH_tmp,
-#                                                                                                     alpha_label_PCH_tmp)
-# [in_dir_names.append(in_dir_name) for in_dir_name in _in_dir_names]
-# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in _in_file_names_FCS]
-# [in_file_names_PCH.append(in_file_name_PCH) for in_file_name_PCH in _in_file_names_PCH]
-# [alpha_label.append(single_alpha_label) for single_alpha_label in _alpha_label]
+# Naming pattern for detecting correct files within subdirs of each in_dir
+# # Bootstrap SD, no burst removal
+file_name_pattern_FCS = '*04_ACF_ch0_bg*'
 
 
 
+# Repeat for FCS
+in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+                                                                                      file_name_pattern_FCS, 
+                                                                                      _alpha_label,
+                                                                                      '')
 
+# Workaround as we skip PCH
+[in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
+[in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
+[alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
-# #%% Fit settings
-
-# ############ Config for fitting protein filaments
-# # Output dir for result file writing
-# glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits/ParM_strExp_fits'
-
-# ### General model settings
-
-# labelling_correction_list = [True]
-# incomplete_sampling_correction_list = [False, True]
-# labelling_efficiency_incomp_sampling_list = [False] 
-
-
-# n_species_list = [80]
-# spectrum_type_list = ['par_StrExp'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-# spectrum_parameter_list = ['N_monomers'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-# oligomer_type_list = ['single_filament'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
-
-# use_blinking_list = [False]
-
-# # Shortest and longest diffusion time to fit (parameter bounds)
-# tau_diff_min_list = [2.1E-4]
-# tau_diff_max_list = [1E1]
-
-
-# ### FCS settings
-# use_FCS_list = [True]
-
-# # Shortest and longest lag time to consider in fit (time axis clipping)
-# FCS_min_lag_time_list = [1E-5] # Use 0. to use full range of data in .csv file
-# FCS_max_lag_time_list = [3E0]  # Use np.inf to use full range of data in .csv file
-
-
-# ### PCH settings
-# use_PCH_list = [False]
-# time_resolved_PCH_list = [False]
-
-# # Shortest and longest bin times to consider
-# PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
-# PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
-
-# # Calculation settings
-# NLL_funcs_accurate_list = [True] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
-# numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
-
-
-
-############ Config for Amplitude fitting
 # Output dir for result file writing
-glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits/XNA_par_amp_fits'
-# glob_out_dir = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240702_ssXNA_discrete_fits/AF488_par_amp_fits'
+glob_out_dir = r'D:\temp\FCS_Spectrum_debug\12_ACR_constraint_spectrum'
 
-### General model settings
 
-labelling_correction_list = [False]
-incomplete_sampling_correction_list = [False]
+
+
+#%% Fit settings
+# All "..._list" settings are handled such that the software will iterate over 
+# the elements of all lists and runs fits with attempt fits with all parameter
+# combinations. NOT ALL COMBINATIONS WORK! Some combinations are hard-coded 
+# excluded and will be skipped, others may crash. It should be easy to 
+# see that there are simply too many combinations for me to debug every one of 
+# them systematically.
+
+###### General model settings
+
+labelling_correction_list = [True] 
+    # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
+    
+incomplete_sampling_correction_list = [False] 
+    # Whether to fit deviations between "population-level" and "observation-level"
+    # dynamics, i.e., explicit treatment of an additional layer of noise
+    
 labelling_efficiency_incomp_sampling_list = [False] 
+    # Addition to combined incomplete sampling correction and labelling correction 
+    # that also considers noise in observed vs. population-level labelled fractions 
+    # for each oligomer species. CAVE: Computationally very expensive!
+    
+fit_label_efficiency_list = [False] 
+    # If you consider finite labelling fraction, here you can also decide to 
+    # make that a fit parameter, although that may be numerically extremely instable
 
-n_species_list = [80]
-spectrum_type_list = ['par_Gauss', 'par_LogNorm', 'par_Gamma'] # 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-spectrum_parameter_list = ['Amplitude'] # 'Amplitude', 'N_monomers', 'N_oligomers',
-oligomer_type_list = ['naive'] # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
-
+use_avg_count_rate_list = [True]
+    # Use average count rate to constrain fit? Allows more meaningful estimation 
+    # of molecular brightness. Also helps constrain mixture models of e.g. an
+    # oligomer spectrum and a free-dye species
+    
 use_blinking_list = [False]
+    # Whether to consider blinking in the particle dynamics
 
-# Shortest and longest diffusion time to fit (parameter bounds)
-tau_diff_min_list = [1E-6] 
+n_species_list = [70]
+    # How many species to consider
+    
+tau_diff_min_list = [2E-5]
+    # Shortest diffusion time to fit (parameter bounds)
+    # For spectrum models, tau_diff_min is also considered the monomer diffusion time!
+    
 tau_diff_max_list = [1E0]
+    # Longest diffusion time to fit (parameter bounds)
+    
+spectrum_type_list = ['par_LogNorm'] 
+    # Options: 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+    # 'discrete' is traditional FCS mixutre model fitting, using few constraints. 
+    #   -> Not recommended for more than 1-2 species.
+    # 'reg' variants are statistically regularized fits with "CONTIN" or maximum entropy constraints.
+    #   -> The fit will attempt to automatically optimize the regularization strength.
+    # 'par' models use simple model functions to parameterize the oligomer concentration spectrum shape
+    
+spectrum_parameter_list = ['N_monomers'] 
+    # On which parameter to define regularized or parameterized models
+    # Options: 'Amplitude', 'N_monomers', 'N_oligomers'
+    
+oligomer_type_list = ['spherical_shell'] 
+    # Choice of oligomer type (basically which polymer-physics-based approximation to use in calculation)
+    # Options: 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+    # use 'naive' for discrete-species fitting, and can also be used for Amplitude spectra
+    # For monomer N or oligomer N spectrum fitting, you should use a meaningful
+    # physics model to fix a relation between diffusion time and stoichiometry
 
-### FCS settings
-use_FCS_list = [True]
-
-# Shortest and longest lag time to consider in fit (time axis clipping)
-FCS_min_lag_time_list = [1E-6] # Use 0. to use full range of data in .csv file
-FCS_max_lag_time_list = [np.inf]  # Use np.inf to use full range of data in .csv file
 
 
-### PCH settings
+###### FCS settings
+
+use_FCS_list = [False]
+    # Whether to use correlation function data at all
+
+FCS_min_lag_time_list = [1E-6] 
+    # Shortest lag time to consider in fit (time axis clipping)
+    # Specify 0. to use full range of data in .csv file
+    
+FCS_max_lag_time_list = [1E0] 
+    # Longest lag time to consider in fit (time axis clipping)
+    # Specify np.inf to use full range of data in .csv file
+
+
+
+###### PCH settings
 use_PCH_list = [False]
+    # Whether to use photon counting histogram data
+    # CAVE: Get computationally prohibitively expensive for many species
+    # or with labelling correction 
+    
 time_resolved_PCH_list = [False]
+    # Whether to use photon counting MULTIPLE histograms
+    # If false, by default only the PCH with the shortest bin time contained 
+    # in the data will be used. FCS_Spectrum.run_fit() has a handle to specify 
+    # the index of the desired PCH in case you want to use one single specific 
+    # one: i_bin_time (not used in this script currently)
+    
+PCH_min_bin_time_list = [0.] 
+    # Shortest PCMH bin times to consider
+    # Specify 0. to use full range of data in .csv file
+    
+PCH_max_bin_time_list = [5E-4]
+    # Longest PCMH bin times to consider
+    # Specify np.inf to use full range of data in .csv file
 
-# Shortest and longest bin times to consider
-PCH_min_bin_time_list = [0.] # Use 0. to use full range of data in .csv file
-PCH_max_bin_time_list = [5E-4] # Use np.inf to use full range of data in .csv file
-
-# Calculation settings
-NLL_funcs_accurate_list = [False] # Accurate MLE or faster least-squares approximation (affects some, not all, likelihood terms)?
-numeric_precision_list = [np.array([1E-3, 1E-4, 1E-5])] # PCH requires numerical precision cutoff, which is set here
 
 
-#%% Metadata/calibration data/settings that are global for all measurements
-verbosity = 1 # How much do you want the software to talk?
-FCS_psf_width_nm = 210. # Roughly
-FCS_psf_aspect_ratio = 6. # Roughly
+###### Metadata/calibration data/settings (global for all fits in batch)
 
-acquisition_time_s = 90.
+NLL_funcs_accurate = True
+    # Accurate maximum-likelihood evaluation, or use faster least-squares 
+    # approximation? Affects most likelihood terms except the chi-square 
+    # minimization on the ACF correlation function
+    
+numeric_precision = np.array([1E-3, 1E-4, 1E-5])
+    # PCH requires a numerical precision cutoff, which is set here. The lower 
+    # the number, the more accurate but computationally expensive the 
+    # evaluation. You can specify a single number, then it's trivial, or an 
+    # array, in which case the model is first evaluated with low accuracy and 
+    # precision is then incrementally increased according to the steps you specified.
+    
+two_step_fit = False
+    # For some model configuration, you can first run a simpler, more robust, 
+    # version of the fit with some parameters fixed, and then re-fit with the 
+    # "full" model complexity
 
-PCH_Q = 10. # More calculation parameter than metadata, but whatever
+verbosity = 1 
+    # How much do you want the software to talk?
 
-# How many parallel processes?
-# If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
-# If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
-mp_processes = os.cpu_count()
-# mp_processes = 1  # no multiprocessing
+FCS_psf_width_nm = np.mean([210])
+    # FCS calibration of PSF width in xy (w_0: 1/e^2 radius), although it is 
+    # actually not used for anything meaningful currently
 
+FCS_psf_aspect_ratio = np.mean([6])
+    # FCS calibration of PSF aspect ratio (w_z/w_0), also used for PCMH
+
+PCH_Q = 10. 
+    # Evaluation parameter for PCH
+
+# mp_processes = os.cpu_count() // 2
+mp_processes = 1  # no multiprocessing
+    # How many parallel processes?
+    # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
+    # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
+
+suppress_mp = True
+    # More for debugging purposes: Forces the software to run entirely without multiprocessing
+    
 #%% Wrap all permutations for different fit settings and all files...Long list!
-
-
 # Iterate over all settings and files
 list_of_parameter_tuples = []
 fit_counter = 1
@@ -614,19 +236,19 @@ for use_FCS in use_FCS_list:
                 for PCH_min_bin_time in PCH_min_bin_time_list:
                     for PCH_max_bin_time in PCH_max_bin_time_list:
                         for time_resolved_PCH in time_resolved_PCH_list:
-                            for NLL_funcs_accurate in NLL_funcs_accurate_list:
-                                for n_species in n_species_list:
-                                    for tau_diff_min in tau_diff_min_list:
-                                        for tau_diff_max in tau_diff_max_list:
-                                            for use_blinking in use_blinking_list:
-                                                for spectrum_type in spectrum_type_list:
-                                                    for spectrum_parameter in spectrum_parameter_list:
-                                                        for oligomer_type in oligomer_type_list:
-                                                            for labelling_correction in labelling_correction_list:
-                                                                for incomplete_sampling_correction in incomplete_sampling_correction_list:
-                                                                    for labelling_efficiency_incomp_sampling in labelling_efficiency_incomp_sampling_list:
-                                                                        for numeric_precision in numeric_precision_list:
-                                                                            
+                            for n_species in n_species_list:
+                                for tau_diff_min in tau_diff_min_list:
+                                    for tau_diff_max in tau_diff_max_list:
+                                        for use_blinking in use_blinking_list:
+                                            for spectrum_type in spectrum_type_list:
+                                                for spectrum_parameter in spectrum_parameter_list:
+                                                    for oligomer_type in oligomer_type_list:
+                                                        for labelling_correction in labelling_correction_list:
+                                                            for incomplete_sampling_correction in incomplete_sampling_correction_list:
+                                                                for labelling_efficiency_incomp_sampling in labelling_efficiency_incomp_sampling_list:
+                                                                    for use_avg_count_rate in use_avg_count_rate_list:
+                                                                        for fit_label_efficiency in fit_label_efficiency_list:
+                                                                
                                                                             # a number of sanity-checks to make sure we do not waste time planning fits that cannot work:
                                                                             if (type(use_FCS) == bool and
                                                                                 FCS_min_lag_time >= 0 and
@@ -635,7 +257,6 @@ for use_FCS in use_FCS_list:
                                                                                 PCH_min_bin_time >= 0 and
                                                                                 PCH_max_bin_time >= PCH_min_bin_time and
                                                                                 type(time_resolved_PCH) == bool and
-                                                                                type(NLL_funcs_accurate) == bool and
                                                                                 utils.isint(n_species) and n_species > 0 and
                                                                                 tau_diff_min > 0 and
                                                                                 tau_diff_max >= tau_diff_min and
@@ -650,12 +271,8 @@ for use_FCS in use_FCS_list:
                                                                                 ((not labelling_efficiency_incomp_sampling) or (labelling_efficiency_incomp_sampling and incomplete_sampling_correction and labelling_correction)) and
                                                                                 (incomplete_sampling_correction == False and spectrum_type == 'discrete' or
                                                                                   spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
-                                                                                ((utils.isfloat(numeric_precision) and 
-                                                                                      numeric_precision < 1. and 
-                                                                                      numeric_precision > 0.) or
-                                                                                  (utils.isiterable(numeric_precision) and 
-                                                                                      np.all(numeric_precision < 1.) and 
-                                                                                      np.all(numeric_precision > 0.)))
+                                                                                type(use_avg_count_rate) == bool and
+                                                                                type(fit_label_efficiency) == bool
                                                                                 ):
                                                                             
                                                                                 fit_settings_str = f'{spectrum_type}_{n_species}spec'
@@ -676,127 +293,134 @@ for use_FCS in use_FCS_list:
                                                                                     
                                                                                     fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
                                                                                     
-                                                                                    parameter_tuple = (fit_counter,
+                                                                                    parameter_tuple = (fit_res_table_path,
+                                                                                                       fit_counter,
                                                                                                        i_file,
                                                                                                        job_prefix,
-                                                                                                        save_path,
-                                                                                                        fit_res_table_path,
-                                                                                                        dir_name,
-                                                                                                        in_file_names_FCS[i_file],
-                                                                                                        in_file_names_PCH[i_file] if len(in_file_names_PCH) > 0 else '',
-                                                                                                        use_FCS,
-                                                                                                        FCS_min_lag_time,
-                                                                                                        FCS_max_lag_time,
-                                                                                                        FCS_psf_width_nm,
-                                                                                                        FCS_psf_aspect_ratio,
-                                                                                                        use_PCH,
-                                                                                                        PCH_min_bin_time,
-                                                                                                        PCH_max_bin_time,
-                                                                                                        PCH_Q,
-                                                                                                        NLL_funcs_accurate,
-                                                                                                        time_resolved_PCH,
-                                                                                                        n_species,
-                                                                                                        tau_diff_min,
-                                                                                                        tau_diff_max,
-                                                                                                        use_blinking,
-                                                                                                        spectrum_type,
-                                                                                                        spectrum_parameter,
-                                                                                                        oligomer_type,
-                                                                                                        alpha_label[i_file],
-                                                                                                        labelling_correction,
-                                                                                                        incomplete_sampling_correction,
-                                                                                                        labelling_efficiency_incomp_sampling,
-                                                                                                        numeric_precision,
-                                                                                                        verbosity)
+                                                                                                       save_path,
+                                                                                                       dir_name,
+                                                                                                       in_file_names_FCS[i_file],
+                                                                                                       in_file_names_PCH[i_file] if len(in_file_names_PCH) > 0 else '',
+                                                                                                       use_FCS,
+                                                                                                       FCS_min_lag_time,
+                                                                                                       FCS_max_lag_time,
+                                                                                                       FCS_psf_width_nm,
+                                                                                                       FCS_psf_aspect_ratio,
+                                                                                                       use_PCH,
+                                                                                                       PCH_min_bin_time,
+                                                                                                       PCH_max_bin_time,
+                                                                                                       PCH_Q,
+                                                                                                       time_resolved_PCH,
+                                                                                                       n_species,
+                                                                                                       tau_diff_min,
+                                                                                                       tau_diff_max,
+                                                                                                       use_blinking,
+                                                                                                       spectrum_type,
+                                                                                                       spectrum_parameter,
+                                                                                                       oligomer_type,
+                                                                                                       alpha_label[i_file],
+                                                                                                       labelling_correction,
+                                                                                                       incomplete_sampling_correction,
+                                                                                                       labelling_efficiency_incomp_sampling,
+                                                                                                       NLL_funcs_accurate,
+                                                                                                       use_avg_count_rate,
+                                                                                                       fit_label_efficiency,
+                                                                                                       numeric_precision,
+                                                                                                       two_step_fit,
+                                                                                                       verbosity,
+                                                                                                       mp_processes <= 1 and not suppress_mp)
                                                                                     list_of_parameter_tuples.extend((parameter_tuple,))
                                                                                     fit_counter += 1
                                                                             
                                                                             
                                                                             
-#%% Parallel processing function definition
-
-
-def fitting_parfunc(fit_number,
-                    i_file,
-                    job_prefix,
-                    save_path,
-                    fit_res_table_path,
-                    dir_name,
-                    in_file_name_FCS,
-                    in_file_name_PCH,
-                    use_FCS,
-                    FCS_min_lag_time,
-                    FCS_max_lag_time,
-                    FCS_psf_width_nm,
-                    FCS_psf_aspect_ratio,
-                    use_PCH,
-                    PCH_min_bin_time,
-                    PCH_max_bin_time,
-                    PCH_Q,
-                    PCH_fitting_accurate,
-                    time_resolved_PCH,
-                    n_species,
-                    tau_diff_min,
-                    tau_diff_max,
-                    use_blinking,
-                    spectrum_type,
-                    spectrum_parameter,
-                    oligomer_type,
-                    labelling_efficiency,
-                    labelling_correction,
-                    incomplete_sampling_correction,
-                    labelling_efficiency_incomp_sampling,
-                    numeric_precision,
-                    verbosity,
-                    ):
-    
+#%% Parallel execution function...
+def par_func(fit_res_table_path,
+             fit_number,
+             i_file,
+             job_prefix,
+             save_path,
+             dir_name,
+             in_file_name_FCS,
+             in_file_name_PCH,
+             use_FCS,
+             FCS_min_lag_time,
+             FCS_max_lag_time,
+             FCS_psf_width_nm,
+             FCS_psf_aspect_ratio,
+             use_PCH,
+             PCH_min_bin_time,
+             PCH_max_bin_time,
+             PCH_Q,
+             time_resolved_PCH,
+             n_species_target,
+             tau_diff_min,
+             tau_diff_max,
+             use_blinking,
+             spectrum_type,
+             spectrum_parameter,
+             oligomer_type,
+             labelling_efficiency,
+             labelling_correction,
+             incomplete_sampling_correction,
+             labelling_efficiency_incomp_sampling,
+             NLL_funcs_accurate,
+             use_avg_count_rate,
+             fit_label_efficiency,
+             numeric_precision,
+             two_step_fit,
+             verbosity,
+             use_parallel):
     
     # Command line message
-    time_tag = datetime.datetime.now()
-    message = f'[{job_prefix}] [{fit_number}] Fitting '
-    message += in_file_name_FCS if use_FCS else ''
-    message += ' and ' if (use_FCS and use_PCH) else ''
-    message += in_file_name_PCH if use_PCH else ''
-    message += ' globally:' if (use_FCS and use_PCH) else ''
-    print('\n' + time_tag.strftime("%Y-%m-%d %H:%M:%S") + '\n' + message)
+    if verbosity >= 1:
+        time_tag = datetime.datetime.now()
+        message = f'[{job_prefix}] [{fit_number}] Fitting '
+        message += in_file_name_FCS if use_FCS else ''
+        message += ' and ' if (use_FCS and use_PCH) else ''
+        message += in_file_name_PCH if use_PCH else ''
+        message += ' globally:' if (use_FCS and use_PCH) else ''
+        print('\n' + time_tag.strftime("%Y-%m-%d %H:%M:%S") + '\n' + message)
     
     try:
-        try:
-            data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
-                                                                                                                      in_file_name_FCS,
-                                                                                                                      FCS_min_lag_time,
-                                                                                                                      FCS_max_lag_time)
-            if use_PCH:
-                data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
-                                                                    in_file_name_PCH,
-                                                                    PCH_min_bin_time,
-                                                                    PCH_max_bin_time)
-        except:
+        data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
+                                                                                                                 in_file_name_FCS,
+                                                                                                                 FCS_min_lag_time,
+                                                                                                                 FCS_max_lag_time)
+        if use_PCH:
+            data_PCH_bin_times, data_PCH_hist = utils.read_PCMH(dir_name,
+                                                                in_file_name_PCH,
+                                                                PCH_min_bin_time,
+                                                                PCH_max_bin_time)
+    except:
+        if verbosity >= 1:
             message = f'[{job_prefix}] [{fit_number}] Error in data loading for '
             message += in_file_name_FCS if use_FCS else ''
             message += ' and ' if (use_FCS and use_PCH) else ''
             message += in_file_name_PCH if use_PCH else ''
             message += ' - aborting.'
             print('\n' + time_tag.strftime("%Y-%m-%d %H:%M:%S") + '\n' + message)
-            return None # Dummy return to terminate function call
+        return None # Dummy return to terminate function call
             
-        fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
-                                      FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
-                                      PCH_Q = PCH_Q,
-                                      acquisition_time_s = acquisition_time_s, 
-                                      data_FCS_tau_s = data_FCS_tau_s if use_FCS else None,
-                                      data_FCS_G = data_FCS_G if use_FCS else None,
-                                      data_FCS_sigma = data_FCS_sigma if use_FCS else None,
-                                      data_PCH_bin_times = data_PCH_bin_times if use_PCH else None,
-                                      data_PCH_hist = data_PCH_hist if use_PCH else None,
-                                      labelling_efficiency = labelling_efficiency,
-                                      numeric_precision = numeric_precision,
-                                      NLL_funcs_accurate = NLL_funcs_accurate,
-                                      verbosity = verbosity,
-                                      job_prefix = job_prefix,
-                                      labelling_efficiency_incomp_sampling = labelling_efficiency_incomp_sampling
-                                      )
-        
+   
+    fitter = fitting.FCS_spectrum(FCS_psf_width_nm = FCS_psf_width_nm,
+                                  FCS_psf_aspect_ratio = FCS_psf_aspect_ratio,
+                                  PCH_Q = PCH_Q,
+                                  acquisition_time_s = acquisition_time_s, 
+                                  data_FCS_tau_s = data_FCS_tau_s if use_FCS else None,
+                                  data_FCS_G = data_FCS_G if use_FCS else None,
+                                  data_FCS_sigma = data_FCS_sigma if use_FCS else None,
+                                  data_PCH_bin_times = data_PCH_bin_times if use_PCH else None,
+                                  data_PCH_hist = data_PCH_hist if use_PCH else None,
+                                  data_avg_count_rate = avg_count_rate,
+                                  labelling_efficiency = labelling_efficiency,
+                                  numeric_precision = numeric_precision,
+                                  NLL_funcs_accurate = NLL_funcs_accurate,
+                                  verbosity = verbosity,
+                                  job_prefix = job_prefix,
+                                  labelling_efficiency_incomp_sampling = labelling_efficiency_incomp_sampling
+                                  )
+    try:
         if spectrum_type in ['discrete', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             fit_result = fitter.run_fit(use_FCS = use_FCS, # bool
                                         use_PCH = use_PCH, # bool
@@ -806,14 +430,20 @@ def fitting_parfunc(fit_number,
                                         oligomer_type = oligomer_type, # 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
                                         labelling_correction = labelling_correction, # bool
                                         incomplete_sampling_correction = incomplete_sampling_correction, # bool
-                                        n_species = n_species, # int
+                                        n_species = n_species_target, # int
                                         tau_diff_min = tau_diff_min, # float
                                         tau_diff_max = tau_diff_max, # float
                                         use_blinking = use_blinking, # bool
-                                        two_step_fit = True, # bool
-                                        use_parallel = mp_processes <= 1 # Bool
-                                        # use_parallel = False # Bool
+                                        use_avg_count_rate = use_avg_count_rate, # Bool
+                                        fit_label_efficiency = fit_label_efficiency, # Bool
+                                        two_step_fit = two_step_fit, # bool
+                                        use_parallel = use_parallel, # Bool
                                         )
+            
+                        
+            # Dummies
+            N_pop_array = np.array([])
+            lagrange_mul = np.inf # Is defined such that high lagrange_mul means weak/no regularization
             
         else: # spectrum_type in ['reg_MEM', 'reg_CONTIN']
             # Here we get more complex output
@@ -825,882 +455,63 @@ def fitting_parfunc(fit_number,
                                                                     oligomer_type = oligomer_type, #  'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
                                                                     labelling_correction = labelling_correction, # bool
                                                                     incomplete_sampling_correction = incomplete_sampling_correction, # bool
-                                                                    n_species = n_species, # int
+                                                                    n_species = n_species_target, # int
                                                                     tau_diff_min = tau_diff_min, # float
                                                                     tau_diff_max = tau_diff_max, # float
                                                                     use_blinking = use_blinking, # bool
-                                                                    use_parallel = mp_processes <= 1 # Bool
-                                                                    # use_parallel = False # Bool
+                                                                    use_avg_count_rate = use_avg_count_rate, # Bool
+                                                                    fit_label_efficiency = fit_label_efficiency, # Bool
+                                                                    two_step_fit = two_step_fit, # bool
+                                                                    use_parallel = use_parallel # Bool
                                                                     )
             
-        
-        if not fit_result == None:
-            if hasattr(fit_result, 'params') and hasattr(fit_result, 'covar'): 
-                # dirty workaround for essentially testing "if type(fit_result) == lmfit.MinimizerResult", as MinimizerResult class cannot be explicitly referenced
-                # Unpack fit result
-                fit_params = fit_result.params
-                covar = fit_result.covar
-                # Recalculate number of species, it is possible we lose some in between
-                n_species = fitter.get_n_species(fit_params)
-                
-            elif type(fit_result) == lmfit.Parameters:
-                # Different output that can come from regularized fitting
-                # Unpack fit result
-                fit_params = fit_result
-                covar = None
-                
-                n_species = N_pop_array.shape[0]
-                
-            else:
-                raise Exception(f'Got a fit_result output, but with unsupported type. Expected lmfit.MinimizerResult or lmfit.Parameters, got {type(fit_result)}')
-
-
-
-
-            out_name = os.path.join(save_path,
-                                    f'{fit_number}_{i_file}_' + time_tag.strftime("%m%d-%H%M%S") + f'_{in_file_name_FCS if use_FCS else in_file_name_PCH}_fit_{spectrum_type}_{n_species}spec')
+        if not fit_result == None:    
+            [print(key) for key in fit_result.params.keys()]
+            _ = utils.write_fit_results(fit_result,
+                                        fitter,
+                                        save_path,
+                                        spectrum_type,
+                                        labelling_correction,
+                                        incomplete_sampling_correction,
+                                        use_FCS,
+                                        use_PCH,
+                                        time_resolved_PCH,
+                                        job_prefix,
+                                        fit_res_table_path,
+                                        N_pop_array,
+                                        lagrange_mul,
+                                        fit_number,
+                                        i_file,
+                                        in_file_name_FCS,
+                                        in_file_name_PCH,
+                                        dir_name
+                                        )
             
-            # Command line preview of fit results
-            print(f' [{job_prefix}]   Fitted parameters:')
-            [print(f'[{job_prefix}] {key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
-            
-            
-            # Dict in which we collect various mean and SD values
-            avg_values_dict = {}
-            
-                
-                
-            # Small spreadsheets for species-wise parameters in case we have multiple species
-            # all of these are technically redundant with the big one written later...
-            # But reading these out of the main results spreadsheet is just
-            # too much trouble if you have more than 1 or 2 species
-            if n_species > 1:
-                
-                # Unpack species parameters into arrays
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    N_oligo_pop_array = N_pop_array
-                elif spectrum_type == 'discrete':
-                    # Historical reasons why here N_obs has to be used...
-                    N_oligo_pop_array =  np.array([fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-                else:
-                    N_oligo_pop_array = np.array([fit_params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species)])
-                
-                stoichiometry_array = np.array([fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-                stoichiometry_bw_array = np.array([fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-                tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
+            return fit_result, fitter, N_pop_array, lagrange_mul
 
-
-                # Stoichiometry
-                fit_res_tmp_path = fit_res_table_path + '_stoi.csv' 
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number                 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                for i_spec in range(n_species):
-                    fit_result_dict[f'stoichiometry_{i_spec}'] = stoichiometry_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         header = True, 
-                                         index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         mode = 'a', 
-                                         header = False, 
-                                         index = False)
-                    
-                # Stoichiometry binwidth
-                fit_res_tmp_path = fit_res_table_path + '_stoi_bw.csv' 
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number                 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                for i_spec in range(n_species):
-                    fit_result_dict[f'stoi_bw_{i_spec}'] = stoichiometry_bw_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         header = True, 
-                                         index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         mode = 'a', 
-                                         header = False, 
-                                         index = False)
-
-
-                # Diffusion time
-                fit_res_tmp_path = fit_res_table_path + '_tau_diff.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                for i_spec in range(n_species):
-                    fit_result_dict[f'tau_diff_{i_spec}'] = tau_diff_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         header = True, 
-                                         index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                         mode = 'a', 
-                                         header = False, 
-                                         index = False)
-
-
-                # Amplitudes - population level - density
-                fit_res_tmp_path = fit_res_table_path + '_amp_density.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                amp_density_array = N_oligo_pop_array * stoichiometry_array**2
-                if labelling_correction:
-                    amp_density_array *= 1 - (1 - labelling_efficiency) / (labelling_efficiency * stoichiometry_array)
-                amp_density_array /= amp_density_array.max()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'amp_density_{i_spec}'] = amp_density_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-                
-
-                # Amplitudes - population level - histogram
-                fit_res_tmp_path = fit_res_table_path + '_amp_histogram.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                amp_histogram_array = N_oligo_pop_array * stoichiometry_array**2 * stoichiometry_bw_array
-                if labelling_correction:
-                    amp_histogram_array *= 1 - (1 - labelling_efficiency) / (labelling_efficiency * stoichiometry_array)
-                amp_histogram_array /= amp_histogram_array.sum()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'amp_histogram_{i_spec}'] = amp_histogram_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-                
-                # Use amp_histogram_array to get amplitude-weighted mean values
-                avg_values_dict['avg_stoi_amp'] = np.sum(stoichiometry_array * amp_histogram_array)
-                avg_values_dict['sd_stoi_amp'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
-                avg_values_dict['avg_tau_diff_amp'] = np.sum(tau_diff_array * amp_histogram_array)
-                avg_values_dict['sd_tau_diff_amp'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
-
-                
-                # N_oligomers - population level - absolute
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_abs.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_pop_oligo_abs_array = N_oligo_pop_array * stoichiometry_bw_array
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_oligo_abs_{i_spec}'] = N_pop_oligo_abs_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                
-                # N_oligomers - population level - density
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_density.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                N_pop_oligo_density_array = N_oligo_pop_array / N_oligo_pop_array.max()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_oligo_density_{i_spec}'] = N_pop_oligo_density_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-
-                # N_oligomers - population level - histogram
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_histogram.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_pop_oligo_histogram_array = N_oligo_pop_array * stoichiometry_bw_array
-                N_pop_oligo_histogram_array /= N_pop_oligo_histogram_array.sum()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_oligo_histogram_{i_spec}'] = N_pop_oligo_histogram_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                # Use N_pop_oligo_histogram_array to get oligomer_N_pop-weighted mean values
-                avg_values_dict['avg_stoi_N_oligo_pop'] = np.sum(stoichiometry_array * N_pop_oligo_histogram_array)
-                avg_values_dict['sd_stoi_N_oligo_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
-                avg_values_dict['avg_tau_diff_N_oligo_pop'] = np.sum(tau_diff_array * N_pop_oligo_histogram_array)
-                avg_values_dict['sd_tau_diff_N_oligo_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
-
-                # N_monomers - population level - absolute
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_abs.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_pop_mono_abs_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_mono_abs_{i_spec}'] = N_pop_mono_abs_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                
-                # N_monomers - population level - density
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_density.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                N_pop_mono_density_array = N_oligo_pop_array * stoichiometry_array
-                N_pop_mono_density_array /= N_pop_mono_density_array.max()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_mono_density_{i_spec}'] = N_pop_mono_density_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-
-                # N_monomers - population level - histogram
-                fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_histogram.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_pop_mono_histogram_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
-                N_pop_mono_histogram_array /= N_pop_mono_histogram_array.sum()
-                
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_mono_oligo_histogram_{i_spec}'] = N_pop_mono_histogram_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                # Use N_pop_mono_histogram_array to get monomer_N_pop-weighted mean values
-                avg_values_dict['avg_stoi_N_mono_pop'] = np.sum(stoichiometry_array * N_pop_mono_histogram_array)
-                avg_values_dict['sd_stoi_N_mono_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
-                avg_values_dict['avg_tau_diff_N_mono_pop'] = np.sum(tau_diff_array * N_pop_mono_histogram_array)
-                avg_values_dict['sd_tau_diff_N_mono_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
-
-
-                # The remaining ones only if we have incomplete sampling correction
-                if incomplete_sampling_correction:
-                    N_oligo_obs_array = np.array([fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species)])
-
-                    # N_oligomers - observation level - absolute
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_abs.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                        
-                    N_obs_oligo_abs_array = N_oligo_obs_array * stoichiometry_bw_array
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_oligo_abs_{i_spec}'] = N_obs_oligo_abs_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-                    
-                    # N_oligomers - observation level - density
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_density.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                    N_obs_oligo_density_array = N_oligo_obs_array / N_oligo_obs_array.max()
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_oligo_density_{i_spec}'] = N_obs_oligo_density_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-
-                    # N_oligomers - observation level - histogram
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_histogram.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                        
-                    N_obs_oligo_histogram_array = N_oligo_obs_array * stoichiometry_bw_array
-                    N_obs_oligo_histogram_array /= N_obs_oligo_histogram_array.sum()
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_oligo_histogram_{i_spec}'] = N_obs_oligo_histogram_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-
-
-                    # N_monomers - observation level - absolute
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_abs.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                        
-                    N_obs_mono_abs_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_mono_abs_{i_spec}'] = N_obs_mono_abs_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-                    
-                    # N_monomers - observation level - density
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_density.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                    N_obs_mono_density_array = N_oligo_obs_array * stoichiometry_array
-                    N_obs_mono_density_array /= N_obs_mono_density_array.max()
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_mono_density_{i_spec}'] = N_obs_mono_density_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-
-                    # N_monomers - observation level - histogram
-                    fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_histogram.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                        
-                    N_obs_mono_histogram_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
-                    N_obs_mono_histogram_array /= N_obs_mono_histogram_array.sum()
-                    
-                    for i_spec in range(n_species):
-                        fit_result_dict[f'N_obs_mono_oligo_histogram_{i_spec}'] = N_obs_mono_histogram_array[i_spec]
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-                                     
-                    if labelling_efficiency_incomp_sampling:
-                        # If and only if we have incomplete-sampling-of-incomplete-labelling correction, we also write that separately
-                        fit_res_tmp_path = fit_res_table_path + '_label_eff_obs.csv'
-                        fit_result_dict = {}
-                        fit_result_dict['fit_number'] = fit_number 
-                        fit_result_dict['file_number'] = i_file
-                        fit_result_dict['folder'] = dir_name 
-                        fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                        fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                        if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                            fit_result_dict['lagrange_mul'] = lagrange_mul
-                                                    
-                        for i_spec in range(n_species):
-                            fit_result_dict[f'_label_eff_obs{i_spec}'] = fit_params[f'Label_efficiency_obs_{i_spec}'].value
-                        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                        if not os.path.isfile(fit_res_tmp_path):
-                            # Does not yet exist - create with header
-                            fit_result_df.to_csv(fit_res_tmp_path, 
-                                                    header = True, 
-                                                    index = False)
-                        else:
-                            # Exists - append
-                            fit_result_df.to_csv(fit_res_tmp_path, 
-                                                    mode = 'a', 
-                                                    header = False, 
-                                                    index = False)
-
-
-            # Write large spreadsheet with ALL fit results
-            fit_result_dict = {}            
-            
-            # Metadata
-            fit_result_dict['fit_number'] = fit_number            
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            
-            
-            # Insert average and standard deviation values into results dict
-            for key in avg_values_dict.keys():
-                fit_result_dict[key] = avg_values_dict[key]
-            
-            
-            # Fit parameters, with uncertainty where available
-            has_covar = not covar == None
-            if has_covar:
-                uncertainty_array = np.sqrt(np.diag(covar))
-                covar_pointer = 0
-            
-            for key in fit_params.keys():
-                fit_result_dict[key + '_val'] = fit_params[key].value
-                fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
-                if not fit_params[key].stderr == None:
-                    fit_result_dict[key + '_err'] = fit_params[key].stderr
-                elif has_covar and fit_params[key].vary:
-                    fit_result_dict[key + '_err'] = uncertainty_array[covar_pointer]
-                    covar_pointer += 1
-                    
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                # Special stuff for regularized fitting
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                for i_spec in range(n_species):
-                    fit_result_dict[f'N_pop_{i_spec}'] = N_pop_array[i_spec]
-                    
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            
-            fit_res_table_path_full = fit_res_table_path + '.csv'
-            if not os.path.isfile(fit_res_table_path_full):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_table_path_full, 
-                                      header = True, 
-                                      index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_table_path_full, 
-                                      mode = 'a', 
-                                      header = False, 
-                                      index = False)
-
-
-
-    
-            # Show and write fits themselves
-            if use_FCS:
-                if not labelling_correction:
-                    if spectrum_type == 'discrete':
-                        model_FCS = fitter.get_acf_full_labelling(fit_params)
-                    elif  spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-                        model_FCS = fitter.get_acf_full_labelling_par(fit_params)
-                    else: #  spectrum_type in ['reg_MEM', 'reg_CONTIN']
-                        model_FCS = fitter.get_acf_full_labelling_reg(fit_params)
-    
-                else:
-                    if spectrum_type == 'discrete':
-                        model_FCS = fitter.get_acf_partial_labelling(fit_params)
-                    else: # spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp', 'reg_MEM', 'reg_CONTIN']:
-                        model_FCS = fitter.get_acf_partial_labelling_par_reg(fit_params)
-    
-                # Plot FCS fit
-                fig, ax = plt.subplots(nrows=1, ncols=1)
-                ax.semilogx(data_FCS_tau_s,
-                            data_FCS_G, 
-                            'dk')
-                ax.semilogx(data_FCS_tau_s, 
-                            data_FCS_G + data_FCS_sigma,
-                            '-k', 
-                            alpha = 0.7)
-                ax.semilogx(data_FCS_tau_s, 
-                            data_FCS_G - data_FCS_sigma,
-                            '-k', 
-                            alpha = 0.7)
-                ax.semilogx(data_FCS_tau_s,
-                            model_FCS, 
-                            marker = '',
-                            linestyle = '-', 
-                            color = 'tab:gray')
-                
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
-                    stoichiometry_array = np.array([fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
-                    stoichiometry_binwidth_array = np.array([fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species)])
-                    label_efficiency_array = np.array([fit_params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species)])
-
-                    scaled_N_pop_array = N_pop_array / N_pop_array.max() * model_FCS.max()
-                    
-                    ax.semilogx(tau_diff_array,
-                                scaled_N_pop_array, 
-                                linestyle = '',
-                                marker = 'x',
-                                color = 'b')
-                    
-                    scaled_amp_array = N_pop_array * stoichiometry_binwidth_array * stoichiometry_array**2 
-                    if labelling_correction:
-                        scaled_amp_array  *= (1 + (1-label_efficiency_array) / label_efficiency_array / stoichiometry_array)
-                    scaled_amp_array = scaled_amp_array / scaled_amp_array.max() * model_FCS.max()
-                    ax.semilogx(tau_diff_array,
-                                scaled_amp_array, 
-                                linestyle = '',
-                                marker = 'x',
-                                color = 'r')
-
-                
-                try:
-                    fig.supxlabel('Correlation time [s]')
-                    fig.supylabel('G(\u03C4)')
-                except:
-                    # Apparently this can fail???
-                    pass
-                ax.set_xlim(data_FCS_tau_s[0], data_FCS_tau_s[-1])
-                plot_y_min_max = (np.percentile(data_FCS_G, 3), np.percentile(data_FCS_G, 97))
-                ax.set_ylim(0. if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
-                            plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
-        
-                # Save and show figure
-                plt.savefig(os.path.join(save_path, 
-                                          out_name + '_FCS.png'), 
-                            dpi=300)
-                plt.show()
-                
-                
-                # Write spreadsheet
-                out_table = pd.DataFrame(data = {'Lagtime[s]':data_FCS_tau_s, 
-                                                  'Correlation': data_FCS_G,
-                                                  'Uncertainty_SD': data_FCS_sigma,
-                                                  'Fit': model_FCS})
-                out_table.to_csv(os.path.join(save_path, 
-                                              out_name + '_FCS.csv'),
-                                  index = False, 
-                                  header = True)
-        
-        
-            if use_PCH:
-        
-                if not labelling_correction:
-                    model_PCH = fitter.get_pch_full_labelling(fit_params,
-                                                              t_bin = data_PCH_bin_times[0],
-                                                              spectrum_type = spectrum_type,
-                                                              time_resolved_PCH = time_resolved_PCH,
-                                                              crop_output = True,
-                                                              numeric_precision = np.min(numeric_precision),
-                                                              mp_pool = None
-                                                              )
-                else: 
-                    model_PCH = fitter.get_pch_partial_labelling(fit_params,
-                                                                  t_bin = data_PCH_bin_times[0],
-                                                                  time_resolved_PCH = time_resolved_PCH,
-                                                                  crop_output = True,
-                                                                  numeric_precision = np.min(numeric_precision),
-                                                                  mp_pool = None)
-                
-                # Plot PCH fit
-                # Cycle through colors
-                prop_cycle = plt.rcParams['axes.prop_cycle']
-                colors = cycle(prop_cycle.by_key()['color'])
-                iter_color = next(colors)
-        
-                
-                fig2, ax2 = plt.subplots(1, 1)
-                ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
-                              data_PCH_hist[:,0],
-                              marker = '.',
-                              linestyle = 'none',
-                              color = iter_color)
-                
-                ax2.semilogy(np.arange(0, model_PCH.shape[0]),
-                              model_PCH * data_PCH_hist[:,0].sum(),
-                              marker = '',
-                              linestyle = '-',
-                              color = iter_color)
-                
-                max_x = np.nonzero(data_PCH_hist[:,0])[0][-1]
-                max_y = np.max(data_PCH_hist[:,0])
-                
-                if time_resolved_PCH:
-                    # PCMH
-                    for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
-                        iter_color = next(colors)
-                        if not labelling_correction:
-                            model_PCH = fitter.get_pch_full_labelling(fit_params,
-                                                                      t_bin = data_PCH_bin_times[i_bin_time],
-                                                                      spectrum_type = spectrum_type,
-                                                                      time_resolved_PCH = time_resolved_PCH,
-                                                                      crop_output = True,
-                                                                      numeric_precision = np.min(numeric_precision),
-                                                                      mp_pool = None
-                                                                      )
-                        else: 
-                            model_PCH = fitter.get_pch_partial_labelling(fit_params,
-                                                                          t_bin = data_PCH_bin_times[i_bin_time],
-                                                                          time_resolved_PCH = time_resolved_PCH,
-                                                                          crop_output = True,
-                                                                          numeric_precision = np.min(numeric_precision),
-                                                                          mp_pool = None)
-                        
-                        
-                        ax2.semilogy(np.arange(0, data_PCH_hist.shape[0]),
-                                      data_PCH_hist[:,i_bin_time],
-                                      marker = '.',
-                                      linestyle = 'none',
-                                      color = iter_color)
-                        
-                        ax2.semilogy(np.arange(0, model_PCH.shape[0]),
-                                      model_PCH * data_PCH_hist[:,i_bin_time].sum(),
-                                      marker = '',
-                                      linestyle = '-',
-                                      color = iter_color)
-                
-                        max_x = np.max([max_x, np.nonzero(data_PCH_hist[:,i_bin_time])[0][-1]])
-                        max_y = np.max([max_y, np.max(data_PCH_hist[:,i_bin_time])])
-                        
-                        
-                ax2.set_xlim(-0.49, max_x + 1.49)
-                ax2.set_ylim(0.3, max_y * 1.7)
-                ax2.set_title('PCH fit')
-                try:
-                    fig2.supxlabel('Photons in bin')
-                    fig2.supylabel('Counts')
-                except:
-                    pass
-                # Save and show figure
-                plt.savefig(os.path.join(save_path, 
-                                          out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.png'), 
-                            dpi=300)
-                plt.show()
-    
-                # Write spreadsheet
-                out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 
-                            str(data_PCH_bin_times[0]): data_PCH_hist[:,0]}
-                if time_resolved_PCH:
-                    for i_bin_time in range(1, data_PCH_bin_times.shape[0]):
-                        out_dict[str(data_PCH_bin_times[i_bin_time])] = data_PCH_hist[:,i_bin_time]
-                out_table = pd.DataFrame(data = out_dict)
-                out_table.to_csv(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'),
-                                  index = False, 
-                                  header = True)
-                
-                
         else: # No valid fit result
-            # Command line message
-            message = f'[{job_prefix}] Failed to fit '
-            message += in_file_name_FCS if use_FCS else ''
-            message += ' and ' if (use_FCS and use_PCH) else ''
-            message += in_file_name_PCH if use_PCH else ''
-            print(message)
+            if verbosity >= 1:
+                # Command line message
+                message = f'[{job_prefix}] Failed to fit '
+                message += in_file_name_FCS if use_FCS else ''
+                message += ' and ' if (use_FCS and use_PCH) else ''
+                message += in_file_name_PCH if use_PCH else ''
+                print(message)
+            return None, fitter, None, None
+        
+        
     except:
         traceback.print_exc()
-        
-    return None
+        return None, fitter, None, None
 
 
-#%% Preparations done- run fits
+#%% Preparations done - run fits
 
 if mp_processes > 1:
     try:
         mp_pool = multiprocessing.Pool(processes = mp_processes)
         
-        _ = [mp_pool.starmap(fitting_parfunc, list_of_parameter_tuples)]
+        _ = [mp_pool.starmap(par_func, list_of_parameter_tuples)]
     except:
         traceback.print_exception()
     finally:
@@ -1709,4 +520,4 @@ if mp_processes > 1:
 else:
     # Single process analysis
     for i_fit in range(len(list_of_parameter_tuples)):
-        _ = fitting_parfunc(*list_of_parameter_tuples[i_fit])
+        _ = par_func(*list_of_parameter_tuples[i_fit])

@@ -13,8 +13,8 @@ def g3Ddiff_MEMFCS_fit(FCS_data_tau,
                        FCS_data_G, 
                        FCS_data_sigma_G, 
                        PSF_aspect_ratio, 
-                       tau_D_min = 1e-5, 
-                       tau_D_max = 1., 
+                       tau_D_min = 1e-6, 
+                       tau_D_max = 1e-1, 
                        n_tau_D = 100,
                        tau_D_array = np.array([]),
                        initial_amp_array = np.array([]),
@@ -220,7 +220,7 @@ def g3Ddiff_MEMFCS_fit(FCS_data_tau,
             break
         
         chi_sq_array_outer[iterator_outer] = chi_sq_array_inner[iterator_inner]
-        if chi_sq_array_outer[iterator_outer] < 1 or chi_sq_array_outer[iterator_outer] > 1.3: 
+        if chi_sq_array_outer[iterator_outer] < 1 or chi_sq_array_outer[iterator_outer] > 1.3 or iterator_outer < 3: 
             # Over- or underfit: Update Lagrange multiplier!
             # The way it is defined, high lagrange_mul leads to high weight for 
             # chi-square gradients. 
@@ -283,27 +283,38 @@ if __name__ == '__main__':
     # Plotting
     import matplotlib.pyplot as plt
 
-    dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Analysis\20240307_JHK_NL_ParMRC_Oligomerization\5uMParM_ATP_Ficoll\20240309_1231_5uMParM_ATP_Ficoll_1_T0s_1'
-    in_file_names_FCS = '11_CCF_symm_ch0_ch1_bg'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil3\EGFP_AF488_Mix_Dil3_1_T0s_1_20240610_1336'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil9\EGFP_AF488_Mix_Dil9_1_T0s_1_20240610_1308'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil27\EGFP_AF488_Mix_Dil27_1_T0s_1_20240610_1211'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240423_Test_data\Test_data.sptw\EGFP_AF488_Mix_Dil81\EGFP_AF488_Mix_Dil81_1_T0s_1_20240610_1222'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240521_Test_data\20240521.sptw\SUVs3_2e-5_labelling_long_1_20240610_1342'
+    dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240416_JHK_NK_New_ParM_data\20240416_data.sptw\10uM_ParM_2\ParM_10uM_1in10k1_T0s_1_20240613_1016'
+    # dir_name = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\D044_MT200_Naora\20240416_JHK_NK_New_ParM_data\20240416_data.sptw\10uM_ParM_3\ParM_10uM_1in401_T0s_1_20240613_1435'
+    
+
+    in_file_names_FCS = '06_ACF_ch0_dt_bg'
     
     data_FCS_tau_s, data_FCS_G, avg_count_rate, data_FCS_sigma, acquisition_time_s = utils.read_Kristine_FCS(dir_name, 
                                                                                                              in_file_names_FCS,
                                                                                                              1e-6,
                                                                                                              1.)
-
+    # We cheat a little to get better weighting
+    # data_FCS_sigma_fit = data_FCS_sigma *data_FCS_tau_s**(2/3)
+    
     G_fit, amp_array, tau_D_array = g3Ddiff_MEMFCS_fit(data_FCS_tau_s, 
                                                        data_FCS_G, 
                                                        data_FCS_sigma, 
                                                        PSF_aspect_ratio = 5, 
-                                                       tau_D_min = 1e-5, 
-                                                       tau_D_max = 1., 
+                                                       tau_D_min = 2.1e-4, 
+                                                       tau_D_max = 1e0, 
                                                        n_tau_D = 100,
                                                        tau_D_array = np.array([]),
                                                        initial_amp_array = np.array([]),
                                                        convergence_criterion_inner = 'parallel_gradients', # 'parallel_gradients', 
                                                        max_iter_inner = 2.5E4,
-                                                       max_iter_outer = 20,
-                                                       reg_method = 'MEM'
+                                                       max_iter_outer = 50,
+                                                       reg_method = 'MEM',# 'MEM', 'CONTIN'
+                                                       max_lagrange_mul = 1e4
                                                        )
 
     fig, ax = plt.subplots(nrows=2, 
@@ -326,7 +337,7 @@ if __name__ == '__main__':
                    marker = '',
                    linestyle = '-', 
                    color = 'tab:gray')  
-    ax[0].set_xlim(data_FCS_tau_s[0], data_FCS_tau_s[-1])
+    ax[0].set_xlim(np.min([data_FCS_tau_s[0], tau_D_array[0]]), np.max([data_FCS_tau_s[-1], tau_D_array[-1]]))
     plot_y_min_max = (np.percentile(data_FCS_G, 3), np.percentile(data_FCS_G, 97))
     ax[0].set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
                 plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
