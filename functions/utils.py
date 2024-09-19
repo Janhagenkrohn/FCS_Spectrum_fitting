@@ -514,6 +514,7 @@ def write_fit_results(fit_result,
                       in_file_name_FCS = '',
                       in_file_name_PCH = '',
                       dir_name = '',
+                      verbosity = 0
                       ):
     
     # Unpack simple stuff
@@ -551,8 +552,9 @@ def write_fit_results(fit_result,
         out_name = os.path.join(save_path, out_suffix)
         
         # Command line preview of fit results
-        print(f' [{job_prefix}]   Fitted parameters:')
-        [print(f'[{job_prefix}] {key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
+        if verbosity > 0:
+            print(f' [{job_prefix}]   Fitted parameters:')
+            [print(f'[{job_prefix}] {key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
         
         # Compile all parameters for all discrete species in a single smaller table
         if n_species_disc > 0:

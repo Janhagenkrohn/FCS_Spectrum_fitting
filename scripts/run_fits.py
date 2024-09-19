@@ -8,21 +8,15 @@ Created on Sat Jun  8 10:56:42 2024
 # I/O modules
 import os
 import sys
-import pandas as pd
 
 # Data processing modules
 import numpy as np
 
-# Plotting
-import matplotlib.pyplot as plt
 
 # Misc
-import datetime
-from itertools import cycle # used only in plotting
+import datetime # Time tags in file names
 import traceback # Crash handling
-import multiprocessing 
-import lmfit # only used for type recognition
-
+import multiprocessing # Parallel processing
 
 # Custom module
 repo_dir = os.path.abspath('..')
@@ -75,7 +69,7 @@ in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_
 [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
 # Output dir for result file writing
-glob_out_dir = r'D:\temp\FCS_Spectrum_debug\12_ACR_constraint_spectrum'
+glob_out_dir = r'D:\temp\FCS_Spectrum_debug\25'
 
 
 
@@ -88,7 +82,7 @@ glob_out_dir = r'D:\temp\FCS_Spectrum_debug\12_ACR_constraint_spectrum'
 # see that there are simply too many combinations for me to debug every one of 
 # them systematically.
 
-###### General model settings
+###### Settings relating to model itself
 
 labelling_correction_list = [True] 
     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
@@ -101,21 +95,12 @@ labelling_efficiency_incomp_sampling_list = [False]
     # Addition to combined incomplete sampling correction and labelling correction 
     # that also considers noise in observed vs. population-level labelled fractions 
     # for each oligomer species. CAVE: Computationally very expensive!
-    
-fit_label_efficiency_list = [False] 
-    # If you consider finite labelling fraction, here you can also decide to 
-    # make that a fit parameter, although that may be numerically extremely instable
-
-use_avg_count_rate_list = [True]
-    # Use average count rate to constrain fit? Allows more meaningful estimation 
-    # of molecular brightness. Also helps constrain mixture models of e.g. an
-    # oligomer spectrum and a free-dye species
-    
+        
 use_blinking_list = [False]
     # Whether to consider blinking in the particle dynamics
 
 n_species_list = [70]
-    # How many species to consider
+    # How many species to evaluate within the range of [tau_diff_min; tau_diff_max]
     
 tau_diff_min_list = [2E-5]
     # Shortest diffusion time to fit (parameter bounds)
@@ -136,31 +121,54 @@ spectrum_parameter_list = ['N_monomers']
     # On which parameter to define regularized or parameterized models
     # Options: 'Amplitude', 'N_monomers', 'N_oligomers'
     
-oligomer_type_list = ['spherical_shell'] 
+oligomer_type_list = ['double_filament'] 
     # Choice of oligomer type (basically which polymer-physics-based approximation to use in calculation)
     # Options: 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
     # use 'naive' for discrete-species fitting, and can also be used for Amplitude spectra
     # For monomer N or oligomer N spectrum fitting, you should use a meaningful
     # physics model to fix a relation between diffusion time and stoichiometry
 
+discrete_species_list = [
+    [{
+      }
+    ],
+    [
+        {'N_avg_obs': 1., # default 1.
+         'vary_N_avg_obs': True, # default True
+         'tau_diff': 1E-5,  # default 1E-3
+         'vary_tau_diff': False, # default False
+         'cpms': 1000.,  # default 1.
+         'vary_cpms': True, # default False
+         'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
+         'stoichiometry': 1.,# default 1.
+         'vary_stoichiometry': False, # default (RECOMMENDED) False
+         'stoichiometry_binwidth': 1., # default 1.
+         'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
+         'labelling_efficiency': 1., # default 1.
+         'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
+        }
+    ]
+    ]
+    # Definition of discrete species to add to the model in addtion to spectrum 
+    # models. Careful about the format: This is a LIST OF LISTS OF DICTS.
+    # Each dict defines the parameters for one species according to the keyword
+    # arguments to fitting.FCS_Spectrum.add_discrete_species(). Note that the
+    # available kwargs give a a lot of freedom to fix or fit whatever parameter 
+    # you want - in fact, perhaps more than is healthy. Some defaults are better 
+    # left untouched unless you understand the model well and are sure that 
+    # changing them is the right thing to do. You can leave out keywords, 
+    # these will be replaced by defaults.
+    # Each list of dicts is a set of discrete species to include in parallel 
+    # in the same fit.
+    # The list of lists of dicts finally is equivalent to the other lists here,
+    # an iteration over different configuration to try in fitting.
 
 
-###### FCS settings
+###### Settings relating to evaluation
 
-use_FCS_list = [False]
+use_FCS_list = [True]
     # Whether to use correlation function data at all
 
-FCS_min_lag_time_list = [1E-6] 
-    # Shortest lag time to consider in fit (time axis clipping)
-    # Specify 0. to use full range of data in .csv file
-    
-FCS_max_lag_time_list = [1E0] 
-    # Longest lag time to consider in fit (time axis clipping)
-    # Specify np.inf to use full range of data in .csv file
-
-
-
-###### PCH settings
 use_PCH_list = [False]
     # Whether to use photon counting histogram data
     # CAVE: Get computationally prohibitively expensive for many species
@@ -173,19 +181,35 @@ time_resolved_PCH_list = [False]
     # the index of the desired PCH in case you want to use one single specific 
     # one: i_bin_time (not used in this script currently)
     
-PCH_min_bin_time_list = [0.] 
-    # Shortest PCMH bin times to consider
-    # Specify 0. to use full range of data in .csv file
-    
-PCH_max_bin_time_list = [5E-4]
-    # Longest PCMH bin times to consider
-    # Specify np.inf to use full range of data in .csv file
+use_avg_count_rate_list = [True]
+    # Use average count rate to constrain fit? Allows more meaningful estimation 
+    # of molecular brightness. Also helps constrain mixture models of e.g. an
+    # oligomer spectrum and a free-dye species
 
+fit_label_efficiency_list = [False] 
+    # If you consider finite labelling fraction, here you can also decide to 
+    # make that a fit parameter, although that may be numerically extremely instable
 
 
 ###### Metadata/calibration data/settings (global for all fits in batch)
 
-NLL_funcs_accurate = True
+FCS_min_lag_time = 1E-6
+    # Shortest lag time to consider in fit (time axis clipping)
+    # Specify 0. to use full range of data in .csv file
+    
+FCS_max_lag_time = 1E0
+    # Longest lag time to consider in fit (time axis clipping)
+    # Specify np.inf to use full range of data in .csv file
+
+PCH_min_bin_time = 0. 
+    # Shortest PCMH bin times to consider
+    # Specify 0. to use full range of data in .csv file
+    
+PCH_max_bin_time = 5E-4
+    # Longest PCMH bin times to consider
+    # Specify np.inf to use full range of data in .csv file
+
+NLL_funcs_accurate = False
     # Accurate maximum-likelihood evaluation, or use faster least-squares 
     # approximation? Affects most likelihood terms except the chi-square 
     # minimization on the ACF correlation function
@@ -202,7 +226,7 @@ two_step_fit = False
     # version of the fit with some parameters fixed, and then re-fit with the 
     # "full" model complexity
 
-verbosity = 1 
+verbosity = 0
     # How much do you want the software to talk?
 
 FCS_psf_width_nm = np.mean([210])
@@ -215,14 +239,16 @@ FCS_psf_aspect_ratio = np.mean([6])
 PCH_Q = 10. 
     # Evaluation parameter for PCH
 
-# mp_processes = os.cpu_count() // 2
-mp_processes = 1  # no multiprocessing
+mp_processes = 1 
     # How many parallel processes?
     # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
     # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
+    # mp_processes = os.cpu_count() // 2 to use half of available logical cores 
+    # (-> on many machines all physical cores without hyperthreading)
 
 suppress_mp = True
-    # More for debugging purposes: Forces the software to run entirely without multiprocessing
+    # For debugging purposes: Forces the software to run entirely without 
+    # multiprocessing, which yields more interpretable error messages
     
 #%% Wrap all permutations for different fit settings and all files...Long list!
 # Iterate over all settings and files
@@ -230,107 +256,104 @@ list_of_parameter_tuples = []
 fit_counter = 1
 print(f'Sanity check all: Found {len(in_file_names_FCS)} FCS files, {len(in_file_names_PCH)} PCH files, {len(in_dir_names)} dir names.')
 for use_FCS in use_FCS_list:
-    for FCS_min_lag_time in FCS_min_lag_time_list:
-        for FCS_max_lag_time in FCS_max_lag_time_list:
-            for use_PCH in use_PCH_list:
-                for PCH_min_bin_time in PCH_min_bin_time_list:
-                    for PCH_max_bin_time in PCH_max_bin_time_list:
-                        for time_resolved_PCH in time_resolved_PCH_list:
-                            for n_species in n_species_list:
-                                for tau_diff_min in tau_diff_min_list:
-                                    for tau_diff_max in tau_diff_max_list:
-                                        for use_blinking in use_blinking_list:
-                                            for spectrum_type in spectrum_type_list:
-                                                for spectrum_parameter in spectrum_parameter_list:
-                                                    for oligomer_type in oligomer_type_list:
-                                                        for labelling_correction in labelling_correction_list:
-                                                            for incomplete_sampling_correction in incomplete_sampling_correction_list:
-                                                                for labelling_efficiency_incomp_sampling in labelling_efficiency_incomp_sampling_list:
-                                                                    for use_avg_count_rate in use_avg_count_rate_list:
-                                                                        for fit_label_efficiency in fit_label_efficiency_list:
+    for use_PCH in use_PCH_list:
+        for time_resolved_PCH in time_resolved_PCH_list:
+            for n_species in n_species_list:
+                for tau_diff_min in tau_diff_min_list:
+                    for tau_diff_max in tau_diff_max_list:
+                        for use_blinking in use_blinking_list:
+                            for spectrum_type in spectrum_type_list:
+                                for spectrum_parameter in spectrum_parameter_list:
+                                    for oligomer_type in oligomer_type_list:
+                                        for labelling_correction in labelling_correction_list:
+                                            for incomplete_sampling_correction in incomplete_sampling_correction_list:
+                                                for labelling_efficiency_incomp_sampling in labelling_efficiency_incomp_sampling_list:
+                                                    for use_avg_count_rate in use_avg_count_rate_list:
+                                                        for fit_label_efficiency in fit_label_efficiency_list:
+                                                            for discrete_species in discrete_species_list:
+                                                    
+                                                                # a number of sanity-checks to make sure we do not waste time planning fits that cannot work:
+                                                                if (type(use_FCS) == bool and
+                                                                    type(use_PCH) == bool and
+                                                                    type(time_resolved_PCH) == bool and
+                                                                    utils.isint(n_species) and n_species > 0 and
+                                                                    tau_diff_min > 0 and
+                                                                    tau_diff_max >= tau_diff_min and
+                                                                    type(use_blinking) == bool and
+                                                                    (n_species < 5 and spectrum_type == 'discrete' or
+                                                                      n_species > 10 and spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
+                                                                    spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] and
+                                                                    oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] and
+                                                                    type(labelling_correction) == bool and
+                                                                    type(incomplete_sampling_correction) == bool and
+                                                                    type(labelling_efficiency_incomp_sampling) == bool and
+                                                                    ((not labelling_efficiency_incomp_sampling) or (labelling_efficiency_incomp_sampling and incomplete_sampling_correction and labelling_correction)) and
+                                                                    (incomplete_sampling_correction == False and spectrum_type == 'discrete' or
+                                                                      spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
+                                                                    type(use_avg_count_rate) == bool and
+                                                                    type(fit_label_efficiency) == bool and
+                                                                    type(discrete_species) == list and
+                                                                    np.all([type(element) == dict for element in discrete_species])
+                                                                    ):
                                                                 
-                                                                            # a number of sanity-checks to make sure we do not waste time planning fits that cannot work:
-                                                                            if (type(use_FCS) == bool and
-                                                                                FCS_min_lag_time >= 0 and
-                                                                                FCS_max_lag_time > FCS_min_lag_time and
-                                                                                type(use_PCH) == bool and
-                                                                                PCH_min_bin_time >= 0 and
-                                                                                PCH_max_bin_time >= PCH_min_bin_time and
-                                                                                type(time_resolved_PCH) == bool and
-                                                                                utils.isint(n_species) and n_species > 0 and
-                                                                                tau_diff_min > 0 and
-                                                                                tau_diff_max >= tau_diff_min and
-                                                                                type(use_blinking) == bool and
-                                                                                (n_species < 5 and spectrum_type == 'discrete' or
-                                                                                  n_species > 10 and spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
-                                                                                spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] and
-                                                                                oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament'] and
-                                                                                type(labelling_correction) == bool and
-                                                                                type(incomplete_sampling_correction) == bool and
-                                                                                type(labelling_efficiency_incomp_sampling) == bool and
-                                                                                ((not labelling_efficiency_incomp_sampling) or (labelling_efficiency_incomp_sampling and incomplete_sampling_correction and labelling_correction)) and
-                                                                                (incomplete_sampling_correction == False and spectrum_type == 'discrete' or
-                                                                                  spectrum_type in ['reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']) and
-                                                                                type(use_avg_count_rate) == bool and
-                                                                                type(fit_label_efficiency) == bool
-                                                                                ):
-                                                                            
-                                                                                fit_settings_str = f'{spectrum_type}_{n_species}spec'
-                                                                                fit_settings_str += f'_{oligomer_type}_{spectrum_parameter}' if spectrum_type != 'discrete' else ''
-                                                                                fit_settings_str += '_blink' if use_blinking else ''
-                                                                                fit_settings_str += '_lblcr' if labelling_correction else ''
-                                                                                fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
-                                                                                fit_settings_str += '_lblsmplcr' if labelling_efficiency_incomp_sampling else ''
-                                                                                fit_settings_str += '_FCS' if use_FCS else ''
-                                                                                fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
-                                                                                fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
-                                                                                
-                                                                                for i_file, dir_name in enumerate(in_dir_names):
-                                                                                    job_prefix = in_file_names_FCS[i_file] + '_' + fit_settings_str
-                                                                                    save_path = os.path.join(glob_out_dir, fit_settings_str)
-                                                                                    if not os.path.exists(save_path):
-                                                                                        os.makedirs(save_path)
-                                                                                    
-                                                                                    fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
-                                                                                    
-                                                                                    parameter_tuple = (fit_res_table_path,
-                                                                                                       fit_counter,
-                                                                                                       i_file,
-                                                                                                       job_prefix,
-                                                                                                       save_path,
-                                                                                                       dir_name,
-                                                                                                       in_file_names_FCS[i_file],
-                                                                                                       in_file_names_PCH[i_file] if len(in_file_names_PCH) > 0 else '',
-                                                                                                       use_FCS,
-                                                                                                       FCS_min_lag_time,
-                                                                                                       FCS_max_lag_time,
-                                                                                                       FCS_psf_width_nm,
-                                                                                                       FCS_psf_aspect_ratio,
-                                                                                                       use_PCH,
-                                                                                                       PCH_min_bin_time,
-                                                                                                       PCH_max_bin_time,
-                                                                                                       PCH_Q,
-                                                                                                       time_resolved_PCH,
-                                                                                                       n_species,
-                                                                                                       tau_diff_min,
-                                                                                                       tau_diff_max,
-                                                                                                       use_blinking,
-                                                                                                       spectrum_type,
-                                                                                                       spectrum_parameter,
-                                                                                                       oligomer_type,
-                                                                                                       alpha_label[i_file],
-                                                                                                       labelling_correction,
-                                                                                                       incomplete_sampling_correction,
-                                                                                                       labelling_efficiency_incomp_sampling,
-                                                                                                       NLL_funcs_accurate,
-                                                                                                       use_avg_count_rate,
-                                                                                                       fit_label_efficiency,
-                                                                                                       numeric_precision,
-                                                                                                       two_step_fit,
-                                                                                                       verbosity,
-                                                                                                       mp_processes <= 1 and not suppress_mp)
-                                                                                    list_of_parameter_tuples.extend((parameter_tuple,))
-                                                                                    fit_counter += 1
+                                                                    fit_settings_str = f'{spectrum_type}_{n_species}spec'
+                                                                    fit_settings_str += f'_{oligomer_type}_{spectrum_parameter}' if spectrum_type != 'discrete' else ''
+                                                                    fit_settings_str += '_blink' if use_blinking else ''
+                                                                    fit_settings_str += '_lblcr' if labelling_correction else ''
+                                                                    fit_settings_str += '_smplcr' if incomplete_sampling_correction else ''
+                                                                    fit_settings_str += '_lblsmplcr' if labelling_efficiency_incomp_sampling else ''
+                                                                    fit_settings_str += f'_{len(discrete_species)}discr' if discrete_species != [{}] else ''
+                                                                    fit_settings_str += '_FCS' if use_FCS else ''
+                                                                    fit_settings_str += ('_PCMH' if time_resolved_PCH else '_PCH') if use_PCH else ''
+                                                                    fit_settings_str += ('_MLE' if NLL_funcs_accurate else '_WLSQ') if (use_PCH or incomplete_sampling_correction) else ''
+                                                                    
+                                                                    for i_file, dir_name in enumerate(in_dir_names):
+                                                                        job_prefix = in_file_names_FCS[i_file] + '_' + fit_settings_str
+                                                                        save_path = os.path.join(glob_out_dir, fit_settings_str)
+                                                                        if not os.path.exists(save_path):
+                                                                            os.makedirs(save_path)
+                                                                        
+                                                                        fit_res_table_path = os.path.join(save_path, 'Fit_params_' + fit_settings_str)
+                                                                        
+                                                                        parameter_tuple = (fit_res_table_path,
+                                                                                           fit_counter,
+                                                                                           i_file,
+                                                                                           job_prefix,
+                                                                                           save_path,
+                                                                                           dir_name,
+                                                                                           in_file_names_FCS[i_file],
+                                                                                           in_file_names_PCH[i_file] if len(in_file_names_PCH) > 0 else '',
+                                                                                           use_FCS,
+                                                                                           FCS_min_lag_time,
+                                                                                           FCS_max_lag_time,
+                                                                                           FCS_psf_width_nm,
+                                                                                           FCS_psf_aspect_ratio,
+                                                                                           use_PCH,
+                                                                                           PCH_min_bin_time,
+                                                                                           PCH_max_bin_time,
+                                                                                           PCH_Q,
+                                                                                           time_resolved_PCH,
+                                                                                           n_species,
+                                                                                           tau_diff_min,
+                                                                                           tau_diff_max,
+                                                                                           use_blinking,
+                                                                                           spectrum_type,
+                                                                                           spectrum_parameter,
+                                                                                           oligomer_type,
+                                                                                           alpha_label[i_file],
+                                                                                           labelling_correction,
+                                                                                           incomplete_sampling_correction,
+                                                                                           labelling_efficiency_incomp_sampling,
+                                                                                           NLL_funcs_accurate,
+                                                                                           use_avg_count_rate,
+                                                                                           fit_label_efficiency,
+                                                                                           numeric_precision,
+                                                                                           two_step_fit,
+                                                                                           discrete_species,
+                                                                                           verbosity,
+                                                                                           mp_processes <= 1 and not suppress_mp)
+                                                                        list_of_parameter_tuples.extend((parameter_tuple,))
+                                                                        fit_counter += 1
                                                                             
                                                                             
                                                                             
@@ -369,6 +392,7 @@ def par_func(fit_res_table_path,
              fit_label_efficiency,
              numeric_precision,
              two_step_fit,
+             discrete_species,
              verbosity,
              use_parallel):
     
@@ -437,6 +461,7 @@ def par_func(fit_res_table_path,
                                         use_avg_count_rate = use_avg_count_rate, # Bool
                                         fit_label_efficiency = fit_label_efficiency, # Bool
                                         two_step_fit = two_step_fit, # bool
+                                        discrete_species = discrete_species, # list of dicts
                                         use_parallel = use_parallel, # Bool
                                         )
             
@@ -462,11 +487,12 @@ def par_func(fit_res_table_path,
                                                                     use_avg_count_rate = use_avg_count_rate, # Bool
                                                                     fit_label_efficiency = fit_label_efficiency, # Bool
                                                                     two_step_fit = two_step_fit, # bool
+                                                                    discrete_species = discrete_species, # list of dicts
                                                                     use_parallel = use_parallel # Bool
                                                                     )
             
         if not fit_result == None:    
-            [print(key) for key in fit_result.params.keys()]
+            # [print(key) for key in fit_result.params.keys()]
             _ = utils.write_fit_results(fit_result,
                                         fitter,
                                         save_path,
@@ -521,3 +547,5 @@ else:
     # Single process analysis
     for i_fit in range(len(list_of_parameter_tuples)):
         _ = par_func(*list_of_parameter_tuples[i_fit])
+        
+print('Job done.')
