@@ -25,6 +25,41 @@ from functions import utils
 from functions import fitting
 
 
+'''
+About the model and analysis here:
+We have data from lipid nanoparticles loaded with fluorescently labelled RNA.
+The key questions are:
+    1. How much freely-diffusing RNA do we get outside LNPs?
+    2. How many RNA molecules are loaded into an LNP on average?
+
+Model structure:
+    - Dense-sphere model, as we are observing the content of LNP lumen
+    - Try different parameterized oligomer distribution shapes, but probably 
+      lognormal or Gamma make most sense.
+    - Oligomer size is defined as counting "unit cells" of RNA molecules that 
+      could occupy inside an LNP
+    - Labelling probability is product of actual labelling probability of an 
+      RNA molecule times occupation probability of the "unit cell"
+
+The challenge in this model is that the effective labelling probability is an 
+unknown and must be fitted. ALSO, this LNP data, being LNP data, is chaotic and
+probably requires incomplete sampling correction.
+
+
+Required information:
+METADATA
+RNA labelling probability -> 0.025
+PSF width [nm] -> 290
+PSF aspect ratio -> 7
+FROM MONOMER MEASUREMENT
+RNA monomer diffusion time [s] -> 2.28453E-4
+RNA monomer brightness [Hz] -> 5897.36792
+
+
+
+
+'''
+
 
 #%% Define input files and output dir
 # Input directory and the labelled protein fraction in each of them
@@ -33,23 +68,231 @@ in_file_names_FCS = []
 in_file_names_PCH = []
 alpha_label = []
 
-glob_in_dir = r'D:\temp\FCS_Spectrum_debug\Data'
+glob_in_dir = r'/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240808_IGialdini_data_export/Exports'
 
 
 
-#%% 20240604 - A488-labelled ParM 
+# #%% Fit 1: free RNA monomers to calibrate their diffusion time and brightness 
 
-####### NO BURST REMOVAL #########
-# SHould be good for incomplete-sampling stuff
-''' Labelled protein fraction'''
+# _in_dir_names = []
+# _alpha_label = []
+# local_dir = os.path.join(glob_in_dir, r'siRNA_in_buffer/01_siRNA-Atto565_1to12_25Mhz_1uW__ch1_20240827_1503')
+# _in_dir_names.extend([os.path.join(local_dir)])
+# _alpha_label.append(0.025)
+
+
+# # Naming pattern for detecting correct files within subdirs of each in_dir
+# # # Bootstrap SD, no burst removal
+# file_name_pattern_FCS = '*04_ACF_ch0_bg*'
+
+
+
+# # Repeat for FCS
+# in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_files(_in_dir_names, 
+#                                                                                       file_name_pattern_FCS, 
+#                                                                                       _alpha_label,
+#                                                                                       '')
+
+# # Workaround as we skip PCH
+# [in_dir_names.append(in_dir_name) for in_dir_name in in_dir_names_FCS_tmp]
+# [in_file_names_FCS.append(in_file_name_FCS) for in_file_name_FCS in in_file_names_FCS_tmp]
+# [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
+
+# # Output dir for result file writing
+# glob_out_dir = os.path.join(glob_in_dir, 'Fits_discrete')
+
+
+
+
+# # Fit settings
+# # All "..._list" settings are handled such that the software will iterate over 
+# # the elements of all lists and runs fits with attempt fits with all parameter
+# # combinations. NOT ALL COMBINATIONS WORK! Some combinations are hard-coded 
+# # excluded and will be skipped, others may crash. It should be easy to 
+# # see that there are simply too many combinations for me to debug every one of 
+# # them systematically.
+
+# ###### Settings relating to model itself
+
+# labelling_correction_list = [True] 
+#     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
+    
+# incomplete_sampling_correction_list = [False] 
+#     # Whether to fit deviations between "population-level" and "observation-level"
+#     # dynamics, i.e., explicit treatment of an additional layer of noise
+    
+# labelling_efficiency_incomp_sampling_list = [False] 
+#     # Addition to combined incomplete sampling correction and labelling correction 
+#     # that also considers noise in observed vs. population-level labelled fractions 
+#     # for each oligomer species. CAVE: Computationally very expensive!
+        
+# use_blinking_list = [False]
+#     # Whether to consider blinking in the particle dynamics
+
+# n_species_list = [1]
+#     # How many species to evaluate within the range of [tau_diff_min; tau_diff_max]
+    
+# tau_diff_min_list = [4E-5]
+#     # Shortest diffusion time to fit (parameter bounds)
+#     # For spectrum models, tau_diff_min is also considered the monomer diffusion time!
+    
+# tau_diff_max_list = [1E-2]
+#     # Longest diffusion time to fit (parameter bounds)
+    
+# spectrum_type_list = ['discrete'] 
+#     # Options: 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
+#     # 'discrete' is traditional FCS mixutre model fitting, using few constraints. 
+#     #   -> Not recommended for more than 1-2 species.
+#     # 'reg' variants are statistically regularized fits with "CONTIN" or maximum entropy constraints.
+#     #   -> The fit will attempt to automatically optimize the regularization strength.
+#     # 'par' models use simple model functions to parameterize the oligomer concentration spectrum shape
+    
+# spectrum_parameter_list = ['Amplitude'] 
+#     # On which parameter to define regularized or parameterized models
+#     # Options: 'Amplitude', 'N_monomers', 'N_oligomers'
+    
+# oligomer_type_list = ['naive'] 
+#     # Choice of oligomer type (basically which polymer-physics-based approximation to use in calculation)
+#     # Options: 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
+#     # use 'naive' for discrete-species fitting, and can also be used for Amplitude spectra
+#     # For monomer N or oligomer N spectrum fitting, you should use a meaningful
+#     # physics model to fix a relation between diffusion time and stoichiometry
+
+# discrete_species_list = [
+#     [{
+#       }
+#     ],
+#     # [
+#     #     {'N_avg_obs': 1., # default 1.
+#     #      'vary_N_avg_obs': True, # default True
+#     #      'tau_diff': 1E-5,  # default 1E-3
+#     #      'vary_tau_diff': False, # default False
+#     #      'cpms': 1000.,  # default 1.
+#     #      'vary_cpms': True, # default False
+#     #      'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
+#     #      'stoichiometry': 1.,# default 1.
+#     #      'vary_stoichiometry': False, # default (RECOMMENDED) False
+#     #      'stoichiometry_binwidth': 1., # default 1.
+#     #      'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
+#     #      'labelling_efficiency': 1., # default 1.
+#     #      'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
+#     #     }
+#     # ]
+#     ]
+#     # Definition of discrete species to add to the model in addtion to spectrum 
+#     # models. Careful about the format: This is a LIST OF LISTS OF DICTS.
+#     # Each dict defines the parameters for one species according to the keyword
+#     # arguments to fitting.FCS_Spectrum.add_discrete_species(). Note that the
+#     # available kwargs give a a lot of freedom to fix or fit whatever parameter 
+#     # you want - in fact, perhaps more than is healthy. Some defaults are better 
+#     # left untouched unless you understand the model well and are sure that 
+#     # changing them is the right thing to do. You can leave out keywords, 
+#     # these will be replaced by defaults.
+#     # Each list of dicts is a set of discrete species to include in parallel 
+#     # in the same fit.
+#     # The list of lists of dicts finally is equivalent to the other lists here,
+#     # an iteration over different configuration to try in fitting.
+
+
+# ###### Settings relating to evaluation
+
+# use_FCS_list = [True]
+#     # Whether to use correlation function data at all
+
+# use_PCH_list = [False]
+#     # Whether to use photon counting histogram data
+#     # CAVE: Get computationally prohibitively expensive for many species
+#     # or with labelling correction 
+    
+# time_resolved_PCH_list = [False]
+#     # Whether to use photon counting MULTIPLE histograms
+#     # If false, by default only the PCH with the shortest bin time contained 
+#     # in the data will be used. FCS_Spectrum.run_fit() has a handle to specify 
+#     # the index of the desired PCH in case you want to use one single specific 
+#     # one: i_bin_time (not used in this script currently)
+    
+# use_avg_count_rate_list = [True]
+#     # Use average count rate to constrain fit? Allows more meaningful estimation 
+#     # of molecular brightness. Also helps constrain mixture models of e.g. an
+#     # oligomer spectrum and a free-dye species
+
+# fit_label_efficiency_list = [False] 
+#     # If you consider finite labelling fraction, here you can also decide to 
+#     # make that a fit parameter, although that may be numerically extremely instable
+
+
+# ###### Metadata/calibration data/settings (global for all fits in batch)
+
+# FCS_min_lag_time = 1E-6
+#     # Shortest lag time to consider in fit (time axis clipping)
+#     # Specify 0. to use full range of data in .csv file
+    
+# FCS_max_lag_time = 1E0
+#     # Longest lag time to consider in fit (time axis clipping)
+#     # Specify np.inf to use full range of data in .csv file
+
+# PCH_min_bin_time = 0. 
+#     # Shortest PCMH bin times to consider
+#     # Specify 0. to use full range of data in .csv file
+    
+# PCH_max_bin_time = 5E-4
+#     # Longest PCMH bin times to consider
+#     # Specify np.inf to use full range of data in .csv file
+
+# NLL_funcs_accurate = True
+#     # Accurate maximum-likelihood evaluation, or use faster least-squares 
+#     # approximation? Affects most likelihood terms except the chi-square 
+#     # minimization on the ACF correlation function
+    
+# numeric_precision = np.array([1E-3, 1E-4, 1E-5])
+#     # PCH requires a numerical precision cutoff, which is set here. The lower 
+#     # the number, the more accurate but computationally expensive the 
+#     # evaluation. You can specify a single number, then it's trivial, or an 
+#     # array, in which case the model is first evaluated with low accuracy and 
+#     # precision is then incrementally increased according to the steps you specified.
+    
+# two_step_fit = False
+#     # For some model configuration, you can first run a simpler, more robust, 
+#     # version of the fit with some parameters fixed, and then re-fit with the 
+#     # "full" model complexity
+
+# verbosity = 0
+#     # How much do you want the software to talk?
+
+# FCS_psf_width_nm = np.mean([290])
+#     # FCS calibration of PSF width in xy (w_0: 1/e^2 radius), although it is 
+#     # actually not used for anything meaningful currently
+
+# FCS_psf_aspect_ratio = np.mean([7])
+#     # FCS calibration of PSF aspect ratio (w_z/w_0), also used for PCMH
+
+# PCH_Q = 10. 
+#     # Evaluation parameter for PCH
+
+# mp_processes = os.cpu_count() // 2
+#     # How many parallel processes?
+#     # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
+#     # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
+#     # mp_processes = os.cpu_count() // 2 to use half of available logical cores 
+#     # (-> on many machines all physical cores without hyperthreading)
+
+# suppress_mp = False
+#     # For debugging purposes: Forces the software to run entirely without 
+#     # multiprocessing, which yields more interpretable error messages
+    
+# suppress_figs = True
+#     # For batch processing: Suppress figure display, jsut write figures to file
+    
+    
+#%% Fit 2: free RNA monomers to calibrate their diffusion time and brightness 
+
 _in_dir_names = []
 _alpha_label = []
-local_dir = os.path.join(glob_in_dir, r'ssRNA_ladder_RCT_50uM_1_T0s_1_20240826_1203')
-# local_dir = os.path.join(glob_in_dir, r'_4s_0_AF488_long_1_T0s_120240826_1234')
-_in_dir_names.extend([os.path.join(local_dir)])
+_in_dir_names.extend([os.path.join(glob_in_dir, 'NP_in_buffer_time_0/01_NP-naked_batch1_HBG_time0_FCS_ch1_20240827_1503')])
 _alpha_label.append(0.025)
-# [ _in_dir_names.extend([os.path.join(local_dir, f'20240808_more_ssRNA/20240808_data.sptw/ssRNA_IVT{x}_1')]) for x in [*range(1,9), 'mix']]
-# [_alpha_label.append(5E-3) for x in [*range(1,9), 'mix']]
+_in_dir_names.extend([os.path.join(glob_in_dir, 'NP_in_buffer_time_2h/07_NP-naked_batch1_HBG_time2h_FCS_ch1_20240827_1503')])
+_alpha_label.append(0.025)
+
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 # # Bootstrap SD, no burst removal
@@ -69,12 +312,12 @@ in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_
 [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
 # Output dir for result file writing
-glob_out_dir = r'D:\temp\FCS_Spectrum_debug\26'
+glob_out_dir = os.path.join(glob_in_dir, 'Fits_LNPs')
 
 
 
 
-#%% Fit settings
+# Fit settings
 # All "..._list" settings are handled such that the software will iterate over 
 # the elements of all lists and runs fits with attempt fits with all parameter
 # combinations. NOT ALL COMBINATIONS WORK! Some combinations are hard-coded 
@@ -87,7 +330,7 @@ glob_out_dir = r'D:\temp\FCS_Spectrum_debug\26'
 labelling_correction_list = [True] 
     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
     
-incomplete_sampling_correction_list = [False] 
+incomplete_sampling_correction_list = [True, False] 
     # Whether to fit deviations between "population-level" and "observation-level"
     # dynamics, i.e., explicit treatment of an additional layer of noise
     
@@ -99,17 +342,17 @@ labelling_efficiency_incomp_sampling_list = [False]
 use_blinking_list = [False]
     # Whether to consider blinking in the particle dynamics
 
-n_species_list = [70]
+n_species_list = [50]
     # How many species to evaluate within the range of [tau_diff_min; tau_diff_max]
     
-tau_diff_min_list = [2E-5]
+tau_diff_min_list = [2.28453E-4]
     # Shortest diffusion time to fit (parameter bounds)
     # For spectrum models, tau_diff_min is also considered the monomer diffusion time!
     
-tau_diff_max_list = [1E0]
+tau_diff_max_list = [1E-0]
     # Longest diffusion time to fit (parameter bounds)
     
-spectrum_type_list = ['par_LogNorm'] 
+spectrum_type_list = [ 'par_LogNorm', 'par_Gamma'] 
     # Options: 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
     # 'discrete' is traditional FCS mixutre model fitting, using few constraints. 
     #   -> Not recommended for more than 1-2 species.
@@ -117,11 +360,11 @@ spectrum_type_list = ['par_LogNorm']
     #   -> The fit will attempt to automatically optimize the regularization strength.
     # 'par' models use simple model functions to parameterize the oligomer concentration spectrum shape
     
-spectrum_parameter_list = ['N_monomers'] 
+spectrum_parameter_list = ['Amplitude', 'N_monomers', 'N_oligomers'] 
     # On which parameter to define regularized or parameterized models
     # Options: 'Amplitude', 'N_monomers', 'N_oligomers'
     
-oligomer_type_list = ['double_filament'] 
+oligomer_type_list = ['sherical_dense'] 
     # Choice of oligomer type (basically which polymer-physics-based approximation to use in calculation)
     # Options: 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
     # use 'naive' for discrete-species fitting, and can also be used for Amplitude spectra
@@ -129,23 +372,24 @@ oligomer_type_list = ['double_filament']
     # physics model to fix a relation between diffusion time and stoichiometry
 
 discrete_species_list = [
-    # [{
-    #   }
-    # ],
+    [{
+      }
+    ],
     [
-        {'N_avg_obs': 1., # default 1.
-         'vary_N_avg_obs': True, # default True
-         'tau_diff': 1E-5,  # default 1E-3
-         'vary_tau_diff': False, # default False
-         'cpms': 1000.,  # default 1.
-         'vary_cpms': True, # default False
-         'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
-         'stoichiometry': 1.,# default 1.
-         'vary_stoichiometry': False, # default (RECOMMENDED) False
-         'stoichiometry_binwidth': 1., # default 1.
-         'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
-         'labelling_efficiency': 1., # default 1.
-         'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
+        {
+            'N_avg_obs': 0.001, # default 1.
+            'vary_N_avg_obs': True, # default True
+            'tau_diff': 2.28453E-4,  # default 1E-3
+            'vary_tau_diff': False, # default False
+            'cpms': 5897.36792,  # default 1.
+            'vary_cpms': False, # default False
+            'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
+            'stoichiometry': 1.,# default 1.
+            'vary_stoichiometry': False, # default (RECOMMENDED) False
+            'stoichiometry_binwidth': 1., # default (RECOMMENDED) 1.
+            'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
+            'labelling_efficiency': 0.025, # default 1.
+            'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
         }
     ]
     ]
@@ -159,7 +403,8 @@ discrete_species_list = [
     # changing them is the right thing to do. You can leave out keywords, 
     # these will be replaced by defaults.
     # Each list of dicts is a set of discrete species to include in parallel 
-    # in the same fit.
+    # in the same fit (e.g., one for non-conjugated free dye, one for free 
+    # protein monomers).
     # The list of lists of dicts finally is equivalent to the other lists here,
     # an iteration over different configuration to try in fitting.
 
@@ -186,7 +431,7 @@ use_avg_count_rate_list = [True]
     # of molecular brightness. Also helps constrain mixture models of e.g. an
     # oligomer spectrum and a free-dye species
 
-fit_label_efficiency_list = [False] 
+fit_label_efficiency_list = [True, False] 
     # If you consider finite labelling fraction, here you can also decide to 
     # make that a fit parameter, although that may be numerically extremely instable
 
@@ -229,27 +474,30 @@ two_step_fit = False
 verbosity = 0
     # How much do you want the software to talk?
 
-FCS_psf_width_nm = np.mean([210])
+FCS_psf_width_nm = np.mean([290])
     # FCS calibration of PSF width in xy (w_0: 1/e^2 radius), although it is 
     # actually not used for anything meaningful currently
 
-FCS_psf_aspect_ratio = np.mean([6])
+FCS_psf_aspect_ratio = np.mean([7])
     # FCS calibration of PSF aspect ratio (w_z/w_0), also used for PCMH
 
 PCH_Q = 10. 
     # Evaluation parameter for PCH
 
-mp_processes = 1 
+mp_processes = 24
     # How many parallel processes?
     # If mp_processes <= 1, we use multiprocessing WITHIN the fit which allows acceleration of multi-species PCH
     # If mp_processes > 1, we run multiple fits simultaneously, each in single-thread calculation
     # mp_processes = os.cpu_count() // 2 to use half of available logical cores 
     # (-> on many machines all physical cores without hyperthreading)
 
-suppress_mp = True
+suppress_mp = False
     # For debugging purposes: Forces the software to run entirely without 
     # multiprocessing, which yields more interpretable error messages
     
+suppress_figs = True
+    # For batch processing: Suppress figure display, jsut write figures to file
+
 #%% Wrap all permutations for different fit settings and all files...Long list!
 # Iterate over all settings and files
 list_of_parameter_tuples = []
@@ -351,7 +599,8 @@ for use_FCS in use_FCS_list:
                                                                                            two_step_fit,
                                                                                            discrete_species,
                                                                                            verbosity,
-                                                                                           mp_processes <= 1 and not suppress_mp)
+                                                                                           mp_processes <= 1 and not suppress_mp,
+                                                                                           suppress_figs)
                                                                         list_of_parameter_tuples.extend((parameter_tuple,))
                                                                         fit_counter += 1
                                                                             
@@ -394,7 +643,8 @@ def par_func(fit_res_table_path,
              two_step_fit,
              discrete_species,
              verbosity,
-             use_parallel):
+             use_parallel,
+             suppress_figs):
     
     # Command line message
     if verbosity >= 1:
@@ -510,7 +760,8 @@ def par_func(fit_res_table_path,
                                         i_file,
                                         in_file_name_FCS,
                                         in_file_name_PCH,
-                                        dir_name
+                                        dir_name,
+                                        suppress_figs = suppress_figs
                                         )
             
             return fit_result, fitter, N_pop_array, lagrange_mul

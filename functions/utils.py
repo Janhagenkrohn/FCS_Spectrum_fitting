@@ -514,7 +514,8 @@ def write_fit_results(fit_result,
                       in_file_name_FCS = '',
                       in_file_name_PCH = '',
                       dir_name = '',
-                      verbosity = 0
+                      verbosity = 0,
+                      suppress_figs = False
                       ):
     
     # Unpack simple stuff
@@ -566,7 +567,7 @@ def write_fit_results(fit_result,
             disc_spec_params_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             disc_spec_params_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
 
-            query_keys = ['tau_diff_d_', 'N_avg_obs_d_', 'cpms_d_', 'stoichiometry_d_', 'stoichiometry_binwidth_d_', 'Label_efficiency_d_obs_']
+            query_keys = ['tau_diff_d_', 'N_avg_obs_d_', 'cpms_d_', 'stoichiometry_d_', 'stoichiometry_binwidth_d_', 'Label_efficiency_obs_d_']
             for i_spec in range(n_species_disc):
                 for query_key in query_keys:
                     if query_key + str(i_spec) in fit_params.keys():
@@ -1295,7 +1296,10 @@ def write_fit_results(fit_result,
             plt.savefig(os.path.join(save_path, 
                                       out_name + '_FCS.png'), 
                         dpi=300)
-            plt.show()
+            if suppress_figs:
+                plt.close()
+            else:
+                plt.show()
             
             
             # Write spreadsheet
@@ -1404,7 +1408,10 @@ def write_fit_results(fit_result,
             plt.savefig(os.path.join(save_path, 
                                       out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.png'), 
                         dpi=300)
-            plt.show()
+            if suppress_figs:
+                plt.close()
+            else:
+                plt.show()
 
             # Write spreadsheet
             out_dict = {'Photons': np.arange(0, data_PCH_hist.shape[0]), 

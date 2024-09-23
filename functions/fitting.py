@@ -851,21 +851,21 @@ class FCS_spectrum():
             N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
             
         # Likelihood function for particle numbers
-        n_pop = self.n_total_from_N_avg(N_avg_pop_array * stoichiometry_binwidth_array, 
+        n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
                                         tau_diff_array)
 
-        n_obs = self.n_total_from_N_avg(N_avg_obs_array * stoichiometry_binwidth_array, 
+        n_obs = self.n_total_from_N_avg(N_avg_obs_array, 
                                         tau_diff_array)
         if self.NLL_funcs_accurate:
             # Poisson likelihood
             negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                     observations = n_obs,
-                                                    scale = 1.)
+                                                    scale = stoichiometry_binwidth_array**(-0.5))
         else:
             # wlsq approximation
             negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
                                                                    n_pop,
-                                                                   np.min(n_pop[n_pop > 0])))
+                                                                   np.min(n_pop[n_pop > 0])) / np.sqrt(stoichiometry_binwidth_array))
             
         # Normalize by number of species as "pseudo-datapoints"
         negloglik /= n_species_spec
@@ -905,12 +905,12 @@ class FCS_spectrum():
             # Poisson likelihood
             negloglik_N = self.negloglik_poisson_full(rates = n_pop,
                                                       observations = n_obs,
-                                                      scale = 1.)
+                                                      scale = stoichiometry_binwidth_array**(-0.5))
         else:
             # wlsq approximation
             negloglik_N = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
                                                                      n_pop,
-                                                                     np.min(n_pop[n_pop > 0])))
+                                                                     np.min(n_pop[n_pop > 0])) / np.sqrt(stoichiometry_binwidth_array))
         
         # Here, we accumulate the negloglik iteratively over species
         negloglik_labelling = 0.
@@ -1519,12 +1519,10 @@ class FCS_spectrum():
         n_species_spec, n_species_disc = self.get_n_species(params)
         
         cpms_array = np.array([params[f'cpms_{i_spec}'].value for i_spec in range(n_species_spec)])
-        cpms_array /= 2**(3/2) # Gamma correction from peak to PSF-averaged brightness
         N_avg_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
         stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
 
         cpms_array_d = np.array([params[f'cpms_d_{i_spec}'].value for i_spec in range(n_species_disc)])
-        cpms_array_d /= 2**(3/2) # Gamma correction from peak to PSF-averaged brightness
         N_avg_array_d = np.array([params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_disc)])
         stoichiometry_binwidth_array_d = np.array([params[f'stoichiometry_binwidth_d_{i_spec}'].value for i_spec in range(n_species_disc)])
 
@@ -1535,10 +1533,8 @@ class FCS_spectrum():
             Label_efficiency_obs_array = np.ones_like(cpms_array)
             Label_efficiency_obs_array_d = np.ones_like(cpms_array_d)
         
-        count_rates_spec_model = np.sum(cpms_array * N_avg_array * stoichiometry_binwidth_array * Label_efficiency_obs_array) + \
-                                 np.sum(cpms_array_d * N_avg_array_d * stoichiometry_binwidth_array_d * Label_efficiency_obs_array_d)
-
-        avg_count_rate_model = np.sum(count_rates_spec_model)
+        avg_count_rate_model = np.sum(cpms_array * N_avg_array * stoichiometry_binwidth_array * Label_efficiency_obs_array) + \
+                               np.sum(cpms_array_d * N_avg_array_d * stoichiometry_binwidth_array_d * Label_efficiency_obs_array_d)
         
         # Correct dark-state fraction
         avg_count_rate_model *= 1 - params['F_blink'].value
@@ -2310,17 +2306,20 @@ class FCS_spectrum():
         cpms_array /= cpms_norm 
         cpms_array_d /= cpms_norm
 
+
         # Eval spectrum species
-        for i_spec in range(n_species_spec):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
-            acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2
-        acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        if n_species_spec > 0:
+            for i_spec in range(n_species_spec):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
+                acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2
+            acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
         
         # Eval discrete species
-        for i_spec in range(n_species_disc):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
-            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
-        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        if n_species_spec > 0:
+            for i_spec in range(n_species_disc):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+                acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+            acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
 
         # Put together and further terms
         acf *= 2**(-3/2) 
@@ -2355,17 +2354,21 @@ class FCS_spectrum():
         cpms_array /= cpms_norm 
         cpms_array_d /= cpms_norm
 
+        acf_den = 0.
+
         # Eval spectrum species
-        spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2
-        acf = np.dot(self.tau__tau_diff_array, 
-                     spec_weights)
-        acf_den = np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        if n_species_spec > 0:
+            spec_weights =  N_avg_array * stoichiometry_binwidth_array * cpms_array**2
+            acf = np.dot(self.tau__tau_diff_array, 
+                         spec_weights)
+            acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
         # Eval discrete species
-        for i_spec in range(n_species_disc):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
-            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
-        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        if n_species_disc > 0:
+            for i_spec in range(n_species_disc):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+                acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+            acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
      
         # Put together and further terms
         acf *= 2**(-3/2) 
@@ -2399,17 +2402,21 @@ class FCS_spectrum():
         cpms_array /= cpms_norm 
         cpms_array_d /= cpms_norm
 
+        acf_den = 0.
+
         # Eval spectrum species
-        spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2
-        acf = np.dot(self.tau__tau_diff_array, 
-                     spec_weights)
-        acf_den = np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
+        if n_species_spec > 0:
+            spec_weights = self._N_pop_array * stoichiometry_binwidth_array * cpms_array**2
+            acf = np.dot(self.tau__tau_diff_array, 
+                         spec_weights)
+            acf_den += np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
 
         # Eval discrete species
-        for i_spec in range(n_species_disc):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
-            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
-        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        if n_species_disc > 0:
+            for i_spec in range(n_species_disc):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+                acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
+            acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
         
         # Put together and further terms
         acf /= acf_den
@@ -2450,18 +2457,22 @@ class FCS_spectrum():
         cpms_norm = (cpms_array.sum() + cpms_array_d.sum()) / (n_species_spec + n_species_disc)
         cpms_array /= cpms_norm 
         cpms_array_d /= cpms_norm
-
+        
+        acf_den = 0.
+        
         # Eval spectrum species
-        for i_spec in range(n_species_spec):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
-            acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / stoichiometry_array[i_spec] / labelling_efficiency_array[i_spec])
-        acf_den = np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
+        if n_species_spec > 0:
+            for i_spec in range(n_species_spec):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array[i_spec])
+                acf += g_norm * N_avg_array[i_spec] * stoichiometry_binwidth_array[i_spec] * cpms_array[i_spec]**2 * (1 + (1 - labelling_efficiency_array[i_spec]) / stoichiometry_array[i_spec] / labelling_efficiency_array[i_spec])
+            acf_den += np.sum(self._N_pop_array * cpms_array * stoichiometry_binwidth_array)**2
         
         # Eval discrete species
-        for i_spec in range(n_species_disc):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
-            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / stoichiometry_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
-        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        if n_species_disc > 0:
+            for i_spec in range(n_species_disc):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+                acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / stoichiometry_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
+            acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
 
         # Put together and further terms
         acf /= acf_den
@@ -2499,17 +2510,21 @@ class FCS_spectrum():
         cpms_array /= cpms_norm 
         cpms_array_d /= cpms_norm
 
+        acf_den = 0.
+
         # Eval spectrum species
-        spec_weights = N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
-        acf = np.dot(self.tau__tau_diff_array, 
-                     spec_weights)
-        acf_den = np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
+        if n_species_spec > 0:
+            spec_weights = N_avg_array * stoichiometry_binwidth_array * cpms_array**2 * (1 + (1 - labelling_efficiency_array) / stoichiometry_array / labelling_efficiency_array)
+            acf = np.dot(self.tau__tau_diff_array, 
+                         spec_weights)
+            acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
 
         # Eval discrete species
-        for i_spec in range(n_species_disc):
-            g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
-            acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / stoichiometry_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
-        acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
+        if n_species_disc > 0:
+            for i_spec in range(n_species_disc):
+                g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
+                acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2 * (1 + (1 - labelling_efficiency_array_d[i_spec]) / stoichiometry_array_d[i_spec] / labelling_efficiency_array_d[i_spec])
+            acf_den += np.sum(N_avg_array_d * cpms_array_d * stoichiometry_binwidth_array_d)**2
 
         # Put together and further terms
         acf /= acf_den
@@ -3094,6 +3109,7 @@ class FCS_spectrum():
                  # In this configuration, we take the input value specified for this species to express the spectrum cpms_0  
                  initial_params.add(f'cpms_d_{n_species_disc}',
                                     value = cpms,
+                                    min = 0.,
                                     vary = False)
                  
                  initial_params['cpms_0'].vary = False
@@ -3103,28 +3119,36 @@ class FCS_spectrum():
         else:
             # No linking this species to spectrum monomer - then it's trivial
             initial_params.add(f'cpms_d_{n_species_disc}',
-                               expr = cpms,
+                               value = cpms,
+                               min = 0.,
                                vary = vary_cpms)
             
         # The other parameter are all straightforward
         initial_params.add(f'N_avg_obs_d_{n_species_disc}',
                            value = N_avg_obs,
+                           min = 0.,
                            vary = vary_N_avg_obs)
 
         initial_params.add(f'tau_diff_d_{n_species_disc}',
                            value = tau_diff,
+                           min = self.data_FCS_tau_s.min() if self.FCS_possible else 0.,
+                           max = self.data_FCS_tau_s.max() if self.FCS_possible else np.inf,
                            vary = vary_tau_diff)
 
         initial_params.add(f'stoichiometry_d_{n_species_disc}',
                            value = stoichiometry,
+                           min = 1.,
                            vary = vary_stoichiometry)
 
         initial_params.add(f'stoichiometry_binwidth_d_{n_species_disc}',
                            value = stoichiometry_binwidth,
+                           min = 0.,
                            vary = vary_stoichiometry_binwidth)
 
         initial_params.add(f'Label_efficiency_obs_d_{n_species_disc}',
                            value = labelling_efficiency,
+                           min = 0.,
+                           max = 1.,
                            vary = vary_labelling_efficiency)
         
         return initial_params

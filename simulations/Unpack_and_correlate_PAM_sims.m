@@ -9,8 +9,7 @@ file_paths = {
 %     '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-3_simData.mat'
 %     '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\3peaks_mu5-20-50_sigma2-30-10_label1e-4_simData.mat'
 %     '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\PAM_simulations\3f\single_filament_run1\1peaks_mu10_sigma5_label1e-0_simData.mat'
-    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f\debug\physics_test_7.mat'
-    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f\debug\physics_test_8.mat'
+    '\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f\debug\physics_test_10.mat'
 
     };
 
@@ -19,9 +18,11 @@ lagmin_s = 1e-6;
 lagmax_s = 3;
 Sampling = 12;
 
-sim_time_s = 30;
-
 sd_method = 'Bootstrap'; % 'Wohland', 'Bootstrap'
+
+export_time_trace = true;
+
+
 
 for i_file = 1:length(file_paths)
 
@@ -33,13 +34,29 @@ for i_file = 1:length(file_paths)
         load(file_path)
             
         macro_times = Sim_Photons{1,1};
+        sim_time_s = max(macro_times) ./ Header.Freq;
         lagmin_sync = lagmin_s .* Header.Freq;
         lagmax_sync = lagmax_s .* Header.Freq;
     
         [folder, baseFileNameNoExt, ~] = fileparts(file_path);
 
-        
-        
+
+        if export_time_trace
+            %%% Time trace
+            savename = fullfile(folder, [baseFileNameNoExt, '_trace_ch0.csv']);
+            disp(['Time trace'])
+
+            n_bins = floor(sim_time_s * 1E3) + 1;
+            trace_bins_freq = linspace(0, sim_time_s .* Header.Freq, n_bins);
+            [trace, ~] = histcounts(macro_times, trace_bins_freq);
+            
+            out_trace = [trace_bins_freq(1:end-1) ./ Header.Freq; trace]';
+            writematrix(out_trace, savename)
+    
+        end % if export_time_trace
+
+
+
         %%% FCS
         savename = fullfile(folder, [baseFileNameNoExt, '_ACF_ch0.csv']);
         disp(['Correlation function'])
