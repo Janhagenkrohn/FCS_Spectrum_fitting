@@ -412,7 +412,32 @@ class FCS_spectrum():
         axial_ratio = j / 2.
         return 2. * axial_ratio / (2. * np.log(axial_ratio) + 0.632 + 1.165 * axial_ratio ** (-1.) + 0.1 * axial_ratio ** (-2.))
 
+    @staticmethod
+    def wlc_tau_diff_fold_change(j,
+                                 r_mono,
+                                 l_Kuhn,
+                                 ):
+        l_contour = j * 2 * r_mono 
+        msd_fold_change = l_Kuhn * l_contour - l_Kuhn**2 / 2. * (1 - np.exp(-2* l_contour / l_Kuhn))
+        return np.sqrt(msd_fold_change)
+
+    @staticmethod
+    def helical_wlc_tau_diff_fold_change(j,
+                                         helix_radius,
+                                         helix_pitch,
+                                         r_mono,
+                                         l_Kuhn,
+                                         ):
+        
+        kappa_wlc = (4*l_Kuhn*helix_radius*np.pi**2)/(helix_pitch**2 + 4*np.pi**2*helix_radius**2)
+        tau_wlc = (2*helix_pitch*l_Kuhn*np.pi)/(helix_pitch**2 + 4*np.pi**2*helix_radius**2)
+        c_inf = (4 + tau_wlc**2) / (4 + kappa_wlc**2 + tau_wlc**2)
+        l_contour = j * 2 * r_mono / l_Kuhn # not real contour length, but normalized to Kuhn segment length
+        nu = np.sqrt(kappa_wlc**2 + tau_wlc**2)
+        msd_fold_change = c_inf * l_contour - 0.5 * (tau_wlc/nu)**2 - 2 * (kappa_wlc/nu)**2 * (4 - nu**2) / (4+nu**2) + np.exp(-2*l_contour) * (0.5* (tau_wlc / nu)**2 + 2 * (kappa_wlc/nu)**2 * ((4 - nu**2) * np.cos(nu*l_contour) - 4 * nu * np.sin(nu*l_contour)) / (4 + nu**2))
+        return np.sqrt(msd_fold_change)
     
+
     @staticmethod
     def get_n_species(params):
         '''
@@ -860,12 +885,12 @@ class FCS_spectrum():
             # Poisson likelihood
             negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                     observations = n_obs,
-                                                    scale = stoichiometry_binwidth_array**(-0.5))
+                                                    scale = stoichiometry_binwidth_array**(0.5))
         else:
             # wlsq approximation
             negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
                                                                    n_pop,
-                                                                   np.min(n_pop[n_pop > 0])) / np.sqrt(stoichiometry_binwidth_array))
+                                                                   np.min(n_pop[n_pop > 0])) * np.sqrt(stoichiometry_binwidth_array))
             
         # Normalize by number of species as "pseudo-datapoints"
         negloglik /= n_species_spec
@@ -2751,23 +2776,54 @@ class FCS_spectrum():
                                                        tau_diff_fold_change):
         return (self.double_filament_tau_diff_fold_change(np.exp(log_j)) - tau_diff_fold_change) ** 2
 
-    
+
+    def wlc_tau_diff_fold_change_deviation(self,
+                                           log_j,
+                                           tau_diff_fold_change,
+                                           oligomer_model_params):
+        for param_name in ['r_mono', 'l_Kuhn']:
+            if not param_name in oligomer_model_params.keys():
+                raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_model_params - must be dict containing key words r_mono and l_Kuhn. Got: {oligomer_model_params}")
+
+        tau_diff_fold_change_model = self.wlc_tau_diff_fold_change(np.exp(log_j), 
+                                                                   oligomer_model_params['r_mono'],
+                                                                   oligomer_model_params['l_Kuhn'])
+        return (tau_diff_fold_change_model - tau_diff_fold_change) ** 2
+
+
+    def helical_wlc_tau_diff_fold_change_deviation(self,
+                                                   log_j,
+                                                   tau_diff_fold_change,
+                                                   oligomer_model_params):
+        for param_name in ['helix_radius', 'helix_pitch', 'r_mono', 'l_Kuhn']:
+            if not param_name in oligomer_model_params.keys():
+                raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_model_params - must be dict containing key words helix_radius, helix_pitch, r_mono and l_Kuhn. Got: {oligomer_model_params}")
+
+        tau_diff_fold_change_model = self.helical_wlc_tau_diff_fold_change(np.exp(log_j), 
+                                                                           oligomer_model_params['helix_radius'],
+                                                                           oligomer_model_params['helix_pitch'],
+                                                                           oligomer_model_params['r_mono'],
+                                                                           oligomer_model_params['l_Kuhn'])
+        return (tau_diff_fold_change_model - tau_diff_fold_change) ** 2
+
+
     def stoichiometry_from_tau_diff_array(self,
                                           tau_diff_array,
-                                          oligomer_type
+                                          oligomer_type,
+                                          oligomer_model_params = {}
                                           ):
         
         if not utils.isiterable(tau_diff_array):
-            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_array - must be np.array")
+            raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_array - must be np.array. Got: {tau_diff_array}")
             
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
+        if not type(oligomer_model_params) == dict:
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_model_params - must be dict. Got: {oligomer_model_params}")
 
         # The monomer by definition has stoichiometry 1, so we start with the second element
         fold_changes = tau_diff_array[1:] / tau_diff_array[0]
         stoichiometry = np.ones_like(tau_diff_array)
         
-        if oligomer_type == 'sherical_dense':
+        if oligomer_type in ['sherical_dense', 'Spherical_dense', 'Spherical_Dense', 'dense_sphere', 'Dense_sphere', 'Dense_Sphere']:
             # tau_diff proportional hydrodyn. radius
             # Stoichiometry proportional volume
             stoichiometry[1:] = fold_changes ** 3
@@ -2792,9 +2848,9 @@ class FCS_spectrum():
                                                         stoichiometry_binwidth,
                                                         1.))
                     
-        elif oligomer_type in ['spherical_shell', 'Gaussian_chain']:
+        elif oligomer_type in ['spherical_shell', 'Spherical_shell', 'Spherical_Shell', 'gaussian_chain', 'Gaussian_chain', 'Gaussian_Chain', 'GC', 'gc', 'Gc', 'worm_like_chain', 'Worm_like_chain', 'Worm_Like_Chain', 'wlc', 'WLC', 'Wlc']:
             # tau_diff proportional hydrodyn. radius
-            # Stoichiometry proportional surface area Gaussian chain Kuhn segment number
+            # Stoichiometry proportional surface area or sqrt of Kuhn segment number
             stoichiometry[1:] = fold_changes ** 2
 
             stoichiometry, _ = np.unique(np.round(stoichiometry),
@@ -2810,7 +2866,7 @@ class FCS_spectrum():
                                                         stoichiometry_binwidth,
                                                         1.))
 
-        elif oligomer_type == 'single_filament':
+        elif oligomer_type in ['single_filament', 'Single_filament', 'Single_Filament']:
             # For the filament models, we have more complicated expressions based
             # on Seils & Pecora 1995. We numerically solve the expression.
             
@@ -2833,7 +2889,7 @@ class FCS_spectrum():
                                                         stoichiometry_binwidth,
                                                         1.))
 
-        elif oligomer_type == 'double_filament':
+        elif oligomer_type in ['double_filament', 'Double_filament', 'Double_Filament']:
         
             stoichiometry = np.zeros_like(fold_changes)
             
@@ -2857,11 +2913,71 @@ class FCS_spectrum():
                                                         stoichiometry_binwidth,
                                                         1.))
 
-        else: # oligomer_type == naive
+        elif oligomer_type in ['worm_like_chain', 'Worm_like_chain', 'Worm_Like_Chain', 'wlc', 'WLC', 'Wlc']:
+            # This is a simple worm-like chain model parameterized by the Kuhn segment length
+            stoichiometry = np.zeros_like(fold_changes)
+            
+            for i_spec, tau_diff_fold_change in enumerate(fold_changes[1:]):
+
+                res = sminimize_scalar(fun = self.wlc_tau_diff_fold_change_deviation, 
+                                       args = (tau_diff_fold_change,
+                                               oligomer_model_params,))
+                stoichiometry[i_spec + 1] = np.exp(res.x)
+                
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
+            stoichiometry = stoichiometry[stoichiometry > 0]
+            tau_diff_array = np.append(tau_diff_array[0],
+                                       tau_diff_array[0] * self.wlc_tau_diff_fold_change(stoichiometry[1:],
+                                                                                         oligomer_model_params['r_mono'], 
+                                                                                         oligomer_model_params['l_Kuhn']))
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
+
+        elif oligomer_type in ['helical_worm_like_chain', 'Helical_worm_like_chain', 'Helical_Worm_Like_Chain', 'hwlc', 'HWLC', 'Hwlc']:
+            # This is the "helical worm-like chain" described in Yamakawa & Yoshizaki 1981 and papers referenced therein
+            stoichiometry = np.zeros_like(fold_changes)
+            
+            for i_spec, tau_diff_fold_change in enumerate(fold_changes[1:]):
+
+                res = sminimize_scalar(fun = self.helical_wlc_tau_diff_fold_change_deviation, 
+                                       args = (tau_diff_fold_change,
+                                               oligomer_model_params,))
+                stoichiometry[i_spec + 1] = np.exp(res.x)
+                
+            stoichiometry, _ = np.unique(np.round(stoichiometry),
+                                         return_index = True)
+            stoichiometry = stoichiometry[stoichiometry > 0]
+            tau_diff_array = np.append(tau_diff_array[0],
+                                       tau_diff_array[0] * self.helical_wlc_tau_diff_fold_change(stoichiometry[1:],
+                                                                                                 oligomer_model_params['helix_radius'],
+                                                                                                 oligomer_model_params['helix_pitch'],
+                                                                                                 oligomer_model_params['r_mono'], 
+                                                                                                 oligomer_model_params['l_Kuhn']))
+            log_stoichiometry = np.log(stoichiometry)
+            log_spacing = np.diff(log_stoichiometry)
+            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
+            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
+            stoichiometry_binwidth = np.append(1., 
+                                               np.where(stoichiometry_binwidth > 1.,
+                                                        stoichiometry_binwidth,
+                                                        1.))
+            
+        elif oligomer_type in ['naive', 'Naive']:
             # Dummy ones
             stoichiometry = np.arange(1, tau_diff_array.shape[0] + 1)
             stoichiometry_binwidth = 1. / stoichiometry
             # tau_diff_array remains unchanged
+            
+        else:
+            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain', 'worm_like_chain', 'helical_worm_like_chain', or certain allowed synonyms. Got: {oligomer_type}")
+
                     
         return stoichiometry, tau_diff_array, stoichiometry_binwidth
     
@@ -3166,6 +3282,7 @@ class FCS_spectrum():
                           tau_diff_min,
                           tau_diff_max,
                           use_blinking,
+                          oligomer_model_params = {},
                           use_avg_count_rate = False,
                           fit_label_efficiency = False
                           ):
@@ -3184,9 +3301,6 @@ class FCS_spectrum():
             
         if not spectrum_type in ['reg_MEM', 'reg_CONTIN']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_reg - must be one out of 'reg_MEM', 'reg_CONTIN'. Got: {spectrum_type}")
-
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for regularized fitting. Got: {n_species}")
@@ -3208,7 +3322,8 @@ class FCS_spectrum():
                                                  n_species)
         
         stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
-                                                                                                       oligomer_type)
+                                                                                                       oligomer_type,
+                                                                                                       oligomer_model_params)
         # Can be fewer here than originally intended, depending on settings
         n_species = stoichiometry.shape[0]
         
@@ -3469,6 +3584,7 @@ class FCS_spectrum():
                           tau_diff_min,
                           tau_diff_max,
                           use_blinking,
+                          oligomer_model_params = {},
                           previous_params = None,
                           previous_N_obs_array = None,
                           skip_species_mask = None,
@@ -3490,9 +3606,6 @@ class FCS_spectrum():
 
         if not spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type for set_up_params_par - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'")
-
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got: {oligomer_type}")
 
         if not (utils.isint(n_species) and n_species >= 10):
             raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int >= 10 for parameterized spectrum fitting")
@@ -3540,7 +3653,8 @@ class FCS_spectrum():
                                                      tau_diff_max, 
                                                      n_species)        
             stoichiometry, tau_diff_array, stoichiometry_binwidth = self.stoichiometry_from_tau_diff_array(tau_diff_array, 
-                                                                                                           oligomer_type)
+                                                                                                           oligomer_type,
+                                                                                                           oligomer_model_params)
             stoichiometry = stoichiometry.astype(np.float64)
             
             # Can be fewer here than originally intended, depending on settings
@@ -3767,7 +3881,8 @@ class FCS_spectrum():
                     tau_diff_array = np.array([previous_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species)])
                     tau_diff_array = tau_diff_array[np.logical_not(skip_species_mask)]
                     stoichiometry_array, tau_diff_array, stoichiometry_binwidth_array = self.stoichiometry_from_tau_diff_array(tau_diff_array,
-                                                                                                                               oligomer_type)
+                                                                                                                               oligomer_type,
+                                                                                                                               oligomer_model_params)
 
                 else:
                     stoichiometry_array = np.array([previous_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species)])
@@ -4005,6 +4120,7 @@ class FCS_spectrum():
                 tau_diff_min, # float
                 tau_diff_max, # float
                 use_blinking, # bool
+                oligomer_model_params = {}, # Dict
                 use_avg_count_rate = False, # Bool
                 fit_label_efficiency = False, # bool
                 two_step_fit = True,
@@ -4035,10 +4151,7 @@ class FCS_spectrum():
 
         if not (spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers'] or  spectrum_type == 'discrete'):
             raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {spectrum_parameter}")
-    
-        if not (oligomer_type in ['naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'] or spectrum_type == 'discrete'):
-            raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
-        
+            
         if type(labelling_correction) != bool:
             raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
 
@@ -4115,6 +4228,7 @@ class FCS_spectrum():
                                                     tau_diff_min, 
                                                     tau_diff_max, 
                                                     use_blinking,
+                                                    oligomer_model_params = oligomer_model_params,
                                                     use_avg_count_rate = use_avg_count_rate and not two_step_fit,
                                                     fit_label_efficiency = fit_label_efficiency and not two_step_fit # Label efficiency is also optimized in second fit round
                                                     )   
@@ -4132,6 +4246,7 @@ class FCS_spectrum():
                                                     tau_diff_min,
                                                     tau_diff_max,
                                                     use_blinking,
+                                                    oligomer_model_params = oligomer_model_params,
                                                     use_avg_count_rate = use_avg_count_rate,
                                                     fit_label_efficiency = fit_label_efficiency
                                                     )
@@ -4198,6 +4313,7 @@ class FCS_spectrum():
                                                                 tau_diff_min, 
                                                                 tau_diff_max, 
                                                                 use_blinking,
+                                                                oligomer_model_params = oligomer_model_params,
                                                                 previous_params = fit_result.params,
                                                                 use_avg_count_rate = use_avg_count_rate,
                                                                 fit_label_efficiency = fit_label_efficiency
@@ -4228,6 +4344,7 @@ class FCS_spectrum():
                  
                 
                 elif spectrum_type in ['reg_MEM', 'reg_CONTIN'] and two_step_fit:
+                    raise Exception('Currently unsupported, needs debugging that I have not gotten around to do, after some changes affected this code...')
                     # Run Gauss fit
                     fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
                                                 params = initial_params, 
@@ -4348,6 +4465,7 @@ class FCS_spectrum():
                                                                     tau_diff_min, 
                                                                     tau_diff_max, 
                                                                     use_blinking,
+                                                                    oligomer_model_params = oligomer_model_params,
                                                                     previous_params = fit_result.params,
                                                                     use_avg_count_rate = use_avg_count_rate,
                                                                     fit_label_efficiency = fit_label_efficiency
@@ -4492,219 +4610,3 @@ class FCS_spectrum():
         
         
         
-    # def reg_par_fit_sequence(self,
-    #                         use_FCS, # bool
-    #                         use_PCH, # bool
-    #                         time_resolved_PCH, # bool
-    #                         reg_spectrum_type, # 'reg_MEM', 'reg_CONTIN'
-    #                         par_spectrum_type, # 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
-    #                         par_spectrum_parameter, # 'Amplitude', 'N_monomers', 'N_oligomers',
-    #                         oligomer_type, # spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain'
-    #                         labelling_correction, # bool
-    #                         n_species, # int
-    #                         reg_tau_diff_min, # float
-    #                         par_tau_diff_min,  # float
-    #                         tau_diff_max, # float
-    #                         use_blinking, # bool
-    #                         use_avg_count_rate = False, # Bool
-    #                         i_bin_time = 0, # int
-    #                         use_parallel = False # Bool
-    #                         ):
-        
-    #     # This function was an interesting idea, but got abandoned after some time
-        
-    #     # A bunch of input and compatibility checks
-    #     if use_FCS and not self.FCS_possible:
-    #         raise Exception(f'[{self.job_prefix}] Cannot run FCS fit - not all required attributes set in class')
-        
-    #     if use_PCH and not self.PCH_possible:
-    #         raise Exception(f'[{self.job_prefix}] Cannot run PCH fit - not all required attributes set in class')
-
-    #     if use_PCH and time_resolved_PCH and self.FCS_psf_aspect_ratio == None:
-    #         raise Exception(f'[{self.job_prefix}] Cannot run PCMH fit - PSF aspect ratio must be set')
-
-    #     if not reg_spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'reg_MEM' or 'reg_CONTIN'. Got {reg_spectrum_type}")
-
-    #     if not par_spectrum_type in ['par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp']:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_type - must be one out of 'par_Gauss', 'par_LogNorm', 'par_Gamma', or 'par_StrExp'. Got {par_spectrum_type}")
-
-    #     if not par_spectrum_parameter in ['Amplitude', 'N_monomers', 'N_oligomers']:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for spectrum_parameter - unless spectrum_type is 'discrete', spectrum_parameter must be one out of 'Amplitude', 'N_monomers', or 'N_oligomers'. Got {par_spectrum_parameter}")
-    
-    #     if not oligomer_type in ['spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', 'Gaussian_chain']:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for oligomer_type - oligomer_type must be one out of 'spherical_shell', 'sherical_dense', 'single_filament', 'double_filament', or 'Gaussian_chain'. Got {oligomer_type}")
-        
-    #     if type(labelling_correction) != bool:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for labelling_correction - must be bool. Got {labelling_correction}")
-
-    #     if not (utils.isint(n_species) and n_species > 10):
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for n_species - must be int > 10. Got {n_species}")
-        
-    #     if not (utils.isfloat(reg_tau_diff_min) and reg_tau_diff_min > 0):
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float > 0. Got {reg_tau_diff_min}")
-
-    #     if not (utils.isfloat(par_tau_diff_min) and par_tau_diff_min >= reg_tau_diff_min):
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_min - must be float >= reg_tau_diff_min. Got {par_tau_diff_min}")
-
-    #     if not (utils.isfloat(tau_diff_max) and tau_diff_max >= par_tau_diff_min):
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for tau_diff_max - must be float >= par_tau_diff_min. Got {tau_diff_max}")
-
-    #     if type(use_blinking) != bool:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for use_blinking - must be bool. Got {use_blinking}")
-
-    #     if not (utils.isint(i_bin_time) and i_bin_time >= 0):
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for i_bin_time - must be int >= 0. Got {i_bin_time}")
-
-    #     if type(use_avg_count_rate) != bool:
-    #         raise Exception(f"[{self.job_prefix}] Invalid input for use_avg_count_rate - must be bool. Got {use_avg_count_rate}")
-
-    #     if use_avg_count_rate and not self.avg_count_rate_given:
-    #         raise Exception(f"[{self.job_prefix}] Average count rate not specified and thus cannot be included in fit.")
-
-
-    #     #### Step 0: Create parpool, if specified
-        
-    #     if use_parallel:
-    #         mp_pool = multiprocessing.Pool(processes = os.cpu_count() - 1)
-    #     else:
-    #         mp_pool = None
-
-
-
-    #     ##### Step 1: Initial parameters for regularized-spectrum fit
-        
-    #     initial_params = self.set_up_params_reg(use_FCS,
-    #                                             use_PCH,
-    #                                             time_resolved_PCH,
-    #                                             reg_spectrum_type,
-    #                                             oligomer_type,
-    #                                             False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-    #                                             labelling_correction,
-    #                                             n_species,
-    #                                             reg_tau_diff_min,
-    #                                             tau_diff_max,
-    #                                             use_blinking,
-    #                                             use_avg_count_rate = use_avg_count_rate
-    #                                             )
-        
-        
-        
-        
-    #     ##### Step 2: Run regularized-spectrum fit
-        
-    #     if not (self.precision_incremental and use_PCH):
-    #         # Fit with a single numeric precision value (or with settings where the precision parameter is irrelevant)
-    #         reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
-    #                                                                            use_FCS,
-    #                                                                            use_PCH,
-    #                                                                            time_resolved_PCH,
-    #                                                                            reg_spectrum_type,
-    #                                                                            'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
-    #                                                                            labelling_correction,
-    #                                                                            False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-    #                                                                            i_bin_time = i_bin_time,
-    #                                                                            N_pop_array = None,
-    #                                                                            numeric_precision = self.numeric_precision,
-    #                                                                            mp_pool = mp_pool,
-    #                                                                            max_iter_inner = REG_MAX_ITER_INNER,
-    #                                                                            max_iter_outer = REG_MAX_ITER_OUTER,
-    #                                                                            max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
-    #                                                                            use_avg_count_rate = use_avg_count_rate
-    #                                                                            )
-            
-    #     else:
-    #         # Multiple numeric precision increments
-    #         if self.NLL_funcs_accurate:
-    #             # For early, lower-precision fits we also go to the fast least-squares approximation!
-    #             NLL_funcs_accurate = True
-    #             self.NLL_funcs_accurate = False
-    #         else:
-    #             # Leave a marker that we stick to least-squares approximation anyway
-    #             NLL_funcs_accurate = False
-                
-
-    #         # we use incremental precision fitting
-    #         for i_inc, inc_precision in enumerate(self.numeric_precision):
-                
-    #             if self.verbosity > 0:
-    #                 print(f'[{self.job_prefix}] Numeric precision increment {i_inc+1} of {self.numeric_precision.shape[0]}')
-                    
-    #             if i_inc == 0:
-    #                 N_pop_array = None
-    #             elif i_inc == self.numeric_precision.shape[0] - 1:
-    #                 # Last iteration: Switch from least-squares to MLE fitting now if needed
-    #                 self.NLL_funcs_accurate = NLL_funcs_accurate
-
-    #             reg_fit_result, N_pop_array, _ = self.regularized_minimization_fit(initial_params,
-    #                                                                                use_FCS,
-    #                                                                                use_PCH,
-    #                                                                                time_resolved_PCH,
-    #                                                                                reg_spectrum_type,
-    #                                                                                'Amplitude', # spectrum_type is hard-coded 'amplitude' in the reg fitting step
-    #                                                                                labelling_correction,
-    #                                                                                False, # incomplete_sampling_correction is hard-coded False in the reg fitting step
-    #                                                                                i_bin_time = i_bin_time,
-    #                                                                                N_pop_array = N_pop_array,
-    #                                                                                numeric_precision = inc_precision,
-    #                                                                                mp_pool = mp_pool,
-    #                                                                                max_iter_inner = REG_MAX_ITER_INNER,
-    #                                                                                max_iter_outer = REG_MAX_ITER_OUTER,
-    #                                                                                max_lagrange_mul = REG_MAX_LAGRANGE_MUL,
-    #                                                                                use_avg_count_rate = use_avg_count_rate
-    #                                                                                )
-
-    #             if i_inc < self.numeric_precision.shape[0] - 1:
-    #                 # At least one fit more to run, use output of previous fit as input for next round
-    #                 initial_params = reg_fit_result.params
-                    
-            
-            
-    #     #### Step 3: Recalculate parameterized spectrum from regularized spectrum fit result
-        
-    #     # Get tau_diff_array and figure out which tau_diff to continue 
-    #     # using in parameterized-spectrum re-fit
-    #     # tau_diff_array = np.array([reg_fit_result.params[f'tau_diff_{i_spec}'].value for i_spec in range(N_pop_array.shape[0])]
-    #     tau_diff_array = self.tau__tau_diff_array[0,:]
-    #     remove_in_re_fit = tau_diff_array < par_tau_diff_min
-        
-    #     initial_params = self.set_up_params_par(use_FCS, 
-    #                                             use_PCH, 
-    #                                             time_resolved_PCH,
-    #                                             par_spectrum_type,
-    #                                             par_spectrum_parameter, 
-    #                                             oligomer_type, 
-    #                                             True,  # incomplete_sampling_correction is hard-coded True in the par fitting step
-    #                                             labelling_correction, 
-    #                                             n_species,  # Actually gets overwritten here anyway
-    #                                             par_tau_diff_min, 
-    #                                             tau_diff_max, 
-    #                                             use_blinking,
-    #                                             previous_params = reg_fit_result.params if (hasattr(reg_fit_result, 'params') and hasattr(reg_fit_result, 'covar')) else reg_fit_result,
-    #                                             previous_N_obs_array = N_pop_array,
-    #                                             skip_species_mask = remove_in_re_fit,
-    #                                             use_avg_count_rate = use_avg_count_rate
-    #                                             ) 
-        
-        
-    #     #### Step 4: Re-fit parameterized model directly with highest numeric precision
-        
-    #     par_fit_result = lmfit.minimize(fcn = self.negloglik_global_fit, 
-    #                                     params = initial_params, 
-    #                                     method = 'nelder',
-    #                                     args = (use_FCS, 
-    #                                             use_PCH, 
-    #                                             time_resolved_PCH,
-    #                                             par_spectrum_type, 
-    #                                             par_spectrum_parameter,
-    #                                             labelling_correction, 
-    #                                             True # incomplete_sampling_correction is hard-coded True in the par fitting step
-    #                                             ),
-    #                                     kws = {'i_bin_time': i_bin_time,
-    #                                            'numeric_precision': self.numeric_precision[-1] if self.precision_incremental else self.numeric_precision,
-    #                                            'mp_pool': mp_pool,
-    #                                            'use_avg_count_rate': use_avg_count_rate},
-    #                                     calc_covar = True)
-
-    #     return reg_fit_result, N_pop_array, par_fit_result
-    

@@ -288,11 +288,10 @@ glob_in_dir = r'/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/2024080
 
 _in_dir_names = []
 _alpha_label = []
-_in_dir_names.extend([os.path.join(glob_in_dir, 'NP_in_buffer_time_0/01_NP-naked_batch1_HBG_time0_FCS_ch1_20240827_1503')])
+_in_dir_names.extend([os.path.join(glob_in_dir, 'Bootstrap_SD/01_NP-naked_batch1_HBG_time0_FCS_ch1_20240827_1503')])
 _alpha_label.append(0.025)
-_in_dir_names.extend([os.path.join(glob_in_dir, 'NP_in_buffer_time_2h/07_NP-naked_batch1_HBG_time2h_FCS_ch1_20240827_1503')])
+_in_dir_names.extend([os.path.join(glob_in_dir, 'Bootstrap_SD/07_NP-naked_batch1_HBG_time2h_FCS_ch1_20240827_1503')])
 _alpha_label.append(0.025)
-
 
 # Naming pattern for detecting correct files within subdirs of each in_dir
 # # Bootstrap SD, no burst removal
