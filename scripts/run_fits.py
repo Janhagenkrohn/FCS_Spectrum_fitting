@@ -72,7 +72,7 @@ in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_
 [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
 # Output dir for result file writing
-glob_out_dir = r'D:\temp\FCS_Spectrum_debug\18'
+glob_out_dir = r'D:\temp\FCS_Spectrum_debug\22'
 
 
 
@@ -90,9 +90,11 @@ glob_out_dir = r'D:\temp\FCS_Spectrum_debug\18'
 labelling_correction_list = [True] 
     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
     
-incomplete_sampling_correction_list = [False, True] 
+incomplete_sampling_correction_list = [True] 
     # Whether to fit deviations between "population-level" and "observation-level"
     # dynamics, i.e., explicit treatment of an additional layer of noise
+    # If True, very strongy recommended to use with settings:
+        # two_step_fit == True and NLL_funcs_accurate == True
     
 labelling_efficiency_incomp_sampling_list = [False] 
     # Addition to combined incomplete sampling correction and labelling correction 
@@ -193,7 +195,7 @@ use_avg_count_rate_list = [False, True]
     # of molecular brightness. Also helps constrain mixture models of e.g. an
     # oligomer spectrum and a free-dye species
 
-fit_label_efficiency_list = [False, True] 
+fit_label_efficiency_list = [False] 
     # If you consider finite labelling fraction, here you can also decide to 
     # make that a fit parameter, although that may be numerically extremely instable
 
@@ -216,10 +218,12 @@ PCH_max_bin_time = 5E-4
     # Longest PCMH bin times to consider
     # Specify np.inf to use full range of data in .csv file
 
-NLL_funcs_accurate = False
+NLL_funcs_accurate = True
     # Accurate maximum-likelihood evaluation, or use faster least-squares 
     # approximation? Affects most likelihood terms except the chi-square 
-    # minimization on the ACF correlation function
+    # minimization on the ACF correlation function. Highly recommended for 
+    # incomplete sampling fit as least-squares is prone to crashing due to 
+    # zeros!
     
 numeric_precision = np.array([1E-3, 1E-4, 1E-5])
     # PCH requires a numerical precision cutoff, which is set here. The lower 
@@ -231,9 +235,10 @@ numeric_precision = np.array([1E-3, 1E-4, 1E-5])
 two_step_fit = True
     # For some model configuration, you can first run a simpler, more robust, 
     # version of the fit with some parameters fixed, and then re-fit with the 
-    # "full" model complexity
+    # "full" model complexity. Highly recommended for incomplete sampling fit
+    # for numeric stability!
 
-verbosity = 3
+verbosity = 1
     # How much do you want the software to talk?
 
 FCS_psf_width_nm = np.mean([210])

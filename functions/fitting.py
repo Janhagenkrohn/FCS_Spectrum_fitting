@@ -927,6 +927,7 @@ class FCS_spectrum():
         n_obs = self.n_total_from_N_avg(N_avg_obs_array, 
                                         tau_diff_array)
         
+        
         if labelling_correction:
             negloglik = 0.
             labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
@@ -945,9 +946,10 @@ class FCS_spectrum():
                                                               scale = stoichiometry_binwidth_array[i_spec])
                 else:
                     # wlsq approximation
-                    negloglik += 0.5 * np.sum((n_pop_spec_label - n_obs_spec_label)**2 / np.where(n_pop_spec_label > 0,
+                    negloglik += 0.5 * np.sum((n_pop_spec_label - n_obs_spec_label)**2 / np.where(n_pop_spec_label > 1E-50,
                                                                                                   n_pop_spec_label,
-                                                                                                  np.min(n_pop_spec_label[n_pop_spec_label > 0]))) * stoichiometry_binwidth_array[i_spec]
+                                                                                                  # np.min(n_pop_spec_label[n_pop_spec_label > 1E-50]))) * stoichiometry_binwidth_array[i_spec]
+                                                                                                  np.max(n_pop_spec_label))) * stoichiometry_binwidth_array[i_spec]
                     
                     
         else:
@@ -958,9 +960,9 @@ class FCS_spectrum():
                                                         scale = stoichiometry_binwidth_array)
             else:
                 # wlsq approximation
-                negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
+                negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 1E-50,
                                                                        n_pop,
-                                                                       np.max(n_pop[n_pop > 0])) * stoichiometry_binwidth_array)
+                                                                       np.max(n_pop)) * stoichiometry_binwidth_array)
             
             
         # Normalize by number of species as "pseudo-datapoints"
@@ -1786,11 +1788,9 @@ class FCS_spectrum():
                                                                                    numeric_precision = numeric_precision) 
             else: 
                 # not labelling_correction, or at least no treatment of labelling efficiency fluctuations
-                # negloglik += self.negloglik_incomplete_sampling_static_labelling(params,
-                #                                                                  spectrum_type = spectrum_type,
-                #                                                                  labelling_correction = labelling_correction)
-                negloglik += self.negloglik_incomplete_sampling_full_labelling_old(params,
-                                                                                 spectrum_type = spectrum_type)
+                negloglik += self.negloglik_incomplete_sampling_static_labelling(params,
+                                                                                  spectrum_type = spectrum_type,
+                                                                                  labelling_correction = labelling_correction)
                 
                 
                 
