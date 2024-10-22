@@ -33,7 +33,7 @@ in_file_names_FCS = []
 in_file_names_PCH = []
 alpha_label = []
 
-glob_in_dir = r'D:\temp\FCS_Spectrum_debug\Data'
+glob_in_dir = r'D:\temp\FCS_Spectrum_debug\__Data'
 
 
 
@@ -45,9 +45,12 @@ glob_in_dir = r'D:\temp\FCS_Spectrum_debug\Data'
 _in_dir_names = []
 _alpha_label = []
 local_dir = os.path.join(glob_in_dir, r'ssRNA_ladder_RCT_50uM_1_T0s_1_20240826_1203')
-# local_dir = os.path.join(glob_in_dir, r'_4s_0_AF488_long_1_T0s_120240826_1234')
 _in_dir_names.extend([os.path.join(local_dir)])
 _alpha_label.append(0.025)
+# local_dir = os.path.join(glob_in_dir, r'_4s_0_AF488_long_1_T0s_120240826_1234')
+# _in_dir_names.extend([os.path.join(local_dir)])
+# _alpha_label.append(1.)
+
 # [ _in_dir_names.extend([os.path.join(local_dir, f'20240808_more_ssRNA/20240808_data.sptw/ssRNA_IVT{x}_1')]) for x in [*range(1,9), 'mix']]
 # [_alpha_label.append(5E-3) for x in [*range(1,9), 'mix']]
 
@@ -69,7 +72,7 @@ in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_
 [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
 # Output dir for result file writing
-glob_out_dir = r'D:\temp\FCS_Spectrum_debug\26'
+glob_out_dir = r'D:\temp\FCS_Spectrum_debug\18'
 
 
 
@@ -87,7 +90,7 @@ glob_out_dir = r'D:\temp\FCS_Spectrum_debug\26'
 labelling_correction_list = [True] 
     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
     
-incomplete_sampling_correction_list = [False] 
+incomplete_sampling_correction_list = [False, True] 
     # Whether to fit deviations between "population-level" and "observation-level"
     # dynamics, i.e., explicit treatment of an additional layer of noise
     
@@ -98,11 +101,15 @@ labelling_efficiency_incomp_sampling_list = [False]
         
 use_blinking_list = [False]
     # Whether to consider blinking in the particle dynamics
-
+    # Careful: In the implementation here, tau_diff_min serves as an UPPER 
+    # bound on the blinking time! So when using blinking, make sure not to set 
+    # tau_diff_min too short, otherwise the blinking term will just to some 
+    # weird nonsense.
+        
 n_species_list = [70]
     # How many species to evaluate within the range of [tau_diff_min; tau_diff_max]
     
-tau_diff_min_list = [2E-5]
+tau_diff_min_list = [1.56E-5]
     # Shortest diffusion time to fit (parameter bounds)
     # For spectrum models, tau_diff_min is also considered the monomer diffusion time!
     
@@ -121,7 +128,7 @@ spectrum_parameter_list = ['N_monomers']
     # On which parameter to define regularized or parameterized models
     # Options: 'Amplitude', 'N_monomers', 'N_oligomers'
     
-oligomer_type_list = ['double_filament'] 
+oligomer_type_list = ['spherical_shell'] 
     # Choice of oligomer type (basically which polymer-physics-based approximation to use in calculation)
     # Options: 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament'
     # use 'naive' for discrete-species fitting, and can also be used for Amplitude spectra
@@ -129,25 +136,25 @@ oligomer_type_list = ['double_filament']
     # physics model to fix a relation between diffusion time and stoichiometry
 
 discrete_species_list = [
-    # [{
-    #   }
-    # ],
-    [
-        {'N_avg_obs': 1., # default 1.
-         'vary_N_avg_obs': True, # default True
-         'tau_diff': 1E-5,  # default 1E-3
-         'vary_tau_diff': False, # default False
-         'cpms': 1000.,  # default 1.
-         'vary_cpms': True, # default False
-         'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
-         'stoichiometry': 1.,# default 1.
-         'vary_stoichiometry': False, # default (RECOMMENDED) False
-         'stoichiometry_binwidth': 1., # default 1.
-         'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
-         'labelling_efficiency': 1., # default 1.
-         'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
-        }
-    ]
+    [{
+      }
+    ],
+    # [
+    #     {'N_avg_obs': 1., # default 1.
+    #      'vary_N_avg_obs': True, # default True
+    #      'tau_diff': 1E-5,  # default 1E-3
+    #      'vary_tau_diff': False, # default False
+    #      'cpms': 1000.,  # default 1.
+    #      'vary_cpms': True, # default False
+    #      'link_brightness_to_spectrum_monomer': True, # default True - see docstring for details, this one is important!!!
+    #      'stoichiometry': 1.,# default 1.
+    #      'vary_stoichiometry': False, # default (RECOMMENDED) False
+    #      'stoichiometry_binwidth': 1., # default 1.
+    #      'vary_stoichiometry_binwidth': False, # default (RECOMMENDED) False
+    #      'labelling_efficiency': 1., # default 1.
+    #      'vary_labelling_efficiency': False,  # default (RECOMMENDED) False
+    #     }
+    # ]
     ]
     # Definition of discrete species to add to the model in addtion to spectrum 
     # models. Careful about the format: This is a LIST OF LISTS OF DICTS.
@@ -181,12 +188,12 @@ time_resolved_PCH_list = [False]
     # the index of the desired PCH in case you want to use one single specific 
     # one: i_bin_time (not used in this script currently)
     
-use_avg_count_rate_list = [True]
+use_avg_count_rate_list = [False, True]
     # Use average count rate to constrain fit? Allows more meaningful estimation 
     # of molecular brightness. Also helps constrain mixture models of e.g. an
     # oligomer spectrum and a free-dye species
 
-fit_label_efficiency_list = [False] 
+fit_label_efficiency_list = [False, True] 
     # If you consider finite labelling fraction, here you can also decide to 
     # make that a fit parameter, although that may be numerically extremely instable
 
@@ -197,7 +204,7 @@ FCS_min_lag_time = 1E-6
     # Shortest lag time to consider in fit (time axis clipping)
     # Specify 0. to use full range of data in .csv file
     
-FCS_max_lag_time = 1E0
+FCS_max_lag_time = 3E-1
     # Longest lag time to consider in fit (time axis clipping)
     # Specify np.inf to use full range of data in .csv file
 
@@ -221,12 +228,12 @@ numeric_precision = np.array([1E-3, 1E-4, 1E-5])
     # array, in which case the model is first evaluated with low accuracy and 
     # precision is then incrementally increased according to the steps you specified.
     
-two_step_fit = False
+two_step_fit = True
     # For some model configuration, you can first run a simpler, more robust, 
     # version of the fit with some parameters fixed, and then re-fit with the 
     # "full" model complexity
 
-verbosity = 0
+verbosity = 3
     # How much do you want the software to talk?
 
 FCS_psf_width_nm = np.mean([210])
@@ -532,6 +539,9 @@ def par_func(fit_res_table_path,
 
 
 #%% Preparations done - run fits
+
+if len(list_of_parameter_tuples) == 0:
+    raise Exception('No valid parameter configurations found in input! Sanity-check input parameters, invalid values do not raise specific error messages at this point.')
 
 if mp_processes > 1:
     try:

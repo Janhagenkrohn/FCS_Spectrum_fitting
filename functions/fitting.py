@@ -434,7 +434,7 @@ class FCS_spectrum():
         c_inf = (4 + tau_wlc**2) / (4 + kappa_wlc**2 + tau_wlc**2)
         l_contour = j * 2 * r_mono / l_Kuhn # not real contour length, but normalized to Kuhn segment length
         nu = np.sqrt(kappa_wlc**2 + tau_wlc**2)
-        msd_fold_change = c_inf * l_contour - 0.5 * (tau_wlc/nu)**2 - 2 * (kappa_wlc/nu)**2 * (4 - nu**2) / (4+nu**2) + np.exp(-2*l_contour) * (0.5* (tau_wlc / nu)**2 + 2 * (kappa_wlc/nu)**2 * ((4 - nu**2) * np.cos(nu*l_contour) - 4 * nu * np.sin(nu*l_contour)) / (4 + nu**2))
+        msd_fold_change = c_inf * l_contour - 0.5 * (tau_wlc/nu)**2 - 2 * (kappa_wlc/nu)**2 * (4 - nu**2) / (4+nu**2)**2 + np.exp(-2*l_contour) * (0.5* (tau_wlc / nu)**2 + 2 * (kappa_wlc/nu)**2 * ((4 - nu**2) * np.cos(nu*l_contour) - 4 * nu * np.sin(nu*l_contour)) / (4 + nu**2)**2)
         return np.sqrt(msd_fold_change)
     
 
@@ -855,9 +855,9 @@ class FCS_spectrum():
 
     
     #%% Penalty terms in fitting
-    def negloglik_incomplete_sampling_full_labelling(self,
-                                                     params,
-                                                     spectrum_type):
+    def negloglik_incomplete_sampling_full_labelling_old(self,
+                                                         params,
+                                                         spectrum_type):
         '''
         Neg log likelihood function for deviation between population-level
         and observed N, but without treatment of labelling statistics
@@ -885,22 +885,94 @@ class FCS_spectrum():
             # Poisson likelihood
             negloglik = self.negloglik_poisson_full(rates = n_pop,
                                                     observations = n_obs,
-                                                    scale = stoichiometry_binwidth_array**(0.5))
+                                                    scale = stoichiometry_binwidth_array)
         else:
             # wlsq approximation
             negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
                                                                    n_pop,
-                                                                   np.min(n_pop[n_pop > 0])) * np.sqrt(stoichiometry_binwidth_array))
+                                                                   np.min(n_pop[n_pop > 0])) * stoichiometry_binwidth_array)
             
         # Normalize by number of species as "pseudo-datapoints"
         negloglik /= n_species_spec
         return negloglik
+
+
+    def negloglik_incomplete_sampling_static_labelling(self,
+                                                       params,
+                                                       spectrum_type,
+                                                       labelling_correction = False):
+        '''
+        Neg log likelihood function for deviation between population-level
+        and observed N, but without treatment of labelling efficiency variations
+        (but WITH treatment of how a limited fixed labelled fraction changes
+        likelihood function)
+        '''
+        
+        # Unpack parameters
+        n_species_spec, _ = self.get_n_species(params)
+        
+        tau_diff_array = np.array([params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+        N_avg_obs_array = np.array([params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+        stoichiometry_binwidth_array = np.array([params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+        
+        if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+            N_avg_pop_array = self._N_pop_array
+        else:
+            N_avg_pop_array = np.array([params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
+            
+        # Likelihood function for particle numbers
+        n_pop = self.n_total_from_N_avg(N_avg_pop_array, 
+                                        tau_diff_array)
+
+        n_obs = self.n_total_from_N_avg(N_avg_obs_array, 
+                                        tau_diff_array)
+        
+        if labelling_correction:
+            negloglik = 0.
+            labelling_efficiency_array = np.array([params[f'Label_efficiency_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+            
+            for i_spec in range(n_species_spec):
+                label_fractions = sstats.binom.pmf(k = np.arange(1, i_spec + 1),
+                                                    n = i_spec + 1, 
+                                                    p = labelling_efficiency_array[i_spec])
+                n_pop_spec_label = n_pop[i_spec] * label_fractions
+                n_obs_spec_label = n_obs[i_spec] * label_fractions
+                
+                if self.NLL_funcs_accurate:
+                    # Poisson likelihood
+                    negloglik += self.negloglik_poisson_full(rates = n_pop_spec_label,
+                                                              observations = n_obs_spec_label,
+                                                              scale = stoichiometry_binwidth_array[i_spec])
+                else:
+                    # wlsq approximation
+                    negloglik += 0.5 * np.sum((n_pop_spec_label - n_obs_spec_label)**2 / np.where(n_pop_spec_label > 0,
+                                                                                                  n_pop_spec_label,
+                                                                                                  np.min(n_pop_spec_label[n_pop_spec_label > 0]))) * stoichiometry_binwidth_array[i_spec]
+                    
+                    
+        else:
+            if self.NLL_funcs_accurate:
+                # Poisson likelihood
+                negloglik = self.negloglik_poisson_full(rates = n_pop,
+                                                        observations = n_obs,
+                                                        scale = stoichiometry_binwidth_array)
+            else:
+                # wlsq approximation
+                negloglik = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
+                                                                       n_pop,
+                                                                       np.max(n_pop[n_pop > 0])) * stoichiometry_binwidth_array)
+            
+            
+        # Normalize by number of species as "pseudo-datapoints"
+        negloglik /= n_species_spec
+        
+        return negloglik
     
     
-    def negloglik_incomplete_sampling_partial_labelling(self,
-                                                        params,
-                                                        spectrum_type,
-                                                        numeric_precision = 1e-4):
+    def negloglik_incomplete_sampling_variable_labelling(self,
+                                                         params,
+                                                         spectrum_type,
+                                                         numeric_precision = 1e-4):
         '''
         Neg log likelihood function for deviation between population-level
         and observed N and labelling statistics
@@ -930,12 +1002,12 @@ class FCS_spectrum():
             # Poisson likelihood
             negloglik_N = self.negloglik_poisson_full(rates = n_pop,
                                                       observations = n_obs,
-                                                      scale = stoichiometry_binwidth_array**(-0.5))
+                                                      scale = stoichiometry_binwidth_array)
         else:
             # wlsq approximation
             negloglik_N = 0.5 * np.sum((n_pop - n_obs)**2 / np.where(n_pop > 0,
                                                                      n_pop,
-                                                                     np.min(n_pop[n_pop > 0])) / np.sqrt(stoichiometry_binwidth_array))
+                                                                     np.min(n_pop[n_pop > 0])) * stoichiometry_binwidth_array)
         
         # Here, we accumulate the negloglik iteratively over species
         negloglik_labelling = 0.
@@ -1636,7 +1708,8 @@ class FCS_spectrum():
             if dof_FCS <= 0:
                 dof_FCS = 1. 
                 
-            negloglik += negloglik_FCS / dof_FCS
+            # negloglik += negloglik_FCS / dof_FCS
+            negloglik += negloglik_FCS
                 
         if use_PCH and (not time_resolved_PCH):
             # Conventional single PCH is being fitted
@@ -1698,7 +1771,8 @@ class FCS_spectrum():
             if dof_PCH <= 0:
                 dof_PCH = 1. # Ensure positive-nonzero DoF
 
-            negloglik += negloglik_PCH / dof_PCH
+            # negloglik += negloglik_PCH / dof_PCH
+            negloglik += negloglik_PCH 
 
         # For the following two likelihood functions we need no DoF counting, 
         # the normalization is part of the functions itself in these cases.
@@ -1707,12 +1781,19 @@ class FCS_spectrum():
             
             if labelling_correction and self.labelling_efficiency_incomp_sampling:
                 # Allow deviation of labelling efficiency
-                negloglik += self.negloglik_incomplete_sampling_partial_labelling(params,
-                                                                                  spectrum_type = spectrum_type,
-                                                                                  numeric_precision = numeric_precision)
-            else: # not labelling_correction, or at least ignore in likelihood function
-                negloglik += self.negloglik_incomplete_sampling_full_labelling(params,
-                                                                               spectrum_type = spectrum_type)
+                negloglik += self.negloglik_incomplete_sampling_variable_labelling(params,
+                                                                                   spectrum_type = spectrum_type,
+                                                                                   numeric_precision = numeric_precision) 
+            else: 
+                # not labelling_correction, or at least no treatment of labelling efficiency fluctuations
+                # negloglik += self.negloglik_incomplete_sampling_static_labelling(params,
+                #                                                                  spectrum_type = spectrum_type,
+                #                                                                  labelling_correction = labelling_correction)
+                negloglik += self.negloglik_incomplete_sampling_full_labelling_old(params,
+                                                                                 spectrum_type = spectrum_type)
+                
+                
+                
             
         if use_avg_count_rate:
             # Include avg count rate in fit
@@ -2340,7 +2421,7 @@ class FCS_spectrum():
             acf_den += np.sum(N_avg_array * cpms_array * stoichiometry_binwidth_array)**2
         
         # Eval discrete species
-        if n_species_spec > 0:
+        if n_species_disc > 0:
             for i_spec in range(n_species_disc):
                 g_norm = self.fcs_3d_diff_single_species(tau_diff_array_d[i_spec])
                 acf += g_norm * N_avg_array_d[i_spec] * stoichiometry_binwidth_array_d[i_spec] * cpms_array_d[i_spec]**2
@@ -3003,8 +3084,8 @@ class FCS_spectrum():
 
             initial_params.add('beta_blink', 
                                value = 1., 
-                               min = 0., 
-                               max = 10., 
+                               min = 0.5, 
+                               max = 2., 
                                vary = True)
             
         else: # not use_blinking -> Dummy values
@@ -3076,6 +3157,8 @@ class FCS_spectrum():
         # More technical parameters
         initial_params.add('Label_efficiency', 
                            value = self.labelling_efficiency if labelling_correction else 1.,
+                           min = 0.,
+                           max = 1.,
                            vary = fit_label_efficiency)
         
         if use_FCS:
@@ -3109,13 +3192,13 @@ class FCS_spectrum():
             if use_PCH or use_avg_count_rate:
                 initial_params.add(f'cpms_d_{i_spec}', 
                                    value = 1E4 * 10**(i_spec + 0.5 - n_species / 2), # Initialize around 10000
-                                   min = 0., 
+                                   min = 1E-3, 
                                    vary = True)
             else:
                 # If we do not use PCH or the avg count rate, use a dummy, as we won't be able to tell from FCS alone
                 initial_params.add(f'cpms_d_{i_spec}', 
                                    value = 1., 
-                                   min = 0., 
+                                   min = 1E-3, 
                                    vary = False)
                 
             # Additional parameters that are included only as dummies for 
@@ -3225,7 +3308,7 @@ class FCS_spectrum():
                  # In this configuration, we take the input value specified for this species to express the spectrum cpms_0  
                  initial_params.add(f'cpms_d_{n_species_disc}',
                                     value = cpms,
-                                    min = 0.,
+                                    min = 1E-3,
                                     vary = False)
                  
                  initial_params['cpms_0'].vary = False
@@ -3236,7 +3319,7 @@ class FCS_spectrum():
             # No linking this species to spectrum monomer - then it's trivial
             initial_params.add(f'cpms_d_{n_species_disc}',
                                value = cpms,
-                               min = 0.,
+                               min = 1E-3,
                                vary = vary_cpms)
             
         # The other parameter are all straightforward
@@ -3344,6 +3427,8 @@ class FCS_spectrum():
 
         initial_params.add('Label_efficiency', 
                            value = self.labelling_efficiency if labelling_correction else 1.,
+                           min = 0.,
+                           max = 1.,
                            vary = fit_label_efficiency)
 
 
@@ -3391,13 +3476,13 @@ class FCS_spectrum():
                 if use_PCH or use_avg_count_rate:
                     initial_params.add('cpms_0', 
                                        value = 1E3, 
-                                       min = 0, 
+                                       min =  1E-3, 
                                        vary = True)
                 else:
                     # If we do not use PCH or avg count rate, use a dummy, as we won't be able to tell from FCS alone
                     initial_params.add('cpms_0', 
                                        value = 1., 
-                                       min = 0, 
+                                       min =  1E-3,
                                        vary = False)
             else: # i_spec >= 1
             
@@ -3494,6 +3579,8 @@ class FCS_spectrum():
 
     #     initial_params.add('Label_efficiency', 
     #                        value = self.labelling_efficiency if labelling_correction else 1.,
+    #                        min = 0.,
+    #                        max = 1.,
     #                        vary = fit_label_efficiency)
 
 
@@ -3547,13 +3634,13 @@ class FCS_spectrum():
     #             if use_PCH or use_avg_count_rate:
     #                 initial_params.add('cpms_0', 
     #                                    value = gauss_fit_params['cpms_0'].value, 
-    #                                    min = 0, 
+    #                                    min =  1E-3,
     #                                    vary = True)
     #             else:
     #                 # If we do not use PCH or avg_count_rate, use a dummy, as we won't be able to tell from FCS alone
     #                 initial_params.add('cpms_0', 
     #                                    value = 1., 
-    #                                    min = 0, 
+    #                                    min =  1E-3,
     #                                    vary = False)
     #         else: # i_spec >= 1
             
@@ -3678,6 +3765,8 @@ class FCS_spectrum():
                 
             initial_params.add('Label_efficiency', 
                                value = self.labelling_efficiency if labelling_correction else 1.,
+                               min = 0.,
+                               max = 1.,
                                vary = fit_label_efficiency)
             
             # N distribution parameters
@@ -3761,7 +3850,7 @@ class FCS_spectrum():
                         # Allow fluctuations of observed apparent particle count
                         # We increment the value a bit to avoid starting too close to 0
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2) + 0.1,
+                                           value = N_dist_amp  * initial_params[f'spectrum_weight_{i_spec}'].value * np.exp(-0.5 * ((stoichiometry[i_spec] - N_dist_a) / N_dist_b) ** 2) + 1E-9,
                                            min = 0., 
                                            vary = True)
                         
@@ -3772,7 +3861,7 @@ class FCS_spectrum():
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value / stoichiometry[i_spec] * np.exp(-0.5 * ((np.log(stoichiometry[i_spec]) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 1E-9,
                                            min = 0., 
                                            vary = True)
                 if spectrum_type == 'par_Gamma':
@@ -3782,7 +3871,7 @@ class FCS_spectrum():
                     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(- N_dist_b * stoichiometry[i_spec]) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * stoichiometry[i_spec]**(N_dist_a - 1) * np.exp(- N_dist_b * stoichiometry[i_spec]) + 1E-9,
                                            min = 0., 
                                            vary = True)
     
@@ -3793,7 +3882,7 @@ class FCS_spectrum():
     
                     if incomplete_sampling_correction:
                         initial_params.add(f'N_avg_obs_{i_spec}', 
-                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 0.1,
+                                           value = N_dist_amp * initial_params[f'spectrum_weight_{i_spec}'].value * np.exp(1 / N_dist_b - (stoichiometry[i_spec] * N_dist_a) ** N_dist_b) + 1E-9,
                                            min = 0., 
                                            vary = True)
                         
@@ -3810,13 +3899,13 @@ class FCS_spectrum():
                     if use_PCH or use_avg_count_rate:
                         initial_params.add('cpms_0', 
                                            value = 1E3, 
-                                           min = 0, 
+                                           min =  1E-3, 
                                            vary = True)
                     else:
                         # If we do not use PCH or avg count rate, use a dummy, as we won't be able to tell from FCS alone
                         initial_params.add('cpms_0', 
                                            value = 1., 
-                                           min = 0, 
+                                           min =  1E-3,
                                            vary = False)
                         
                 else: # i_spec >= 1
@@ -3860,6 +3949,8 @@ class FCS_spectrum():
                 
             initial_params.add('Label_efficiency', 
                                value = self.labelling_efficiency if labelling_correction else 1.,
+                               min = 0.,
+                               max = 1.,
                                vary = fit_label_efficiency)
             
             
@@ -3908,9 +3999,10 @@ class FCS_spectrum():
                 
                 # Poisson weighting (pseudo-variance), eliminating zeros
                 previous_N_obs_array_fit = previous_N_obs_array[np.logical_not(skip_species_mask)]
-                spectrum_fit_weights = np.where(previous_N_obs_array_fit > 0,
-                                                previous_N_obs_array_fit,
-                                                np.max(previous_N_obs_array_fit))
+                # spectrum_fit_weights = np.where(previous_N_obs_array_fit > 0,
+                #                                 previous_N_obs_array_fit,
+                #                                 np.max(previous_N_obs_array_fit))
+                spectrum_fit_weights = np.ones_like(previous_N_obs_array_fit)
                 
                 # Fit model
                 if spectrum_type == 'par_Gauss':
@@ -4040,13 +4132,13 @@ class FCS_spectrum():
                     else:
                         # From model (initial assumption N_obs = N_pop)
                         if spectrum_type == 'par_Gauss':
-                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(-0.5 * ((previous_params[f'stoichiometry_{i_spec}'].value - N_dist_a) / N_dist_b) ** 2) + 1E-15
                         elif spectrum_type == 'par_LogNorm':
-                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value / previous_params[f'stoichiometry_{i_spec}'].value * np.exp(-0.5 * ((np.log(previous_params[f'stoichiometry_{i_spec}'].value) - np.log(N_dist_a)) / np.log(N_dist_b)) ** 2) + 1E-15
                         elif spectrum_type == 'par_Gamma':
-                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * previous_params[f'stoichiometry_{i_spec}'].value**(N_dist_a - 1) * np.exp(- N_dist_b * previous_params[f'stoichiometry_{i_spec}'].value) + 1E-15
                         else: # spectrum_type == 'par_StrExp'
-                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 0.1
+                            N_avg_obs_spec = N_dist_amp * initial_params[f'spectrum_weight_{i_spec - skip_counter}'].value * np.exp(1 / N_dist_b - (previous_params[f'stoichiometry_{i_spec}'].value * N_dist_a) ** N_dist_b) + 1E-15
                                     
                     initial_params.add(f'N_avg_obs_{i_spec - skip_counter}', 
                                        value = N_avg_obs_spec,
@@ -4066,12 +4158,12 @@ class FCS_spectrum():
                     if use_PCH or use_avg_count_rate:
                         initial_params.add('cpms_0', 
                                            value = previous_params['cpms_0'].value if previous_params['cpms_0'].vary else 1E3, 
-                                           min = 0, 
+                                           min = 1E-3,
                                            vary = True)
                     else:
                         initial_params.add('cpms_0', 
                                            value = 1., 
-                                           min = 0, 
+                                           min = 1E-3,
                                            vary = False)
                         
                 else: # i_spec >= 1

@@ -4,7 +4,8 @@ import subprocess
 import datetime
 
 jobs_ids = range(1)
-job_name = 'FCS_2'
+job_name = 'FCS_dsDNA'
+script_name = "run_fits.py"
 cwd = os.getcwd()
 
 def make_sh_text1(seed):
@@ -26,7 +27,7 @@ def make_sh_text1(seed):
 module purge
 conda activate tttr
 
-srun python /fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Analysis/20240826_ParM_Fitting/FCS_Spectrum_fitting/scripts/06_parallel_fitting_FCS_param_screen_realdata.py'''
+srun python {os.path.join(cwd, script_name)}'''
 
 def make_sh_text2(jobscript_name):
     return f'''#!/bin/bash
@@ -39,13 +40,13 @@ echo "    ${{JOBID1}} {jobscript_name}"
     '''
 
 for i_job in jobs_ids:
-    script_file_name = os.path.join(cwd, f'''script_{i_job}.sh''')
+    script_file_name = os.path.join(cwd, f'''script_{job_name}_{i_job}.sh''')
     # Create job script for SLURM
     open(script_file_name, 'w').write(make_sh_text1(i_job))
     # Make sure all the required rights are there
     os.chmod(script_file_name, stat.S_IRWXU)
     
-    submission_file_name = os.path.join(cwd, f'''submit_{i_job}.sh''')
+    submission_file_name = os.path.join(cwd, f'''submit_{job_name}_{i_job}.sh''')
     # Create wrapper script for SLURM
     open(submission_file_name, 'w').write(make_sh_text2(script_file_name))
     # Make sure all the required rights are there
