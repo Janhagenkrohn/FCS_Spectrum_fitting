@@ -72,7 +72,7 @@ in_dir_names_FCS_tmp, in_file_names_FCS_tmp, alpha_label_FCS_tmp = utils.detect_
 [alpha_label.append(single_alpha_label) for single_alpha_label in alpha_label_FCS_tmp]
 
 # Output dir for result file writing
-glob_out_dir = r'D:\temp\FCS_Spectrum_debug\22'
+glob_out_dir = r'D:\temp\FCS_Spectrum_debug\23'
 
 
 

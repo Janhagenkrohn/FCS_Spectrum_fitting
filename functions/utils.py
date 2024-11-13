@@ -8,7 +8,8 @@ Created on Fri 15 March 2024
 # File I/O and path manipulation
 import os
 import glob
-import sys
+# import sys
+import stat
 
 # Data handling
 import numpy as np
@@ -23,9 +24,9 @@ from itertools import cycle # used only in plotting
 
 # Custom module
 # For localizing module
-repo_dir = os.path.abspath('..')
-sys.path.insert(0, repo_dir)
-from functions import fitting
+# repo_dir = os.path.abspath('..')
+# sys.path.insert(0, repo_dir)
+# from functions import fitting
 
 
 def detect_files(in_dir_names, 
@@ -557,666 +558,6 @@ def write_fit_results(fit_result,
             print(f' [{job_prefix}]   Fitted parameters:')
             [print(f'[{job_prefix}] {key}: {fit_params[key].value}') for key in fit_params.keys() if fit_params[key].vary]
         
-        # Compile all parameters for all discrete species in a single smaller table
-        if n_species_disc > 0:
-            fit_res_tmp_path = fit_res_table_path + '_discrete_species.csv' 
-            disc_spec_params_dict = {}  
-            disc_spec_params_dict['fit_number'] = fit_number                 
-            disc_spec_params_dict['file_number'] = i_file
-            disc_spec_params_dict['folder'] = dir_name 
-            disc_spec_params_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            disc_spec_params_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-
-            query_keys = ['tau_diff_d_', 'N_avg_obs_d_', 'cpms_d_', 'stoichiometry_d_', 'stoichiometry_binwidth_d_', 'Label_efficiency_obs_d_']
-            for i_spec in range(n_species_disc):
-                for query_key in query_keys:
-                    if query_key + str(i_spec) in fit_params.keys():
-                        disc_spec_params_dict[query_key + str(i_spec)] = fit_params[query_key + str(i_spec)].value
-                        
-            fit_result_df = pd.DataFrame(disc_spec_params_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     header = True, 
-                                     index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     mode = 'a', 
-                                     header = False, 
-                                     index = False)
-
-                        
-        # Smaller spreadsheets for species-wise parameters in case we have multiple species
-        # all of these are technically redundant with the big one written later...
-        # But reading these out of the main results spreadsheet is just
-        # too much trouble if you have more than 1 or 2 species
-        
-        # Dict in which we collect various mean and SD values
-        # We create this even if we do not create the result spreadsheets - a dummy whose existence avoids errors
-        avg_values_dict = {}   
-             
-        if n_species_spec > 1:
-
-            
-            # Unpack species parameters into arrays
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                N_oligo_pop_array = N_pop_array
-            elif spectrum_type == 'discrete':
-                # Historical reasons why here N_obs has to be used...
-                N_oligo_pop_array =  np.array([fit_params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_spec)])
-            else:
-                N_oligo_pop_array = np.array([fit_params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
-            
-            stoichiometry_array = np.array([fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)])
-            stoichiometry_bw_array = np.array([fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
-            if 'tau_diff_0' in fit_params.keys():
-                tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
-            else:
-                # There were no tau_diff values in fit_params - can happen, it should be in class attribute then
-                tau_diff_array = fitter.tau__tau_diff_array[0,:]
-
-            
-            tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
-            labelling_efficiency_array = np.ones_like(tau_diff_array) * fit_params['Label_efficiency'].value
-
-
-            # Stoichiometry
-            fit_res_tmp_path = fit_res_table_path + '_stoi.csv' 
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number                 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'stoichiometry_{i_spec}'] = stoichiometry_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     header = True, 
-                                     index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     mode = 'a', 
-                                     header = False, 
-                                     index = False)
-                
-            # Stoichiometry binwidth
-            fit_res_tmp_path = fit_res_table_path + '_stoi_bw.csv' 
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number                 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'stoi_bw_{i_spec}'] = stoichiometry_bw_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     header = True, 
-                                     index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     mode = 'a', 
-                                     header = False, 
-                                     index = False)
-
-
-            # Diffusion time
-            fit_res_tmp_path = fit_res_table_path + '_tau_diff.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'tau_diff_{i_spec}'] = tau_diff_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     header = True, 
-                                     index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                     mode = 'a', 
-                                     header = False, 
-                                     index = False)
-
-
-            # Amplitudes - population level - density
-            fit_res_tmp_path = fit_res_table_path + '_amp_density.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            amp_density_array = N_oligo_pop_array * stoichiometry_array**2
-            if labelling_correction:
-                amp_density_array *= 1 - (1 - labelling_efficiency_array) / (labelling_efficiency_array * stoichiometry_array)
-            amp_density_array /= amp_density_array.max()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'amp_density_{i_spec}'] = amp_density_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-            
-
-            # Amplitudes - population level - histogram
-            fit_res_tmp_path = fit_res_table_path + '_amp_histogram.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            amp_histogram_array = N_oligo_pop_array * stoichiometry_array**2 * stoichiometry_bw_array
-            if labelling_correction:
-                amp_histogram_array *= 1 - (1 - labelling_efficiency_array) / (labelling_efficiency_array * stoichiometry_array)
-            amp_histogram_array /= amp_histogram_array.sum()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'amp_histogram_{i_spec}'] = amp_histogram_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-            
-            # Use amp_histogram_array to get amplitude-weighted mean values
-            avg_values_dict['avg_stoi_amp'] = np.sum(stoichiometry_array * amp_histogram_array)
-            avg_values_dict['sd_stoi_amp'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
-            avg_values_dict['avg_tau_diff_amp'] = np.sum(tau_diff_array * amp_histogram_array)
-            avg_values_dict['sd_tau_diff_amp'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
-
-            
-            # N_oligomers - population level - absolute
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_abs.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            N_pop_oligo_abs_array = N_oligo_pop_array * stoichiometry_bw_array
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_oligo_abs_{i_spec}'] = N_pop_oligo_abs_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-            
-            # N_oligomers - population level - density
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_density.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-            N_pop_oligo_density_array = N_oligo_pop_array / N_oligo_pop_array.max()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_oligo_density_{i_spec}'] = N_pop_oligo_density_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-
-            # N_oligomers - population level - histogram
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_histogram.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            N_pop_oligo_histogram_array = N_oligo_pop_array * stoichiometry_bw_array
-            N_pop_oligo_histogram_array /= N_pop_oligo_histogram_array.sum()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_oligo_histogram_{i_spec}'] = N_pop_oligo_histogram_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-            # Use N_pop_oligo_histogram_array to get oligomer_N_pop-weighted mean values
-            avg_values_dict['avg_stoi_N_oligo_pop'] = np.sum(stoichiometry_array * N_pop_oligo_histogram_array)
-            avg_values_dict['sd_stoi_N_oligo_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
-            avg_values_dict['avg_tau_diff_N_oligo_pop'] = np.sum(tau_diff_array * N_pop_oligo_histogram_array)
-            avg_values_dict['sd_tau_diff_N_oligo_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
-
-            # N_monomers - population level - absolute
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_abs.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            N_pop_mono_abs_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_mono_abs_{i_spec}'] = N_pop_mono_abs_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-            
-            # N_monomers - population level - density
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_density.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-            N_pop_mono_density_array = N_oligo_pop_array * stoichiometry_array
-            N_pop_mono_density_array /= N_pop_mono_density_array.max()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_mono_density_{i_spec}'] = N_pop_mono_density_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-
-            # N_monomers - population level - histogram
-            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_histogram.csv'
-            fit_result_dict = {}
-            fit_result_dict['fit_number'] = fit_number 
-            fit_result_dict['file_number'] = i_file
-            fit_result_dict['folder'] = dir_name 
-            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                fit_result_dict['lagrange_mul'] = lagrange_mul
-                
-            N_pop_mono_histogram_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
-            N_pop_mono_histogram_array /= N_pop_mono_histogram_array.sum()
-            
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_mono_oligo_histogram_{i_spec}'] = N_pop_mono_histogram_array[i_spec]
-            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-            if not os.path.isfile(fit_res_tmp_path):
-                # Does not yet exist - create with header
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        header = True, 
-                                        index = False)
-            else:
-                # Exists - append
-                fit_result_df.to_csv(fit_res_tmp_path, 
-                                        mode = 'a', 
-                                        header = False, 
-                                        index = False)
-
-            # Use N_pop_mono_histogram_array to get monomer_N_pop-weighted mean values
-            avg_values_dict['avg_stoi_N_mono_pop'] = np.sum(stoichiometry_array * N_pop_mono_histogram_array)
-            avg_values_dict['sd_stoi_N_mono_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
-            avg_values_dict['avg_tau_diff_N_mono_pop'] = np.sum(tau_diff_array * N_pop_mono_histogram_array)
-            avg_values_dict['sd_tau_diff_N_mono_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
-
-
-            # The remaining ones only if we have incomplete sampling correction
-            if incomplete_sampling_correction:
-                N_oligo_obs_array = np.array([fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
-
-                # N_oligomers - observation level - absolute
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_abs.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_obs_oligo_abs_array = N_oligo_obs_array * stoichiometry_bw_array
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_oligo_abs_{i_spec}'] = N_obs_oligo_abs_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                
-                # N_oligomers - observation level - density
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_density.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                N_obs_oligo_density_array = N_oligo_obs_array / N_oligo_obs_array.max()
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_oligo_density_{i_spec}'] = N_obs_oligo_density_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-
-                # N_oligomers - observation level - histogram
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_histogram.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_obs_oligo_histogram_array = N_oligo_obs_array * stoichiometry_bw_array
-                N_obs_oligo_histogram_array /= N_obs_oligo_histogram_array.sum()
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_oligo_histogram_{i_spec}'] = N_obs_oligo_histogram_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-
-
-                # N_monomers - observation level - absolute
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_abs.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_obs_mono_abs_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_mono_abs_{i_spec}'] = N_obs_mono_abs_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                
-                # N_monomers - observation level - density
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_density.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                N_obs_mono_density_array = N_oligo_obs_array * stoichiometry_array
-                N_obs_mono_density_array /= N_obs_mono_density_array.max()
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_mono_density_{i_spec}'] = N_obs_mono_density_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-
-                # N_monomers - observation level - histogram
-                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_histogram.csv'
-                fit_result_dict = {}
-                fit_result_dict['fit_number'] = fit_number 
-                fit_result_dict['file_number'] = i_file
-                fit_result_dict['folder'] = dir_name 
-                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                    fit_result_dict['lagrange_mul'] = lagrange_mul
-                    
-                N_obs_mono_histogram_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
-                N_obs_mono_histogram_array /= N_obs_mono_histogram_array.sum()
-                
-                for i_spec in range(n_species_spec):
-                    fit_result_dict[f'N_obs_mono_oligo_histogram_{i_spec}'] = N_obs_mono_histogram_array[i_spec]
-                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                if not os.path.isfile(fit_res_tmp_path):
-                    # Does not yet exist - create with header
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            header = True, 
-                                            index = False)
-                else:
-                    # Exists - append
-                    fit_result_df.to_csv(fit_res_tmp_path, 
-                                            mode = 'a', 
-                                            header = False, 
-                                            index = False)
-
-                                 
-                if fitter.labelling_efficiency_incomp_sampling:
-                    # If and only if we have incomplete-sampling-of-incomplete-labelling correction, we also write that separately
-                    fit_res_tmp_path = fit_res_table_path + '_label_eff_obs.csv'
-                    fit_result_dict = {}
-                    fit_result_dict['fit_number'] = fit_number 
-                    fit_result_dict['file_number'] = i_file
-                    fit_result_dict['folder'] = dir_name 
-                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-                        fit_result_dict['lagrange_mul'] = lagrange_mul
-                                                
-                    for i_spec in range(n_species_spec):
-                        fit_result_dict[f'_label_eff_obs{i_spec}'] = fit_params[f'Label_efficiency_obs_{i_spec}'].value
-                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-                    if not os.path.isfile(fit_res_tmp_path):
-                        # Does not yet exist - create with header
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                header = True, 
-                                                index = False)
-                    else:
-                        # Exists - append
-                        fit_result_df.to_csv(fit_res_tmp_path, 
-                                                mode = 'a', 
-                                                header = False, 
-                                                index = False)
-
-
-        # Write large spreadsheet with ALL fit results
-        fit_result_dict = {}            
-        
-        # Metadata
-        fit_result_dict['fit_number'] = fit_number            
-        fit_result_dict['file_number'] = i_file
-        fit_result_dict['folder'] = dir_name
-        fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
-        fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-        
-        
-        # Insert average and standard deviation values into results dict
-        for key in avg_values_dict.keys():
-            fit_result_dict[key] = avg_values_dict[key]
-        
-        
-        # Fit parameters, with uncertainty where available
-        has_covar = not covar == None
-        if has_covar:
-            uncertainty_array = np.sqrt(np.diag(covar))
-            covar_pointer = 0
-        
-        for key in fit_params.keys():
-            fit_result_dict[key + '_val'] = fit_params[key].value
-            fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
-            if not fit_params[key].stderr == None:
-                fit_result_dict[key + '_err'] = fit_params[key].stderr
-            elif has_covar and fit_params[key].vary:
-                fit_result_dict[key + '_err'] = uncertainty_array[covar_pointer]
-                covar_pointer += 1
-                
-        if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
-            # Special stuff for regularized fitting
-            fit_result_dict['lagrange_mul'] = lagrange_mul
-            for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_{i_spec}'] = N_pop_array[i_spec]
-                
-        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
-        
-        fit_res_table_path_full = fit_res_table_path + '.csv'
-        if not os.path.isfile(fit_res_table_path_full):
-            # Does not yet exist - create with header
-            fit_result_df.to_csv(fit_res_table_path_full, 
-                                  header = True, 
-                                  index = False)
-        else:
-            # Exists - append
-            fit_result_df.to_csv(fit_res_table_path_full, 
-                                  mode = 'a', 
-                                  header = False, 
-                                  index = False)
-
-
-
-
         # Show and write fits themselves
         if use_FCS:
             data_FCS_tau_s = fitter.data_FCS_tau_s
@@ -1311,14 +652,21 @@ def write_fit_results(fit_result,
                                           out_name + '_FCS.csv'),
                               index = False, 
                               header = True)
+            # Set rights
+            os.chmod(os.path.join(save_path, 
+                                  out_name + '_FCS.csv'), stat.S_IRWXU)
+
+            # Get chi-square
+            FCS_chi_square = np.sum((data_FCS_G - model_FCS / data_FCS_sigma)**2)
+
     
     
         if use_PCH:
             data_PCH_hist = fitter.data_PCH_hist
             data_PCH_bin_times = fitter.data_PCH_bin_times
             numeric_precision = fitter.numeric_precision
-            
             if not labelling_correction:
+                # Get model
                 model_PCH = fitter.get_pch_full_labelling(fit_params,
                                                           t_bin = data_PCH_bin_times[0],
                                                           spectrum_type = spectrum_type,
@@ -1334,6 +682,7 @@ def write_fit_results(fit_result,
                                                               crop_output = True,
                                                               numeric_precision = np.min(numeric_precision),
                                                               mp_pool = None)
+                
             
             # Plot PCH fit
             # Cycle through colors
@@ -1423,6 +772,789 @@ def write_fit_results(fit_result,
             out_table.to_csv(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'),
                               index = False, 
                               header = True)
+            # Set rights
+            os.chmod(os.path.join(save_path, out_name + '_PC'+ ('M' if time_resolved_PCH else '') +'H.csv'), stat.S_IRWXU)
+
+            # Get chi-square
+            if not time_resolved_PCH and not labelling_correction:
+                PCH_chi_square = fitter.negloglik_pch_single_full_labelling(fit_params,
+                                                                            spectrum_type = spectrum_type,
+                                                                            i_bin_time = 0,
+                                                                            numeric_precision = np.min(numeric_precision),
+                                                                            mp_pool = None)
+            elif not time_resolved_PCH and labelling_correction:
+                PCH_chi_square = fitter.negloglik_pch_single_partial_labelling(fit_params,
+                                                                               i_bin_time = 0,
+                                                                               numeric_precision = np.min(numeric_precision),
+                                                                               mp_pool = None)
+            elif time_resolved_PCH and not labelling_correction:
+                PCH_chi_square = fitter.negloglik_pcmh_full_labelling(fit_params,
+                                                                      spectrum_type = spectrum_type,
+                                                                      numeric_precision = np.min(numeric_precision),
+                                                                      mp_pool = None)
+            else: # time_resolved_PCH and labelling_correction
+                PCH_chi_square = fitter.negloglik_pcmh_partial_labelling(fit_params,
+                                                                         numeric_precision = np.min(numeric_precision),
+                                                                         mp_pool = None)
+                
+                
+        # Compile all parameters for all discrete species in a single smaller table
+        if n_species_disc > 0:
+            fit_res_tmp_path = fit_res_table_path + '_discrete_species.csv' 
+            disc_spec_params_dict = {}
+            disc_spec_params_dict['fit_number'] = fit_number                 
+            disc_spec_params_dict['file_number'] = i_file
+            disc_spec_params_dict['folder'] = dir_name 
+            disc_spec_params_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            disc_spec_params_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            disc_spec_params_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            disc_spec_params_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            
+            query_keys = ['tau_diff_d_', 'N_avg_obs_d_', 'cpms_d_', 'stoichiometry_d_', 'stoichiometry_binwidth_d_', 'Label_efficiency_obs_d_']
+            for i_spec in range(n_species_disc):
+                for query_key in query_keys:
+                    if query_key + str(i_spec) in fit_params.keys():
+                        disc_spec_params_dict[query_key + str(i_spec)] = fit_params[query_key + str(i_spec)].value
+                        
+            fit_result_df = pd.DataFrame(disc_spec_params_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     header = True, 
+                                     index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     mode = 'a', 
+                                     header = False, 
+                                     index = False)
+
+                        
+        # Smaller spreadsheets for species-wise parameters in case we have multiple species
+        # all of these are technically redundant with the big one written later...
+        # But reading these out of the main results spreadsheet is just
+        # too much trouble if you have more than 1 or 2 species
+        
+        # Dict in which we collect various mean and SD values
+        # We create this even if we do not create the result spreadsheets - a dummy whose existence avoids errors
+        avg_values_dict = {}   
+             
+        if n_species_spec > 1:
+
+            
+            # Unpack species parameters into arrays
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                N_oligo_pop_array = N_pop_array
+            elif spectrum_type == 'discrete':
+                # Historical reasons why here N_obs has to be used...
+                N_oligo_pop_array =  np.array([fit_params[f'N_avg_obs_d_{i_spec}'].value for i_spec in range(n_species_spec)])
+            else:
+                N_oligo_pop_array = np.array([fit_params[f'N_avg_pop_{i_spec}'].value for i_spec in range(n_species_spec)])
+            
+            stoichiometry_array = np.array([fit_params[f'stoichiometry_{i_spec}'].value for i_spec in range(n_species_spec)])
+            stoichiometry_bw_array = np.array([fit_params[f'stoichiometry_binwidth_{i_spec}'].value for i_spec in range(n_species_spec)])
+            if 'tau_diff_0' in fit_params.keys():
+                tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+            else:
+                # There were no tau_diff values in fit_params - can happen, it should be in class attribute then
+                tau_diff_array = fitter.tau__tau_diff_array[0,:]
+
+            
+            tau_diff_array = np.array([fit_params[f'tau_diff_{i_spec}'].value for i_spec in range(n_species_spec)])
+            labelling_efficiency_array = np.ones_like(tau_diff_array) * fit_params['Label_efficiency'].value
+
+
+            # Stoichiometry
+            fit_res_tmp_path = fit_res_table_path + '_stoi.csv' 
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number                 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'stoichiometry_{i_spec}'] = stoichiometry_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     header = True, 
+                                     index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     mode = 'a', 
+                                     header = False, 
+                                     index = False)
+
+            # Stoichiometry binwidth
+            fit_res_tmp_path = fit_res_table_path + '_stoi_bw.csv' 
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number                 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'stoi_bw_{i_spec}'] = stoichiometry_bw_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     header = True, 
+                                     index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     mode = 'a', 
+                                     header = False, 
+                                     index = False)
+
+
+            # Diffusion time
+            fit_res_tmp_path = fit_res_table_path + '_tau_diff.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'tau_diff_{i_spec}'] = tau_diff_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     header = True, 
+                                     index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                     mode = 'a', 
+                                     header = False, 
+                                     index = False)
+
+
+            # Amplitudes - population level - density
+            fit_res_tmp_path = fit_res_table_path + '_amp_density.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            amp_density_array = N_oligo_pop_array * stoichiometry_array**2
+            if labelling_correction:
+                amp_density_array *= 1 - (1 - labelling_efficiency_array) / (labelling_efficiency_array * stoichiometry_array)
+            amp_density_array /= amp_density_array.max()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'amp_density_{i_spec}'] = amp_density_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+            
+
+            # Amplitudes - population level - histogram
+            fit_res_tmp_path = fit_res_table_path + '_amp_histogram.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            amp_histogram_array = N_oligo_pop_array * stoichiometry_array**2 * stoichiometry_bw_array
+            if labelling_correction:
+                amp_histogram_array *= 1 - (1 - labelling_efficiency_array) / (labelling_efficiency_array * stoichiometry_array)
+            amp_histogram_array /= amp_histogram_array.sum()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'amp_histogram_{i_spec}'] = amp_histogram_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+            
+            # Use amp_histogram_array to get amplitude-weighted mean values
+            avg_values_dict['avg_stoi_amp'] = np.sum(stoichiometry_array * amp_histogram_array)
+            avg_values_dict['sd_stoi_amp'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
+            avg_values_dict['avg_tau_diff_amp'] = np.sum(tau_diff_array * amp_histogram_array)
+            avg_values_dict['sd_tau_diff_amp'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * amp_histogram_array)**2) / np.sum(amp_histogram_array**2))
+
+            
+            # N_oligomers - population level - absolute
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_abs.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            N_pop_oligo_abs_array = N_oligo_pop_array * stoichiometry_bw_array
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_oligo_abs_{i_spec}'] = N_pop_oligo_abs_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+            
+            # N_oligomers - population level - density
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_density.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+            N_pop_oligo_density_array = N_oligo_pop_array / N_oligo_pop_array.max()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_oligo_density_{i_spec}'] = N_pop_oligo_density_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+
+            # N_oligomers - population level - histogram
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_oligo_histogram.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            N_pop_oligo_histogram_array = N_oligo_pop_array * stoichiometry_bw_array
+            N_pop_oligo_histogram_array /= N_pop_oligo_histogram_array.sum()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_oligo_histogram_{i_spec}'] = N_pop_oligo_histogram_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+            # Use N_pop_oligo_histogram_array to get oligomer_N_pop-weighted mean values
+            avg_values_dict['avg_stoi_N_oligo_pop'] = np.sum(stoichiometry_array * N_pop_oligo_histogram_array)
+            avg_values_dict['sd_stoi_N_oligo_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
+            avg_values_dict['avg_tau_diff_N_oligo_pop'] = np.sum(tau_diff_array * N_pop_oligo_histogram_array)
+            avg_values_dict['sd_tau_diff_N_oligo_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_oligo_histogram_array)**2) / np.sum(N_pop_oligo_histogram_array**2))
+
+            # N_monomers - population level - absolute
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_abs.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            N_pop_mono_abs_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_mono_abs_{i_spec}'] = N_pop_mono_abs_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+            
+            # N_monomers - population level - density
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_density.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+            N_pop_mono_density_array = N_oligo_pop_array * stoichiometry_array
+            N_pop_mono_density_array /= N_pop_mono_density_array.max()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_mono_density_{i_spec}'] = N_pop_mono_density_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+
+            # N_monomers - population level - histogram
+            fit_res_tmp_path = fit_res_table_path + '_N_pop_mono_histogram.csv'
+            fit_result_dict = {}
+            fit_result_dict['fit_number'] = fit_number 
+            fit_result_dict['file_number'] = i_file
+            fit_result_dict['folder'] = dir_name 
+            fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+            fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+            if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                fit_result_dict['lagrange_mul'] = lagrange_mul
+                
+            N_pop_mono_histogram_array = N_oligo_pop_array * stoichiometry_bw_array * stoichiometry_array
+            N_pop_mono_histogram_array /= N_pop_mono_histogram_array.sum()
+            
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_mono_oligo_histogram_{i_spec}'] = N_pop_mono_histogram_array[i_spec]
+            fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+            if not os.path.isfile(fit_res_tmp_path):
+                # Does not yet exist - create with header
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        header = True, 
+                                        index = False)
+                # Set rights
+                os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+            else:
+                # Exists - append
+                fit_result_df.to_csv(fit_res_tmp_path, 
+                                        mode = 'a', 
+                                        header = False, 
+                                        index = False)
+
+            # Use N_pop_mono_histogram_array to get monomer_N_pop-weighted mean values
+            avg_values_dict['avg_stoi_N_mono_pop'] = np.sum(stoichiometry_array * N_pop_mono_histogram_array)
+            avg_values_dict['sd_stoi_N_mono_pop'] = np.sqrt(np.sum(((stoichiometry_array - avg_values_dict['avg_stoi_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
+            avg_values_dict['avg_tau_diff_N_mono_pop'] = np.sum(tau_diff_array * N_pop_mono_histogram_array)
+            avg_values_dict['sd_tau_diff_N_mono_pop'] = np.sqrt(np.sum(((tau_diff_array - avg_values_dict['avg_tau_diff_amp']) * N_pop_mono_histogram_array)**2) / np.sum(N_pop_mono_histogram_array**2))
+
+
+            # The remaining ones only if we have incomplete sampling correction
+            if incomplete_sampling_correction:
+                N_oligo_obs_array = np.array([fit_params[f'N_avg_obs_{i_spec}'].value for i_spec in range(n_species_spec)])
+
+                # N_oligomers - observation level - absolute
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_abs.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                    
+                N_obs_oligo_abs_array = N_oligo_obs_array * stoichiometry_bw_array
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_oligo_abs_{i_spec}'] = N_obs_oligo_abs_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            header = True, 
+                                            index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            mode = 'a', 
+                                            header = False, 
+                                            index = False)
+
+                
+                # N_oligomers - observation level - density
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_density.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                N_obs_oligo_density_array = N_oligo_obs_array / N_oligo_obs_array.max()
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_oligo_density_{i_spec}'] = N_obs_oligo_density_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            header = True, 
+                                            index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            mode = 'a', 
+                                            header = False, 
+                                            index = False)
+
+
+                # N_oligomers - observation level - histogram
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_oligo_histogram.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                    
+                N_obs_oligo_histogram_array = N_oligo_obs_array * stoichiometry_bw_array
+                N_obs_oligo_histogram_array /= N_obs_oligo_histogram_array.sum()
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_oligo_histogram_{i_spec}'] = N_obs_oligo_histogram_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            header = True, 
+                                            index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            mode = 'a', 
+                                            header = False, 
+                                            index = False)
+
+
+
+                # N_monomers - observation level - absolute
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_abs.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                    
+                N_obs_mono_abs_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_mono_abs_{i_spec}'] = N_obs_mono_abs_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            header = True, 
+                                            index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            mode = 'a', 
+                                            header = False, 
+                                            index = False)
+
+                
+                # N_monomers - observation level - density
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_density.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                N_obs_mono_density_array = N_oligo_obs_array * stoichiometry_array
+                N_obs_mono_density_array /= N_obs_mono_density_array.max()
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_mono_density_{i_spec}'] = N_obs_mono_density_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                         header = True, 
+                                         index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                         mode = 'a', 
+                                         header = False, 
+                                         index = False)
+
+
+                # N_monomers - observation level - histogram
+                fit_res_tmp_path = fit_res_table_path + '_N_obs_mono_histogram.csv'
+                fit_result_dict = {}
+                fit_result_dict['fit_number'] = fit_number 
+                fit_result_dict['file_number'] = i_file
+                fit_result_dict['folder'] = dir_name 
+                fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                    fit_result_dict['lagrange_mul'] = lagrange_mul
+                    
+                N_obs_mono_histogram_array = N_oligo_obs_array * stoichiometry_bw_array * stoichiometry_array
+                N_obs_mono_histogram_array /= N_obs_mono_histogram_array.sum()
+                
+                for i_spec in range(n_species_spec):
+                    fit_result_dict[f'N_obs_mono_oligo_histogram_{i_spec}'] = N_obs_mono_histogram_array[i_spec]
+                fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                if not os.path.isfile(fit_res_tmp_path):
+                    # Does not yet exist - create with header
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            header = True, 
+                                            index = False)
+                    # Set rights
+                    os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                else:
+                    # Exists - append
+                    fit_result_df.to_csv(fit_res_tmp_path, 
+                                            mode = 'a', 
+                                            header = False, 
+                                            index = False)
+
+                                 
+                if fitter.labelling_efficiency_incomp_sampling:
+                    # If and only if we have incomplete-sampling-of-incomplete-labelling correction, we also write that separately
+                    fit_res_tmp_path = fit_res_table_path + '_label_eff_obs.csv'
+                    fit_result_dict = {}
+                    fit_result_dict['fit_number'] = fit_number 
+                    fit_result_dict['file_number'] = i_file
+                    fit_result_dict['folder'] = dir_name 
+                    fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+                    fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+                    fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+                    fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+                    if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+                        fit_result_dict['lagrange_mul'] = lagrange_mul
+                                                
+                    for i_spec in range(n_species_spec):
+                        fit_result_dict[f'_label_eff_obs{i_spec}'] = fit_params[f'Label_efficiency_obs_{i_spec}'].value
+                    fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+                    if not os.path.isfile(fit_res_tmp_path):
+                        # Does not yet exist - create with header
+                        fit_result_df.to_csv(fit_res_tmp_path, 
+                                                header = True, 
+                                                index = False)
+                        # Set rights
+                        os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+                    else:
+                        # Exists - append
+                        fit_result_df.to_csv(fit_res_tmp_path, 
+                                                mode = 'a', 
+                                                header = False, 
+                                                index = False)
+
+
+        # Write large spreadsheet with ALL fit results
+        fit_result_dict = {}            
+        
+        # Metadata
+        fit_result_dict['fit_number'] = fit_number            
+        fit_result_dict['file_number'] = i_file
+        fit_result_dict['folder'] = dir_name
+        fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
+        fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
+        fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
+        fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+
+        
+        
+        # Insert average and standard deviation values into results dict
+        for key in avg_values_dict.keys():
+            fit_result_dict[key] = avg_values_dict[key]
+        
+        
+        # Fit parameters, with uncertainty where available
+        has_covar = not covar == None
+        if has_covar:
+            uncertainty_array = np.sqrt(np.diag(covar))
+            covar_pointer = 0
+        
+        for key in fit_params.keys():
+            fit_result_dict[key + '_val'] = fit_params[key].value
+            fit_result_dict[key + '_vary'] = 'Vary' if fit_params[key].vary else 'Fix_Dep'
+            if not fit_params[key].stderr == None:
+                fit_result_dict[key + '_err'] = fit_params[key].stderr
+            elif has_covar and fit_params[key].vary:
+                fit_result_dict[key + '_err'] = uncertainty_array[covar_pointer]
+                covar_pointer += 1
+                
+        if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
+            # Special stuff for regularized fitting
+            fit_result_dict['lagrange_mul'] = lagrange_mul
+            for i_spec in range(n_species_spec):
+                fit_result_dict[f'N_pop_{i_spec}'] = N_pop_array[i_spec]
+                
+        fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
+        
+        fit_res_table_path_full = fit_res_table_path + '.csv'
+        if not os.path.isfile(fit_res_table_path_full):
+            # Does not yet exist - create with header
+            fit_result_df.to_csv(fit_res_table_path_full, 
+                                  header = True, 
+                                  index = False)
+            # Set rights
+            os.chmod(fit_res_tmp_path, stat.S_IRWXU)
+        else:
+            # Exists - append
+            fit_result_df.to_csv(fit_res_table_path_full, 
+                                  mode = 'a', 
+                                  header = False, 
+                                  index = False)
+
+
                 
                 
     return None
