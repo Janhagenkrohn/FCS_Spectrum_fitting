@@ -22,17 +22,14 @@ import stat
 
 
 
-folder = r'D:\temp\par_LogNorm_70spec_spherical_shell_N_oligomers_lblcr_smplcr_FCS_MLE'
-file_spectra = 'Fit_params_par_LogNorm_70spec_spherical_shell_N_oligomers_lblcr_smplcr_FCS_MLE_N_pop_oligo_density.csv'
+folder = r'D:\temp\20240826_ParM_Fitting\par_StrExp_70spec_double_filament_N_monomers_lblcr_1discr_FCS'
+spectrum_parameter = 'N_pop_mono_histogram'
+# spectrum_parameter = 'N_pop_oligo_histogram'
+# spectrum_parameter = 'N_obs_oligo_histogram'
 
-spectrum_parameter = 'N_pop_oligo_density'
 
-file_stoi = 'Fit_params_par_LogNorm_70spec_spherical_shell_N_oligomers_lblcr_smplcr_FCS_MLE_stoi.csv'
-file_stoi_bw = 'Fit_params_par_LogNorm_70spec_spherical_shell_N_oligomers_lblcr_smplcr_FCS_MLE_stoi_bw.csv'
-file_tau = 'Fit_params_par_LogNorm_70spec_spherical_shell_N_oligomers_lblcr_smplcr_FCS_MLE_tau_diff.csv'
-
-condition_name_patterns = ['RNaseA', 'RNaseR']
-sample_type_name_patterns = ['IVT5', 'RCT100uM', 'RCT75uM']
+condition_name_patterns = ['dummy']
+sample_type_name_patterns = [*[f'ParM_10uM_1in{x}' for x in [40, 200, 100, '10k']], 'ParM_10uM', 'ParM_monomers', 'ParM_5uM_1in100']
 
 
 
@@ -79,6 +76,14 @@ def extract_time(col):
     return new_col
 
 #%% Run
+
+file_spectra = 'Fit_params_' + os.path.split(folder)[-1] + '_' + spectrum_parameter + '.csv'
+file_stoi = 'Fit_params_' + os.path.split(folder)[-1] + '_stoi.csv'
+file_stoi_bw = 'Fit_params_' + os.path.split(folder)[-1] + '_stoi_bw.csv'
+file_tau =  'Fit_params_' + os.path.split(folder)[-1] + '_tau_diff.csv'
+
+
+
 path_spectra = os.path.join(folder, file_spectra)
 path_stoi = os.path.join(folder, file_stoi)
 path_stoi_bw = os.path.join(folder, file_stoi)
@@ -114,6 +119,7 @@ for condition in data_spectra['condition'].unique():
             sample_type_test = data_spectra.loc[i_dataset, 'sample_type']
             
             if condition_test == condition and sample_type_test == sample_type:
+                # Correct dataset
                 keep_indices.append(i_dataset)
                 time_tags.append(data_spectra.loc[i_dataset, 'time_tag'])
                 
@@ -132,26 +138,32 @@ for condition in data_spectra['condition'].unique():
         
         
         # Add diffusion time column
-        pointer = 1
-        out_df.loc[0, 'tau_diff'] = np.nan # dummy row
+        pointer = 3
+        out_df.loc[0, 'tau_diff'] = np.nan # dummy rows
+        out_df.loc[1, 'tau_diff'] = np.nan # dummy rows
+        out_df.loc[2, 'tau_diff'] = np.nan # dummy rows
         for key in data_tau.keys():
             if re.search('tau_diff_', key):
                 out_df.loc[pointer, 'tau_diff'] = data_tau.loc[keep_indices[0], key]
                 pointer += 1
 
         # Add stoichiometry column
-        pointer = 1
-        out_df.loc[0, 'stoichiometry'] = np.nan # dummy row
+        pointer = 3
+        out_df.loc[0, 'stoichiometry'] = np.nan # dummy rows
+        out_df.loc[1, 'stoichiometry'] = np.nan # dummy rows
+        out_df.loc[2, 'stoichiometry'] = np.nan # dummy rows
         for key in data_stoi.keys():
             if re.search('stoichiometry_', key):
                 out_df.loc[pointer, 'stoichiometry'] = data_stoi.loc[keep_indices[0], key]
                 pointer += 1
 
         # Add stoichiometry binwidth column
-        pointer = 1
-        out_df.loc[0, 'stoi_bw'] = np.nan # dummy row
+        pointer = 3
+        out_df.loc[0, 'stoi_bw'] = np.nan # dummy rows
+        out_df.loc[1, 'stoi_bw'] = np.nan # dummy rows
+        out_df.loc[2, 'stoi_bw'] = np.nan # dummy rows
         for key in data_stoi_bw.keys():
-            if re.search('stoichiometry_', key):
+            if re.search('stoi_bw_', key):
                 out_df.loc[pointer, 'stoi_bw'] = data_stoi_bw.loc[keep_indices[0], key]
                 pointer += 1
 
@@ -159,9 +171,13 @@ for condition in data_spectra['condition'].unique():
         # Add data, while effectively flipping and sorting spreadsheet axes
         for i_dataset_old in keep_indices:
             dataset_name = data_spectra.loc[i_dataset_old, 'folder_short']
-            out_df.loc[0, dataset_name] = data_spectra.loc[i_dataset_old, 'time_tag'] # This is why we needed the dummy row
             
-            pointer = 1        
+            # Here comes why we needed the dummy rows: To annotate time tags and quality of fit
+            out_df.loc[0, dataset_name] = data_spectra.loc[i_dataset_old, 'time_tag']  # Time
+            out_df.loc[1, dataset_name] = data_spectra.loc[i_dataset_old, 'FCS_chisq'] # goodness of fit FCS
+            out_df.loc[2, dataset_name] = data_spectra.loc[i_dataset_old, 'PCH_chisq'] # goodness of fit PCH
+            
+            pointer = 3     
             for key in data_spectra.keys():
                 if re.search(spectrum_parameter, key):
                     out_df.loc[pointer, dataset_name] = data_spectra.loc[i_dataset_old, key]

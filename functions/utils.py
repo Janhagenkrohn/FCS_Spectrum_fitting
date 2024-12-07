@@ -657,7 +657,7 @@ def write_fit_results(fit_result,
                                   out_name + '_FCS.csv'), stat.S_IRWXU)
 
             # Get chi-square
-            FCS_chi_square = np.sum((data_FCS_G - model_FCS / data_FCS_sigma)**2)
+            FCS_chi_square = np.mean((data_FCS_G - model_FCS / data_FCS_sigma)**2)
 
     
     

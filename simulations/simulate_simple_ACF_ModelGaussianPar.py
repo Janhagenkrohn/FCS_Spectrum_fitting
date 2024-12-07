@@ -12,6 +12,7 @@ import os
 import matplotlib.pyplot as plt
 import multiprocessing
 import traceback
+import imageio
 '''
 Simple script for generating an array of FCS simulation parameters to run a
 simulation of a distribution of particle sizes
@@ -60,25 +61,35 @@ gauss_params = np.array([
 
 
 monomer_brightness = 10000
-monomer_tau_diff = 2E-4 # 200 us, typical protein
+monomer_tau_diff = 2E-4 # 200 us, rather typical protein
 
 min_lag_time = 1E-6
 max_lag_time = 1.
 n_acf_data_points = 200
 
+psf_width_xy = 0.2 # micrometers
 psf_aspect_ratio= 5
 
+RICS_scan_speeds = np.array([1e-6, 3e-6, 1e-5, 3e-5, 1e-4]) # seconds / px
+RICS_pixel_size = 0.04 # micrometers
+RICS_line_length = 128 # pixels per line, sets time scales assuming no dead time (also assumes a square FOV); must be even integer!
+pCF_distances = np.array([0.1, 0.25, 0.5, 1., 2.]) # micrometers
 
-add_noise = False
-noise_scaling_factor = 1e-4
 
 # save_folder_glob = r'\\samba-pool-schwille-spt.biochem.mpg.de\pool-schwille-spt\P6_FCS_HOassociation\Data\ACF_simulations_direct\3f'
 save_folder_glob = '/fs/pool/pool-schwille-spt/P6_FCS_HOassociation/Data/ACF_simulations_direct/3f/'
 
+# Single spot FCS
+# multi-focus FCS with series of distances
+# Scanning FCS
+# RICS
 
 #%% Processing
 n_sims = len(label_efficiencies) * len(oligomer_types)
 
+# We actually need this one to enumerate over axis 1
+pCF_distances = np.reshape(pCF_distances,
+                           newshape = [1, pCF_distances.shape[0]])
 
 # Parallel processing function
 def run_single_sim(i_simulation,
@@ -91,15 +102,30 @@ def run_single_sim(i_simulation,
                    label_efficiency,
                    save_path):
     print(f'Starting simulation number {i_simulation} -- labelling efficiency {label_efficiency}')
+    
+    # Normalization factor is the same for all correlation functions
+    acf_den = 0.
+    
+    # Single-spot FCS
+    single_spot_acf_num = np.zeros_like(tau)
+    
+    # RICS, also defining some geometry-related parameters
+    RICS_map_num = np.zeros(shape = [RICS_line_length + 1, RICS_line_length + 1, RICS_scan_speeds.shape[2]])
+    RICS_meshgrid_fast_axis = np.repeat(np.arange(-RICS_line_length // 2, RICS_line_length // 2 + 1), 
+                                        repeats = RICS_line_length + 1,
+                                        axis = 1)
+    RICS_meshgrid_slow_axis = np.transpose(RICS_meshgrid_fast_axis)
+    RICS_pixel_times = np.reshape(RICS_scan_speeds,
+                                  newshape = [1, 1, RICS_scan_speeds.shape[0]])
+    RICS_line_times = RICS_pixel_times * RICS_line_length
 
-    acf_num = np.zeros_like(tau)
-    acf_den = np.zeros_like(tau)
-    acf_noise_var_num = np.zeros_like(tau)
-    acf_noise_var_den = np.zeros_like(tau)
+    # pCF
+    pCF_num = np.zeros(shape = [tau.shape[0], pCF_distances.shape[1]])
     
     stoichiometry_array = np.round(stoichiometry_array)
     n_stoichiometries = stoichiometry_array.shape[0]
     tau_diff_array = np.zeros_like(stoichiometry_array)
+    diff_coeff_array = np.zeros_like(stoichiometry_array)
     species_weights = np.zeros_like(stoichiometry_array)
     species_signal = np.zeros_like(stoichiometry_array)
 
@@ -118,6 +144,7 @@ def run_single_sim(i_simulation,
         binomial_dist = sstats.binom(stoichiometry, 
                                      label_efficiency)
         
+        # Get diffusion times
         if oligomer_type == 'spherical_dense':
             tau_diff_array[i_stoichiometry] = stoichiometry ** (1/3) * monomer_tau_diff
     
@@ -132,10 +159,23 @@ def run_single_sim(i_simulation,
             tau_diff_array[i_stoichiometry] = monomer_tau_diff * 2. * axial_ratio / (2. * np.log(axial_ratio) + 0.632 + 1.165 * axial_ratio ** (-1.) + 0.1 * axial_ratio ** (-2.))
         else:
             raise Exception(f"Invalid oligomer_type. Must be 'naive', 'spherical_shell', 'sherical_dense', 'single_filament', or 'double_filament', got {oligomer_type}")
-            
-        # Normalized correlation 
-        g_norm_spec = 1 / (1 + tau/tau_diff_array[i_stoichiometry]) / np.sqrt(1 + tau / (np.square(psf_aspect_ratio) * tau_diff_array[i_stoichiometry]))
-
+        
+        # Recalculate diffusion coefficient
+        diff_coeff_array[i_stoichiometry] = psf_width_xy**2 / 4 / tau_diff_array[i_stoichiometry]
+        
+        # Normalized correlation single-spot
+        single_spot_g_norm_spec = 1 / (1 + tau/tau_diff_array[i_stoichiometry]) / np.sqrt(1 + tau / (np.square(psf_aspect_ratio) * tau_diff_array[i_stoichiometry]))
+        
+        # Normalized correlation RICS
+        RICS_abs_lag_map = np.abs(RICS_pixel_times * RICS_meshgrid_fast_axis + RICS_line_times * RICS_meshgrid_slow_axis)
+        RICS_g_norm_spec = 1 / (1 + 4 * diff_coeff_array[i_stoichiometry] * RICS_abs_lag_map  / psf_width_xy**2) / \
+            np.sqrt(1 + 4 * diff_coeff_array[i_stoichiometry] * RICS_abs_lag_map  / psf_aspect_ratio**2 / psf_width_xy**2) * \
+            np.exp(- (RICS_pixel_size**2 * (RICS_meshgrid_fast_axis**2 + RICS_meshgrid_slow_axis**2)) / (psf_width_xy**2 + 4 * diff_coeff_array[i_stoichiometry] * RICS_abs_lag_map))
+        
+        # normalized correlations pCF
+        pCF_g_norm_spec = single_spot_g_norm_spec * np.exp(- pCF_distances**2 / (4 * diff_coeff_array[i_stoichiometry] + psf_width_xy**2))
+        
+        
         for i_labelling in range(int(stoichiometry)):
                 
             # Get species parameters
@@ -147,48 +187,18 @@ def run_single_sim(i_simulation,
             species_weights[i_stoichiometry] += effective_species_N[pointer] * effective_species_cpms[pointer]**2
             species_signal[i_stoichiometry] += effective_species_N[pointer] * effective_species_cpms[pointer]
             
-            if add_noise:
-                # Get a noise curve for this species
-                # Model that we work with (not accurate by any means, but sort of captures the basic trends): 
-                    # Gaussian noise
-                    # SD per data point is linear with relation of molecular brightness and tau
-                    # Variance per data point is proportional to 1/g_norm
-                    # Variance overall is proportional to 1/(1-(probability to have 0 particles in PSF of this species at given time))
-                    # SD has an arbitrary user-supplied SD scaling factor
-                    # Variance adds up species-wise with weights given by ACF amplitude weights
-                
-                acf_noise_var_spec = ((tau * effective_species_cpms[pointer])**-2 / # Term for photon shot noise
-                                      g_norm_spec * # term for survival function for a particle to still be in PFS
-                                      (sstats.poisson(effective_species_N[pointer]).pmf(0) + 1e-6) * # Term for dead time from zero particles in observation volume
-                                      noise_scaling_factor**2) # Scaling factor
-                if np.any(np.isnan(acf_noise_var_spec)): raise Exception('NaN in acf_noise_var_spec!')
-                if np.any(np.isinf(acf_noise_var_spec)): raise Exception('Inf in acf_noise_var_spec!')
-        
-                # Add to total variance 
-                acf_noise_var_num += acf_noise_var_spec * effective_species_N[pointer] * effective_species_cpms[pointer]**2
-                acf_noise_var_den += effective_species_N[pointer] * effective_species_cpms[pointer]
             
             pointer += 1
             
         # Get correlation fucntion weights for this species
 
-        acf_num += g_norm_spec * species_weights[i_stoichiometry]
+        single_spot_acf_num += single_spot_g_norm_spec * species_weights[i_stoichiometry]
+        RICS_map_num += RICS_g_norm_spec * species_weights[i_stoichiometry]
+        pCF_num += pCF_g_norm_spec * species_weights[i_stoichiometry]
         acf_den += species_signal[i_stoichiometry]
 
     print(f'Simulation {i_simulation} -- Wrapping up and saving spreadsheets')
 
-    # Get total ACF            
-    acf = acf_num / acf_den**2
-    
-    # Get uncertainty, normalizing by ACF weights
-    if add_noise:
-        sd_acf = np.sqrt(acf_noise_var_num / acf_noise_var_den**2 / acf_num[0] * acf_den[0]**2)
-        # Get noise term
-        acf_noise = acf + np.random.standard_normal(size = n_acf_data_points) * sd_acf
-    else:
-        sd_acf = np.ones_like(acf)
-        acf_noise = acf
-    
     ################### Write parameters        
     # Effective species (resolved by labelling statistics)
     effective_species_weights = effective_species_cpms**2 * effective_species_N 
@@ -203,47 +213,57 @@ def run_single_sim(i_simulation,
     out_table.to_csv(save_path + '_sim_params.csv',
                      index = False, 
                      header = True)
-    
-    # Diffusion species
-    species_weights /= species_weights.sum()
-    species_signal /= species_signal.sum()
-    
-    out_table = pd.DataFrame(data = {'stoichiometry':stoichiometry_array,
-                                     'N': distribution_y,
-                                     'tau_diff':tau_diff_array, 
-                                     'rel_weights': species_weights,
-                                     'rel_fluorescence': species_signal})
-    
-    out_table.to_csv(save_path + '_species_params.csv',
-                     index = False, 
-                     header = True)
 
+    # Normalize and write ACF            
+    single_spot_acf = single_spot_acf_num / acf_den**2
 
-    ######## Export Kristine csv
     acr_col = np.zeros_like(tau)
     average_count_rate = np.sum(effective_species_cpms * effective_species_N)
     acr_col[:3] = np.array([average_count_rate, average_count_rate, 1E3])
     out_table = pd.DataFrame(data = {'Lagtime[s]':tau, 
-                                     'Correlation': acf_noise,
+                                     'Correlation': single_spot_acf,
                                      'ACR[Hz]': acr_col,
-                                     'Uncertainty_SD': sd_acf})
+                                     'Uncertainty_SD': np.ones_like(single_spot_acf)})
     out_table.to_csv(save_path + '_ACF_ch0.csv',
                      index = False, 
                      header = False)
     
+        
     
+    # Normalize and write RICS data
+    # As we save 16 bit images, we normalize differently
+    RICS_maps = RICS_map_num.copy()
+    for i_map in range(RICS_maps.shape[2]):
+        RICS_maps[:,:, i_map] = np.round(RICS_maps[:,:, i_map] / RICS_maps[:,:, i_map].max() * 65535)
+    RICS_maps = np.uint16(RICS_maps)
+    imageio.mimwrite(save_path + '_RICS_maps.tiff',
+                     RICS_maps)
+    
+    
+    # Normalize and write pCF data
+    pCF_ccs = pCF_num / acf_den**2
+    
+    acr_col = np.zeros_like(tau)
+    average_count_rate = np.sum(effective_species_cpms * effective_species_N)
+    acr_col[:3] = np.array([average_count_rate, average_count_rate, 1E3])
+    out_table = pd.DataFrame(data = {'Lagtime[s]':tau, 
+                                     'ACF': single_spot_acf})
+    for i_dist, dist in pCF_distances:
+        out_table[f'pCF_{int(dist*1E3)}nm'] = pCF_ccs[:, i_dist]
+        
+    out_table.to_csv(save_path + '_pCF.csv',
+                     index = False, 
+                     header = True)
+
     
     print(f'Simulation {i_simulation} -- Saving figures')
     ############# FCS Figure
     fig, ax = plt.subplots(nrows=1, ncols=1)
     
-    ax.semilogx(tau, acf_noise, 'dk')
-    ax.semilogx(tau, acf_noise + sd_acf, '-k', alpha = 0.7)
-    ax.semilogx(tau, acf_noise - sd_acf, '-k', alpha = 0.7)
-    plot_y_min_max = (np.percentile(acf_noise, 15), np.percentile(acf_noise, 85))
-    ax.set_ylim(plot_y_min_max[0] / 1.2 if plot_y_min_max[0] > 0 else plot_y_min_max[0] * 1.2,
-                plot_y_min_max[1] * 1.2 if plot_y_min_max[1] > 0 else plot_y_min_max[1] / 1.2)
-    plt.savefig(save_path + '_ACF_ch0.png', 
+    ax.semilogx(tau, single_spot_acf, 'dk')
+    ax.set_ylim(single_spot_acf.min() / 1.2 if single_spot_acf.min() > 0 else single_spot_acf.min() * 1.2,
+                single_spot_acf.max() * 1.2 if single_spot_acf.max() > 0 else single_spot_acf.max() / 1.2)
+    plt.savefig(save_path + '_single_spot_ACF_ch0.png', 
                 dpi=300)
     # plt.show()
     
