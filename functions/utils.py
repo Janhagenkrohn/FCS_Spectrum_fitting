@@ -807,8 +807,8 @@ def write_fit_results(fit_result,
             disc_spec_params_dict['folder'] = dir_name 
             disc_spec_params_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             disc_spec_params_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            disc_spec_params_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            disc_spec_params_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            disc_spec_params_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            disc_spec_params_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
             
             query_keys = ['tau_diff_d_', 'N_avg_obs_d_', 'cpms_d_', 'stoichiometry_d_', 'stoichiometry_binwidth_d_', 'Label_efficiency_obs_d_']
             for i_spec in range(n_species_disc):
@@ -874,8 +874,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -904,8 +904,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -935,8 +935,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -966,8 +966,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1003,8 +1003,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1046,8 +1046,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1080,8 +1080,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1113,8 +1113,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1153,8 +1153,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1187,8 +1187,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1221,8 +1221,8 @@ def write_fit_results(fit_result,
             fit_result_dict['folder'] = dir_name 
             fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
             fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+            fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+            fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
             if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                 fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1266,8 +1266,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1300,8 +1300,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1333,8 +1333,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1369,8 +1369,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1403,8 +1403,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1437,8 +1437,8 @@ def write_fit_results(fit_result,
                 fit_result_dict['folder'] = dir_name 
                 fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                 fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                 if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                     fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1473,8 +1473,8 @@ def write_fit_results(fit_result,
                     fit_result_dict['folder'] = dir_name 
                     fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
                     fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-                    fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-                    fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+                    fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+                    fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
                     if spectrum_type in ['reg_MEM', 'reg_CONTIN']:
                         fit_result_dict['lagrange_mul'] = lagrange_mul
@@ -1506,8 +1506,8 @@ def write_fit_results(fit_result,
         fit_result_dict['folder'] = dir_name
         fit_result_dict['file_FCS'] = in_file_name_FCS if use_FCS else 'unused' 
         fit_result_dict['file_PCH'] = in_file_name_PCH if use_PCH else 'unused' 
-        fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.nan
-        fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.nan
+        fit_result_dict['FCS_chisq'] = FCS_chi_square if use_FCS else np.inf
+        fit_result_dict['PCH_chisq'] = PCH_chi_square if use_PCH else np.inf
 
         
         

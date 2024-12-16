@@ -22,14 +22,14 @@ import stat
 
 
 
-folder = r'D:\temp\20240826_ParM_Fitting\par_StrExp_70spec_double_filament_N_monomers_lblcr_1discr_FCS'
-spectrum_parameter = 'N_pop_mono_histogram'
-# spectrum_parameter = 'N_pop_oligo_histogram'
+folder = r'D:\temp\20242116\par_StrExp_70spec_spherical_shell_N_oligomers_lblcr_FCS'
+# spectrum_parameter = 'N_pop_mono_histogram'
+spectrum_parameter = 'N_pop_oligo_histogram'
 # spectrum_parameter = 'N_obs_oligo_histogram'
 
 
 condition_name_patterns = ['dummy']
-sample_type_name_patterns = [*[f'ParM_10uM_1in{x}' for x in [40, 200, 100, '10k']], 'ParM_10uM', 'ParM_monomers', 'ParM_5uM_1in100']
+sample_type_name_patterns = ['dummy']
 
 
 
@@ -86,12 +86,12 @@ file_tau =  'Fit_params_' + os.path.split(folder)[-1] + '_tau_diff.csv'
 
 path_spectra = os.path.join(folder, file_spectra)
 path_stoi = os.path.join(folder, file_stoi)
-path_stoi_bw = os.path.join(folder, file_stoi)
+path_stoi_bw = os.path.join(folder, file_stoi_bw)
 path_tau = os.path.join(folder, file_tau)
 
 data_spectra = pd.read_csv(path_spectra)
 data_stoi = pd.read_csv(path_stoi)
-data_stoi_bw = pd.read_csv(path_stoi)
+data_stoi_bw = pd.read_csv(path_stoi_bw)
 data_tau = pd.read_csv(path_tau)
 
 

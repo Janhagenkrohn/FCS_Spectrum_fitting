@@ -2918,16 +2918,11 @@ class FCS_spectrum():
             tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/3)
             
             # Get (log-space-centered) bin widths
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            
-            # Make them integer >=1, and insert a one for the monomer species
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            # Last data point is special as we have no right edge
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
                     
         elif oligomer_type in ['spherical_shell', 'Spherical_shell', 'Spherical_Shell', 'gaussian_chain', 'Gaussian_chain', 'Gaussian_Chain', 'GC', 'gc', 'Gc', 'worm_like_chain', 'Worm_like_chain', 'Worm_Like_Chain', 'wlc', 'WLC', 'Wlc']:
             # tau_diff proportional hydrodyn. radius
@@ -2938,14 +2933,10 @@ class FCS_spectrum():
                                          return_index = True)
             tau_diff_array = tau_diff_array[0] * stoichiometry ** (1/2)
             stoichiometry = stoichiometry[stoichiometry > 0]
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
 
         elif oligomer_type in ['single_filament', 'Single_filament', 'Single_Filament']:
             # For the filament models, we have more complicated expressions based
@@ -2961,14 +2952,10 @@ class FCS_spectrum():
             stoichiometry = stoichiometry[stoichiometry > 0]
             tau_diff_array = np.append(tau_diff_array[0],
                                        tau_diff_array[0] * self.single_filament_tau_diff_fold_change(stoichiometry[1:]))
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
 
         elif oligomer_type in ['double_filament', 'Double_filament', 'Double_Filament']:
         
@@ -2985,14 +2972,10 @@ class FCS_spectrum():
             stoichiometry = stoichiometry[stoichiometry > 0]
             tau_diff_array = np.append(tau_diff_array[0],
                                        tau_diff_array[0] * self.double_filament_tau_diff_fold_change(stoichiometry[1:]))
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
 
         elif oligomer_type in ['worm_like_chain', 'Worm_like_chain', 'Worm_Like_Chain', 'wlc', 'WLC', 'Wlc']:
             # This is a simple worm-like chain model parameterized by the Kuhn segment length
@@ -3012,14 +2995,10 @@ class FCS_spectrum():
                                        tau_diff_array[0] * self.wlc_tau_diff_fold_change(stoichiometry[1:],
                                                                                          oligomer_model_params['r_mono'], 
                                                                                          oligomer_model_params['l_Kuhn']))
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
 
         elif oligomer_type in ['helical_worm_like_chain', 'Helical_worm_like_chain', 'Helical_Worm_Like_Chain', 'hwlc', 'HWLC', 'Hwlc']:
             # This is the "helical worm-like chain" described in Yamakawa & Yoshizaki 1981 and papers referenced therein
@@ -3041,15 +3020,11 @@ class FCS_spectrum():
                                                                                                  oligomer_model_params['helix_pitch'],
                                                                                                  oligomer_model_params['r_mono'], 
                                                                                                  oligomer_model_params['l_Kuhn']))
-            log_stoichiometry = np.log(stoichiometry)
-            log_spacing = np.diff(log_stoichiometry)
-            stoichiometry_binwidth = np.exp(log_stoichiometry[1:] + log_spacing/2) - np.exp(log_stoichiometry[1:] - log_spacing/2)
-            stoichiometry_binwidth = np.round(stoichiometry_binwidth)
-            stoichiometry_binwidth = np.append(1., 
-                                               np.where(stoichiometry_binwidth > 1.,
-                                                        stoichiometry_binwidth,
-                                                        1.))
-            
+            stoichiometry_binwidth = np.ones_like(stoichiometry)
+            for i_stoi in range(0, stoichiometry.shape[0]-1):
+                stoichiometry_binwidth[i_stoi] = np.sqrt(stoichiometry[i_stoi] * stoichiometry[i_stoi + 1])
+            stoichiometry_binwidth[-1] = stoichiometry[-1] * np.mean(stoichiometry_binwidth[:-1] / stoichiometry[:-1])
+
         elif oligomer_type in ['naive', 'Naive']:
             # Dummy ones
             stoichiometry = np.arange(1, tau_diff_array.shape[0] + 1)
