@@ -1231,7 +1231,7 @@ def write_fit_results(fit_result,
             N_pop_mono_histogram_array /= N_pop_mono_histogram_array.sum()
             
             for i_spec in range(n_species_spec):
-                fit_result_dict[f'N_pop_mono_oligo_histogram_{i_spec}'] = N_pop_mono_histogram_array[i_spec]
+                fit_result_dict[f'N_pop_mono_histogram_{i_spec}'] = N_pop_mono_histogram_array[i_spec]
             fit_result_df = pd.DataFrame(fit_result_dict, index = [1]) 
             if not os.path.isfile(fit_res_tmp_path):
                 # Does not yet exist - create with header
