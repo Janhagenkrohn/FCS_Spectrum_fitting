@@ -40,9 +40,9 @@ from functions import utils
 # Some hard-coded metaparameters for regularized minimization
 # Weighting factor between likelihood function and regularization term
 REG_MAX_LAGRANGE_MUL = 1E3
-# "Inertia" factors for iterations in reg fitting
-REG_LAGRANGE_MUL_INERTIA = 1/3 # Exponent
-REG_GRAD_INERTIAL = 0.1 # Multiplicative
+# "Momentum" factors for iterations in reg fitting
+REG_LAGRANGE_MUL_MOMENTUM = 1/3 # Exponent
+REG_GRAD_MOMENTUM = 0.1 # Multiplicative
 # Gradient scaling factor for (inner) iteration update
 REG_GRADIENT_SCALING = 2e-4
 # Inner and outer iteration convergence criteria, and maximum iteration counts
@@ -744,7 +744,7 @@ class FCS_spectrum():
         
                 # update amp_array
                 amp_increment = amp_array * e_G * REG_GRADIENT_SCALING
-                amp_array += amp_increment + REG_GRAD_INERTIAL * old_amp_increment
+                amp_array += amp_increment + REG_GRAD_MOMENTUM * old_amp_increment
                 
                 # Store amp_increment for next iteration for fitting with momentum
                 old_amp_increment = np.copy(amp_increment)
@@ -899,7 +899,7 @@ class FCS_spectrum():
                     # with a bit of a gradient boost)
                 lagrange_mul_del_new = np.sqrt(chisq_grad_length/S_grad_length)
                                 
-                lagrange_mul *= lagrange_mul_del_new * lagrange_mul_del_old**(REG_LAGRANGE_MUL_INERTIA)
+                lagrange_mul *= lagrange_mul_del_new * lagrange_mul_del_old**(REG_LAGRANGE_MUL_MOMENTUM)
                 
                 # Bounds for lagrange_mul
                 if lagrange_mul > REG_MAX_LAGRANGE_MUL:
@@ -3796,7 +3796,6 @@ class FCS_spectrum():
                 fixed_spectrum_params['N_dist_a'] = np.nan
                 fixed_spectrum_params['N_dist_b'] = np.nan
                 N_dist_b_expr = f'exp(sqrt(2*(log({fixed_spectrum_params["j_avg_N_oligo"]}) - log(N_dist_a))))'
-                print(f'N_dist_b_expr: {N_dist_b_expr}')
             elif spectrum_type == 'par_Gamma':
                 fixed_spectrum_params['N_dist_a'] = np.nan
                 fixed_spectrum_params['N_dist_b'] = np.nan

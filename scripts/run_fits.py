@@ -90,7 +90,7 @@ glob_out_dir = r'D:\temp\FCS_Spectrum_debug\5'
 labelling_correction_list = [False, True] 
     # Whether to consider finite fraction of labelled vs. unlabelled particles in fitting
     
-incomplete_sampling_correction_list = [False] 
+incomplete_sampling_correction_list = [True] 
     # Whether to fit deviations between "population-level" and "observation-level"
     # dynamics, i.e., explicit treatment of an additional layer of noise
     # If True, very strongy recommended to use with settings:
@@ -119,7 +119,7 @@ tau_diff_min_list = [1.56E-5]
 tau_diff_max_list = [1E0]
     # Longest diffusion time to fit (parameter bounds)
     
-spectrum_type_list = ['reg_MEM'] 
+spectrum_type_list = ['par_LogNorm'] 
     # Options: 'discrete', 'reg_MEM', 'reg_CONTIN', 'par_Gauss', 'par_LogNorm', 'par_Gamma', 'par_StrExp'
     # 'discrete' is traditional FCS mixutre model fitting, using few constraints. 
     #   -> Not recommended for more than 1-2 species.
@@ -139,18 +139,18 @@ oligomer_type_list = ['spherical_shell']
     # physics model to fix a relation between diffusion time and stoichiometry
 
 fixed_spectrum_params_list = [
-    # {
-    #  'N_dist_amp': np.nan,
-    #  'N_dist_a': np.nan,
-    #  'N_dist_b': np.nan,
-    #  'j_avg_N_oligo' : 1E4
-    #  }, # Average oligomer size fixed
     {
       'N_dist_amp': np.nan,
       'N_dist_a': np.nan,
       'N_dist_b': np.nan,
-      'j_avg_N_oligo' : np.nan
-      } # Nothing fixed
+      'j_avg_N_oligo' : 1E4
+      }, # Average oligomer size fixed
+    # {
+    #   'N_dist_amp': np.nan,
+    #   'N_dist_a': np.nan,
+    #   'N_dist_b': np.nan,
+    #   'j_avg_N_oligo' : np.nan
+    #   } # Nothing fixed
     ]
     # If you use a parameterized spectrum, you can fix some parameters of the 
     # expression. There are four parameters, independent of the model chosen :
@@ -216,12 +216,12 @@ time_resolved_PCH_list = [False]
     # the index of the desired PCH in case you want to use one single specific 
     # one: i_bin_time (not used in this script currently)
     
-use_avg_count_rate_list = [False]
+use_avg_count_rate_list = [True]
     # Use average count rate to constrain fit? Allows more meaningful estimation 
     # of molecular brightness. Also helps constrain mixture models of e.g. an
     # oligomer spectrum and a free-dye species
 
-fit_label_efficiency_list = [False] 
+fit_label_efficiency_list = [True] 
     # If you consider finite labelling fraction, here you can also decide to 
     # make that a fit parameter, although that may be numerically extremely instable
 
